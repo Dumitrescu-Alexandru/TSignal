@@ -1,0 +1,7 @@
+sp_data/*bin
+sp_data/*txt
+*fasta
+.idea
+.idea*
+sp_data/experiments*
+sp_data/models*
