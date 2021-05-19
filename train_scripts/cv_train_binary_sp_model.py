@@ -28,7 +28,7 @@ def get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len=200):
             x, y = batch['emb'], batch['lbl']
             x, y = x.to(device), y.to(device).to(torch.float)
             if use_aa_len != 200:
-                x = x[:, :50, :]
+                x = x[:, :use_aa_len, :]
             with torch.no_grad():
                 model_preds = model(x.permute(0,2,1))
             positive_preds, negative_preds = model_preds >= 0.5, model_preds  < 0.5
@@ -66,7 +66,7 @@ def train_fold(train_datasets, test_datasets, data_folder, model, lr=0.0001, pat
                 x, y = batch['emb'], batch['lbl']
                 x, y = x.to(device), y.to(device).to(torch.float)
                 if use_aa_len != 200:
-                    x = x[:,:50,:]
+                    x = x[:,:use_aa_len,:]
                 preds = model(x.permute(0,2,1))
                 optimizer.zero_grad()
                 loss = criterion(preds.reshape(-1), y)
