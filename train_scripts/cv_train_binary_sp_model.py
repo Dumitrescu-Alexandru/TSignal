@@ -13,7 +13,7 @@ def weighted_avg_results_for_dataset(test_results_for_ds):
     positive_result = sum([weights[i] * test_results_for_ds[i][2] for i in range(len(weights))])
     return negative_result, positive_result
 
-def get_pos_neg_for_datasets(test_datasets, model, data_folder):
+def get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len=200):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     test_results_for_ds = []
     for test_ds in test_datasets:
@@ -27,6 +27,8 @@ def get_pos_neg_for_datasets(test_datasets, model, data_folder):
         for batch in dataset_loader:
             x, y = batch['emb'], batch['lbl']
             x, y = x.to(device), y.to(device).to(torch.float)
+            if use_aa_len != 200:
+                x = x[:, :50, :]
             with torch.no_grad():
                 model_preds = model(x.permute(0,2,1))
             positive_preds, negative_preds = model_preds >= 0.5, model_preds  < 0.5
@@ -46,7 +48,7 @@ def get_pos_neg_for_datasets(test_datasets, model, data_folder):
     neg, pos = weighted_avg_results_for_dataset(test_results_for_ds)
     return neg, pos, test_results_for_ds
 
-def train_fold(train_datasets, test_datasets, data_folder, model, lr=0.0001, patience=5):
+def train_fold(train_datasets, test_datasets, data_folder, model, lr=0.0001, patience=5, use_aa_len=200):
     optimizer = optim.Adam(lr=lr, params=model.parameters())
     criterion = nn.BCELoss()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -63,6 +65,8 @@ def train_fold(train_datasets, test_datasets, data_folder, model, lr=0.0001, pat
             for ind, batch in enumerate(dataset_loader):
                 x, y = batch['emb'], batch['lbl']
                 x, y = x.to(device), y.to(device).to(torch.float)
+                if use_aa_len != 200:
+                    x = x[:,:50,:]
                 preds = model(x.permute(0,2,1))
                 optimizer.zero_grad()
                 loss = criterion(preds.reshape(-1), y)
@@ -70,7 +74,7 @@ def train_fold(train_datasets, test_datasets, data_folder, model, lr=0.0001, pat
                 #     print("Loss on batch {}: {}".format(ind, loss.item()))
                 loss.backward()
                 optimizer.step()
-        neg, pos, test_results_for_ds = get_pos_neg_for_datasets(test_datasets, model, data_folder)
+        neg, pos, test_results_for_ds = get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len)
         if pos < max_pos:
             patience -= 1
         else:
@@ -84,13 +88,14 @@ def init_model():
     model = BinarySPClassifier(input_size=1024, output_size=1)
     return model
 
-def train_bin_sp_mdl():
+def train_bin_sp_mdl(run_name,use_aa_len,lr):
     sp_data = SPbinaryData()
-    model = init_model()
     for ind, (train_datasets, test_datasets) in enumerate(zip(sp_data.train_datasets_per_fold,
                                                             sp_data.test_datasets_per_fold)):
-        max_dict = train_fold(train_datasets, test_datasets, sp_data.data_folder, model)
-        pickle.dump([train_datasets, test_datasets, max_dict], open("results_on_fold_{}.bin", "wb"))
+        model = init_model()
+        max_dict = train_fold(train_datasets, test_datasets, sp_data.data_folder, model, use_aa_len=use_aa_len, lr=lr)
+        pickle.dump([train_datasets, test_datasets, max_dict], open("{}_results_on_fold_{}.bin".
+                                                                    format(run_name, ind), "wb"))
 
 
 
