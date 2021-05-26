@@ -1342,7 +1342,7 @@ def remove_duplicates(long, cdr3, epitope):
 def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", test_new_data=False,
                                 extract_cdr3=False, use_only_cdr3=False, use_covid_data="",
                                 add_specific_epitopes_vdj50=[], sum_tcrs=True, extract_unlabeled=True,
-                                add_long_aa=-1, data_file="raw_seq_data_0.15_0.9.bin"):
+                                add_long_aa=-1, data_file="raw_seq_data_0.15_0.9.bin",seqs_per_ds=4500):
     """
     Function for various bert-model based embedding extraction
     sum_tcrs: sums tcrs along the sequence dimension, to reduce memory necessary (only useful probably in visualizations
@@ -1353,9 +1353,10 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
     use_only_cdr3: do not use the whole long sequence when extracting the cdr3b sequences (useful when for some datapoints
                 theres only the CDR3B available etc.)
     """
+    # TODO first file seems to have 4599 when it should have 4500 seqs. See what the problems is
     model.cuda()
     if test_new_data:
-        long, epitope = pickle.load(open(data_file, "rb"))
+        long, epitope, _ = pickle.load(open(data_file, "rb"))
         cdr3bs = long
         # when extracting covid data, those only hve CDR3B seqs.
     elif use_covid_data:
@@ -1464,7 +1465,9 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
                 vdjdb_embeddings[long_seq] = (features[ind], "ASD")
             else:
                 vdjdb_embeddings[long_seq] = (features[ind], ld2ep[long_seq])
-        if i * 100 % 3000 == 0 and i != 0:
+        print("1", len(vdjdb_embeddings.keys()))
+        if i * 100 % seqs_per_ds == 0 and i != 0:
+            print("2", len(vdjdb_embeddings.keys()))
             pickle.dump(vdjdb_embeddings, open(emb_name + "_{}.bin".format(file_index), "wb"))
             file_index += 1
             vdjdb_embeddings = {}

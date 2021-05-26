@@ -5,3 +5,5 @@ sp_data/*txt
 .idea*
 sp_data/experiments*
 sp_data/models*
+sp_data/*fasta
+sp_data/sp5_outputs/*
