@@ -70,8 +70,10 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
     lr, patience, use_aa_len = param_set['lr'], param_set['patience'], param_set['use_aa_len']
     optimizer = optim.Adam(lr=lr, params=model.parameters())
     criterion = nn.BCELoss()
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
+
     convergence_condition = False
     max_results, epoch, max_pos, max_neg, epochs_trained = {}, -1, 0, 0, 0
     while not convergence_condition:
@@ -103,12 +105,12 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
             else:
                 max_neg, max_pos, max_results = neg, pos, test_results_for_ds
         print("Results for epoch {} (pos/neg acc): {}/{}".format(epoch, pos, neg))
-        convergence_condition = patience == 0
+        convergence_condition = patience == 0 or (fixed_ep_test == epoch and fixed_ep_test != -1)
 
     return max_results
 
 
-def init_model(parameters=None):
+def init_model(param_set=None):
     model = BinarySPClassifier(input_size=1024, output_size=1)
     return model
 
@@ -133,7 +135,7 @@ def train_test_folds(run_name, train_datasets_per_fold, test_datasets_per_fold, 
     results_over_all_ds = []
     for ind, (train_datasets, test_datasets) in enumerate(zip(train_datasets_per_fold,
                                                               test_datasets_per_fold)):
-        model = init_model()
+        model = init_model(param_set)
         max_results = train_fold(train_datasets, test_datasets, data_folder, model, param_set)
         if not nested:
             pickle.dump([train_datasets, test_datasets, max_results], open("{}_results_on_fold_{}.bin".
@@ -179,48 +181,51 @@ def get_avg_results_for_fold(results):
     return negative_results, positive_results, avg_epoch
 
 
-def train_test_nested_folds(run_name, params, train_ds, test_ds, data_folder):
+def train_test_nested_folds(run_name, params, train_ds, test_ds, data_folder, param_set_number):
     best_param, best_result = None, 0
     # move over all 80%/20% train/test splits
     best_pos, best_results_params_and_epoch = 0, []
     for ind, (train_datasets, test_datasets) in enumerate(zip(train_ds,
                                                               test_ds)):
-        # for param_set in params:
-        #     # further split into 4 folds of 75%/25% the training set
-        #     print(train_datasets)
-        #     train_ds_subfold, test_ds_subfold = split_train_test(train_datasets)
-        #     print(train_datasets)
-        #     max_results = train_test_folds(run_name, train_ds_subfold, test_ds_subfold, data_folder, param_set,
-        #                                    nested=True)
-        #     print(max_results)
-        #     current_neg, current_pos, train_epochs = get_avg_results_for_fold(max_results)
-        #     if best_pos < current_pos:
-        #         best_pos = current_pos
-        #         best_results_params_and_epoch = [param_set, train_epochs]
-        # final_result_current_fold = train_test_folds(run_name, train_datasets, test_datasets,
-        #                                              param_set=best_results_params_and_epoch[0],
-        #                                              fixed_epoch=best_results_params_and_epoch[1],
-        #                                              data_folder=data_folder)
-        parameters = {'lr': 0.0001, 'patience': 1, 'use_aa_len': 100}
-        model = init_model(parameters)
-        final_result_current_fold = train_fold( train_datasets, test_datasets,data_folder=data_folder,model=model,
-                                                     param_set=parameters,
-                                                     fixed_ep_test=0)
-        final_result_current_fold = get_avg_results_for_fold(final_result_current_fold)
-        print(final_result_current_fold)
-        pickle.dump([final_result_current_fold, best_results_params_and_epoch], open("results_fold_{}.bin".format(ind), "rb"))
+        for param_set in params:
+            # further split into 4 folds of 75%/25% the training set
+            train_ds_subfold, test_ds_subfold = split_train_test(train_datasets)
+            max_results = train_test_folds(run_name, train_ds_subfold, test_ds_subfold, data_folder, param_set,
+                                           nested=True)
+
+            current_neg, current_pos, train_epochs = get_avg_results_for_fold(max_results)
+            if best_pos < current_pos:
+                best_pos = current_pos
+                best_results_params_and_epoch = [param_set, train_epochs]
+        print("final best parameters:", best_results_params_and_epoch)
+        model = init_model(best_results_params_and_epoch[0])
+        final_result_current_fold = train_fold(model=model, train_datasets=train_datasets, test_datasets=test_datasets,
+                                               param_set=best_results_params_and_epoch[0],
+                                               fixed_ep_test=best_results_params_and_epoch[1],
+                                               data_folder=data_folder)
+        print(final_result_current_fold, best_results_params_and_epoch)
+        # saves as  [len(dataset), negative_result, positive_result, epoch)]
+        pickle.dump([final_result_current_fold, best_results_params_and_epoch],
+                    open("results_fold_{}{}.bin".format(ind, "_" + str(param_set_number) if
+                    param_set_number != -1 else ""), "wb"))
 
 
-
-def train_bin_sp_mdl(run_name, use_aa_len, lr, nested_cv=True, parameters=None):
+def train_bin_sp_mdl(run_name, use_aa_len, lr, nested_cv=True, parameters=None, param_set_number=1):
     sp_data = SPbinaryData()
     train_ds, test_ds, data_folder = sp_data.train_datasets_per_fold, \
                                      sp_data.test_datasets_per_fold, sp_data.data_folder
+    if param_set_number != -1:
+        paramgrpid2params = pickle.load(open("param_groups_by_id.bin", "rb"))
+        if param_set_number in paramgrpid2params:
+            parameters = paramgrpid2params[param_set_number]
+        else:
+            print("Paramter group not present. Exiting...")
+            exit(1)
     if parameters is None:
-        parameters = [{'lr': 0.0001, 'patience': 1, 'use_aa_len': 100}]
+        parameters = [{'lr': 0.0001, 'patience': 1, 'use_aa_len': 100}, {'lr': 0.001, 'patience': 1, 'use_aa_len': 70}]
 
     if nested_cv:
-        train_test_nested_folds(run_name, parameters, train_ds, test_ds, data_folder)
+        train_test_nested_folds(run_name, parameters, train_ds, test_ds, data_folder, param_set_number=param_set_number)
     else:
         train_test_folds(run_name, train_ds, test_ds, data_folder, parameters[0])
 # for nested cv

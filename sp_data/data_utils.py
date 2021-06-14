@@ -31,6 +31,7 @@ class SPbinaryData:
         self.form_cv_indices()
 
     def form_cv_indices(self):
+        random.seed(123)
         files = os.listdir(self.data_folder)
         all_emb_files = []
         for f in files:
