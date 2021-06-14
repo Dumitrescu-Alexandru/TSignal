@@ -10,7 +10,7 @@ def create_parameter_set():
     from sklearn.model_selection import ParameterGrid
     parameters = {"dos": [[0., 0.], [0.1, 0.1], [0.2, 0.2], [0.3, 0.3]], "filters":[[100, 80, 60, 40],
                     [120, 100, 80, 60], [140, 120, 100, 80]], "lengths":[[3, 5, 9, 15],[5, 9, 15, 21]],
-                  "lr":[0.001, 0.0001], "patience":[10], "use_aa_len":[100]}
+                  "lr":[0.001, 0.0001], "patience":[5], "use_aa_len":[100]}
     group_params = list(ParameterGrid(parameters))
     grpid_2_params = {}
     for i in range(len(group_params) // 10  + 1):

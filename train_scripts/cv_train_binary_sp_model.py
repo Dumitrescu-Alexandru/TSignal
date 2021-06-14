@@ -97,6 +97,8 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
         if fixed_ep_test != -1 and fixed_ep_test == epoch:
             neg, pos, test_results_for_ds = get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len,
                                                                      epoch)
+            if pos < max_pos:
+                max_neg, max_pos, max_results = neg, pos, test_results_for_ds
         else:
             neg, pos, test_results_for_ds = get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len,
                                                                      epoch)
@@ -111,7 +113,8 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
 
 
 def init_model(param_set=None):
-    model = BinarySPClassifier(input_size=1024, output_size=1)
+    model = BinarySPClassifier(input_size=1024, output_size=1, dos=param_set['dos'], filters=param_set['filters'],
+                               lengths=param_set['lengths'])
     return model
 
 
