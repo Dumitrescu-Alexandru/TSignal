@@ -8,13 +8,13 @@ import argparse
 
 def create_parameter_set():
     from sklearn.model_selection import ParameterGrid
-    parameters = {"dos": [[0., 0.], [0.1, 0.1], [0.2, 0.2], [0.3, 0.3]], "filters":[[100, 80, 60, 40],
+    parameters = {"dos": [[0.1, 0.2], [0.3, 0.3]], "filters":[[100, 80, 60, 40],
                     [120, 100, 80, 60], [140, 120, 100, 80]], "lengths":[[3, 5, 9, 15],[5, 9, 15, 21]],
-                  "lr":[0.001, 0.0001], "patience":[5], "use_aa_len":[100]}
+                  "lr":[0.001, 0.0001], "patience":[5], "use_aa_len":[100], "pos_weight":[1,5]}
     group_params = list(ParameterGrid(parameters))
     grpid_2_params = {}
-    for i in range(len(group_params) // 10  + 1):
-        grpid_2_params[i] = group_params[i*10:(i+1)*10]
+    for i in range(len(group_params) // 5  + 1):
+        grpid_2_params[i] = group_params[i*5:(i+1)*5]
     pickle.dump(grpid_2_params, open("param_groups_by_id.bin", "wb"))
 
 def parse_arguments():

@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import random
 import pickle
@@ -55,7 +56,7 @@ def get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len=200, 
     return neg, pos, test_results_for_ds
 
 
-def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fixed_ep_test=-1):
+def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fixed_ep_test=-1,pos_weight=4):
     """
 
     :param train_datasets: list of train ds file names
@@ -65,17 +66,17 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
     :param param_set: dictionary of parameters
     :param fixed_ep_test: if != -1, test after this many epochs (used in nested-cv, when number of epochs to train is
                           tuned on the training set
+    :param pos_weight: the loss weight for positive samples
     :return: dictionary with maximum results TODO return the model and test it in nested-cv case
     """
     lr, patience, use_aa_len = param_set['lr'], param_set['patience'], param_set['use_aa_len']
-    optimizer = optim.Adam(lr=lr, params=model.parameters())
-    criterion = nn.BCELoss()
+    optimizer = optim.Adam(lr=lr, params=model.parameters(), weight_decay=0.2)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
     convergence_condition = False
-    max_results, epoch, max_pos, max_neg, epochs_trained = {}, -1, 0, 0, 0
+    max_avg_pos_neg, max_results, epoch, max_pos, max_neg, epochs_trained = 0, {}, -1, 0, 0, 0
     while not convergence_condition:
         epoch += 1
         model.train()
@@ -86,6 +87,8 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
                                                          num_workers=4)
             for ind, batch in enumerate(dataset_loader):
                 x, y = batch['emb'], batch['lbl']
+                weights = torch.ones(y.shape) + y * (pos_weight-1)
+                criterion = nn.BCELoss(weight=weights).to(device)
                 x, y = x.to(device), y.to(device).to(torch.float)
                 if use_aa_len != 200:
                     x = x[:, :use_aa_len, :]
@@ -97,16 +100,19 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
         if fixed_ep_test != -1 and fixed_ep_test == epoch:
             neg, pos, test_results_for_ds = get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len,
                                                                      epoch)
-            if pos < max_pos:
-                max_neg, max_pos, max_results = neg, pos, test_results_for_ds
+            avg_pos_neg = neg * 1 / 3 + pos * 2 / 3
+            max_avg_pos_neg, max_neg, max_pos, max_results = avg_pos_neg, neg, pos, test_results_for_ds
         else:
             neg, pos, test_results_for_ds = get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len,
                                                                      epoch)
-            if pos < max_pos:
+            # average results between positive and negative accuracies is taken into account, with more weight on the
+            # positive labels
+            avg_pos_neg = neg * 1/3 + pos * 2/3
+            if avg_pos_neg < max_avg_pos_neg:
                 patience -= 1
             else:
-                max_neg, max_pos, max_results = neg, pos, test_results_for_ds
-        print("Results for epoch {} (pos/neg acc): {}/{}".format(epoch, pos, neg))
+                max_avg_pos_neg, max_neg, max_pos, max_results = avg_pos_neg, neg, pos, test_results_for_ds
+        print("Results for epoch {} (pos/neg acc/avg_pos_neg): {}/{}/{}".format(epoch, pos, neg, avg_pos_neg))
         convergence_condition = patience == 0 or (fixed_ep_test == epoch and fixed_ep_test != -1)
 
     return max_results
@@ -119,7 +125,7 @@ def init_model(param_set=None):
 
 
 def train_test_folds(run_name, train_datasets_per_fold, test_datasets_per_fold, data_folder, param_set, nested=False,
-                     fixed_epoch=-1):
+                     fixed_epoch=-1, pos_weight=1):
     """
     :param run_name: save name
     :param train_datasets_per_fold: list of training dataset filenames
@@ -133,13 +139,14 @@ def train_test_folds(run_name, train_datasets_per_fold, test_datasets_per_fold, 
                         used in nested-cv: after the best set of params is found in the inner-cv loop, along with the
                         hyperparameters, the number of epochs it was trained for is also returned (that is also tuned with
                         patience) and that is the fixed_epoch parameter
+    :param pos_weight: the weight given for positive samples of the dataset
     :return: list containing (number_of_datapoints, negative_acc, pos_acc, epoch)
     """
     results_over_all_ds = []
     for ind, (train_datasets, test_datasets) in enumerate(zip(train_datasets_per_fold,
                                                               test_datasets_per_fold)):
         model = init_model(param_set)
-        max_results = train_fold(train_datasets, test_datasets, data_folder, model, param_set)
+        max_results = train_fold(train_datasets, test_datasets, data_folder, model, param_set, pos_weight=pos_weight)
         if not nested:
             pickle.dump([train_datasets, test_datasets, max_results], open("{}_results_on_fold_{}.bin".
                                                                            format(run_name, ind), "wb"))
@@ -190,28 +197,45 @@ def train_test_nested_folds(run_name, params, train_ds, test_ds, data_folder, pa
     best_pos, best_results_params_and_epoch = 0, []
     for ind, (train_datasets, test_datasets) in enumerate(zip(train_ds,
                                                               test_ds)):
-        print(train_datasets, test_datasets)
         for param_set in params:
             # further split into 4 folds of 75%/25% the training set
+            print("Training parameter set {}...".format(param_set))
             train_ds_subfold, test_ds_subfold = split_train_test(train_datasets)
             max_results = train_test_folds(run_name, train_ds_subfold, test_ds_subfold, data_folder, param_set,
-                                           nested=True)
+                                           nested=True, pos_weight=param_set['pos_weight'])
 
             current_neg, current_pos, train_epochs = get_avg_results_for_fold(max_results)
             if best_pos < current_pos:
                 best_pos = current_pos
                 best_results_params_and_epoch = [param_set, train_epochs]
-        print("final best parameters:", best_results_params_and_epoch)
-        model = init_model(best_results_params_and_epoch[0])
-        final_result_current_fold = train_fold(model=model, train_datasets=train_datasets, test_datasets=test_datasets,
-                                               param_set=best_results_params_and_epoch[0],
-                                               fixed_ep_test=best_results_params_and_epoch[1],
-                                               data_folder=data_folder)
-        print(final_result_current_fold, best_results_params_and_epoch)
-        # saves as  [len(dataset), negative_result, positive_result, epoch)]
-        pickle.dump([final_result_current_fold, best_results_params_and_epoch],
-                    open("results_fold_{}{}.bin".format(ind, "_" + str(param_set_number) if
-                    param_set_number != -1 else ""), "wb"))
+            if param_set_number != -1:
+                # this means that the program will run o given set of hyperparameters for the inner loops created from
+                # each ouetr-loop cv train set. This should then be put together from multiple machines at the end
+                # so that the maximum out of all hyperparameters will be taken into account when testing on the final
+                # (validation - outer loop test set)
+                result_file_name = "results_fold_{}{}.bin".format(ind, "_" + str(param_set_number))
+                if os.path.exists(result_file_name):
+                    all_results = pickle.load(open(result_file_name, "rb"))
+                else:
+                    all_results = []
+                all_results.append([current_neg, current_pos, param_set, train_epochs])
+                pickle.dump(all_results, open(result_file_name, "wb"))
+                print("Results for param set {} after {} epochs (neg/pos):{}/{}".
+                      format(param_set, train_epochs, current_neg, current_pos))
+        if param_set_number == -1:
+            # if the hyperparamter search is done on one machine, just save the best results for each given test-fold
+            # validation
+            print("final best parameters:", best_results_params_and_epoch)
+            model = init_model(best_results_params_and_epoch[0])
+            final_result_current_fold = train_fold(model=model, train_datasets=train_datasets, test_datasets=test_datasets,
+                                                   param_set=best_results_params_and_epoch[0],
+                                                   fixed_ep_test=best_results_params_and_epoch[1],
+                                                   data_folder=data_folder)
+            print(final_result_current_fold, best_results_params_and_epoch)
+            # saves as  [len(dataset), negative_result, positive_result, epoch)]
+            pickle.dump([final_result_current_fold, best_results_params_and_epoch],
+                        open("results_fold_{}{}.bin".format(ind, "_" + str(param_set_number) if
+                        param_set_number != -1 else ""), "wb"))
 
 
 def train_bin_sp_mdl(run_name, use_aa_len, lr, nested_cv=True, parameters=None, param_set_number=1):
