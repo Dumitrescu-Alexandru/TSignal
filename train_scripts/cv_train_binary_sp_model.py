@@ -190,6 +190,7 @@ def train_test_nested_folds(run_name, params, train_ds, test_ds, data_folder, pa
     best_pos, best_results_params_and_epoch = 0, []
     for ind, (train_datasets, test_datasets) in enumerate(zip(train_ds,
                                                               test_ds)):
+        print(train_datasets, test_datasets)
         for param_set in params:
             # further split into 4 folds of 75%/25% the training set
             train_ds_subfold, test_ds_subfold = split_train_test(train_datasets)

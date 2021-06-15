@@ -32,29 +32,35 @@ class SPbinaryData:
 
     def form_cv_indices(self):
         np.random.seed(123)
-        files = os.listdir(self.data_folder)
-        all_emb_files = []
-        for f in files:
-            if "bert_seq_data_{}_{}_".format(self.threshold_pos, self.threshold_neg) in f:
-                all_emb_files.append(f)
-        num_files = len(all_emb_files)
-        base_f_name = "bert_seq_data_{}_{}_".format(self.threshold_pos, self.threshold_neg)
-        test_ds_inds = np.random.choice(list(range(num_files)), num_files, replace=False)
-        num_test_ds_per_fold = num_files//5
+        if os.path.exists(self.data_folder + "train_datasets_per_fold.bin"):
+            self.train_datasets_per_fold = pickle.load(open(self.data_folder+"train_datasets_per_fold.bin", "rb"))
+            self.test_datasets_per_fold = pickle.load(open(self.data_folder+"test_datasets_per_fold.bin", "rb"))
+        else:
+            files = os.listdir(self.data_folder)
+            all_emb_files = []
+            for f in files:
+                if "bert_seq_data_{}_{}_".format(self.threshold_pos, self.threshold_neg) in f:
+                    all_emb_files.append(f)
+            num_files = len(all_emb_files)
+            base_f_name = "bert_seq_data_{}_{}_".format(self.threshold_pos, self.threshold_neg)
+            test_ds_inds = np.random.choice(list(range(num_files)), num_files, replace=False)
+            num_test_ds_per_fold = num_files//5
 
-        test_datasets_per_fold, train_datasets_per_fold = [], []
-        # if num_test_ds_per_fold * 5 < num_files:
-        left_out_ds = num_files - num_test_ds_per_fold * 5
-        for i in range(5):
-            test_ds_current_fold_inds = test_ds_inds[i * num_test_ds_per_fold: (i+1) * num_test_ds_per_fold]
-            if left_out_ds > 0:
-                test_ds_current_fold_inds.append(test_ds_inds[-left_out_ds])
-                left_out_ds -= 1
-            train_ds_current_fold_inds = list(set(list(range(num_files)))- set(test_ds_current_fold_inds))
-            train_datasets_per_fold.append([all_emb_files[i] for i in train_ds_current_fold_inds])
-            test_datasets_per_fold.append([all_emb_files[i] for i in test_ds_current_fold_inds])
-        self.train_datasets_per_fold = train_datasets_per_fold
-        self.test_datasets_per_fold = test_datasets_per_fold
+            test_datasets_per_fold, train_datasets_per_fold = [], []
+            # if num_test_ds_per_fold * 5 < num_files:
+            left_out_ds = num_files - num_test_ds_per_fold * 5
+            for i in range(5):
+                test_ds_current_fold_inds = test_ds_inds[i * num_test_ds_per_fold: (i+1) * num_test_ds_per_fold]
+                if left_out_ds > 0:
+                    test_ds_current_fold_inds.append(test_ds_inds[-left_out_ds])
+                    left_out_ds -= 1
+                train_ds_current_fold_inds = list(set(list(range(num_files)))- set(test_ds_current_fold_inds))
+                train_datasets_per_fold.append([all_emb_files[i] for i in train_ds_current_fold_inds])
+                test_datasets_per_fold.append([all_emb_files[i] for i in test_ds_current_fold_inds])
+            self.train_datasets_per_fold = train_datasets_per_fold
+            self.test_datasets_per_fold = test_datasets_per_fold
+            pickle.dump(self.train_datasets_per_fold, open(self.data_folder+"train_datasets_per_fold.bin", "wb"))
+            pickle.dump(self.test_datasets_per_fold, open(self.data_folder+"test_datasets_per_fold.bin", "wb"))
 
     def shuffle_w_even_lbl_no(self, sequences_data, labels, names, no_sequences=4500):
         """
