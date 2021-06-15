@@ -31,7 +31,7 @@ class SPbinaryData:
         self.form_cv_indices()
 
     def form_cv_indices(self):
-        random.seed(123)
+        np.random.seed(123)
         files = os.listdir(self.data_folder)
         all_emb_files = []
         for f in files:
@@ -39,7 +39,7 @@ class SPbinaryData:
                 all_emb_files.append(f)
         num_files = len(all_emb_files)
         base_f_name = "bert_seq_data_{}_{}_".format(self.threshold_pos, self.threshold_neg)
-        test_ds_inds = random.sample(list(range(num_files)), num_files)
+        test_ds_inds = np.random.choice(list(range(num_files)), num_files, replace=False)
         num_test_ds_per_fold = num_files//5
 
         test_datasets_per_fold, train_datasets_per_fold = [], []
