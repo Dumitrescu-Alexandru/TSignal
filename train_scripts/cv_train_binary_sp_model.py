@@ -23,7 +23,7 @@ def get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len=200, 
     test_results_for_ds = []
     for test_ds in test_datasets:
         model.eval()
-        dataset = BinarySPDataset(data_folder + test_ds)
+        dataset = BinarySPDataset(data_folder + test_ds, use_aa_len=use_aa_len)
         dataset_loader = torch.utils.data.DataLoader(dataset,
                                                      batch_size=64, shuffle=True,
                                                      num_workers=4)
@@ -31,7 +31,7 @@ def get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len=200, 
         total_positive_hits, total_negative_hits = 0, 0
         for batch in dataset_loader:
             x, y = batch['emb'], batch['lbl']
-            x, y = x.to(device), y.to(device).to(torch.float)
+            x, y = x.to(device, dtype=torch.float32), y.to(device).to(torch.float)
             if use_aa_len != 200:
                 x = x[:, :use_aa_len, :]
             with torch.no_grad():
@@ -81,7 +81,7 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
         epoch += 1
         model.train()
         for train_ds in train_datasets:
-            dataset = BinarySPDataset(data_folder + train_ds)
+            dataset = BinarySPDataset(data_folder + train_ds, use_aa_len=use_aa_len)
             dataset_loader = torch.utils.data.DataLoader(dataset,
                                                          batch_size=64, shuffle=True,
                                                          num_workers=4)
@@ -89,7 +89,7 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
                 x, y = batch['emb'], batch['lbl']
                 weights = torch.ones(y.shape) + y * (pos_weight-1)
                 criterion = nn.BCELoss(weight=weights).to(device)
-                x, y = x.to(device), y.to(device).to(torch.float)
+                x, y = x.to(device,dtype=torch.float32), y.to(device).to(torch.float)
                 if use_aa_len != 200:
                     x = x[:, :use_aa_len, :]
                 preds = model(x.permute(0, 2, 1))
@@ -146,7 +146,8 @@ def train_test_folds(run_name, train_datasets_per_fold, test_datasets_per_fold, 
     for ind, (train_datasets, test_datasets) in enumerate(zip(train_datasets_per_fold,
                                                               test_datasets_per_fold)):
         model = init_model(param_set)
-        max_results = train_fold(train_datasets, test_datasets, data_folder, model, param_set, pos_weight=pos_weight)
+        max_results = train_fold(train_datasets, test_datasets, data_folder, model, param_set, pos_weight=pos_weight,
+                                 fixed_ep_test=fixed_epoch)
         if not nested:
             pickle.dump([train_datasets, test_datasets, max_results], open("{}_results_on_fold_{}.bin".
                                                                            format(run_name, ind), "wb"))
@@ -237,9 +238,31 @@ def train_test_nested_folds(run_name, params, train_ds, test_ds, data_folder, pa
                         open("results_fold_{}{}.bin".format(ind, "_" + str(param_set_number) if
                         param_set_number != -1 else ""), "wb"))
 
+def get_data_folder():
+    if os.path.exists("/scratch/work/dumitra1"):
+        return "/scratch/work/dumitra1/sp_data/"
+    elif os.path.exists("/home/alex"):
+        return "sp_data/"
+    else:
+        return "/scratch/project2003818/dumitra1/sp_data/"
 
-def train_bin_sp_mdl(run_name, use_aa_len, lr, nested_cv=True, parameters=None, param_set_number=1):
-    sp_data = SPbinaryData()
+def get_all_ds(ds):
+    ds_set = set()
+    for d in ds:
+        ds_set.update(d)
+    return list(ds_set)
+
+def get_all_bench_ds():
+    data_folder =get_data_folder()
+    test_datasets = []
+    for f in os.listdir(data_folder):
+        if "raw_sp6_bench_data_" in f:
+            test_datasets.append(f)
+    return test_datasets
+
+
+def train_bin_sp_mdl(run_name, use_aa_len, lr, nested_cv=True, parameters=None, param_set_number=1, data="mammal"):
+    sp_data = SPbinaryData(data=data)
     train_ds, test_ds, data_folder = sp_data.train_datasets_per_fold, \
                                      sp_data.test_datasets_per_fold, sp_data.data_folder
     if param_set_number != -1:
@@ -255,7 +278,22 @@ def train_bin_sp_mdl(run_name, use_aa_len, lr, nested_cv=True, parameters=None, 
     if nested_cv:
         train_test_nested_folds(run_name, parameters, train_ds, test_ds, data_folder, param_set_number=param_set_number)
     else:
-        train_test_folds(run_name, train_ds, test_ds, data_folder, parameters[0])
+        parameters = [{'dos': [0.3, 0.3], 'filters': [140, 120, 100, 80], 'lengths': [5, 9, 15, 21], 'lr': 0.0001, 'patience': 5, 'pos_weight': 5, 'use_aa_len': 100}]
+
+        # search for the best early-stopping epoch in cv cross-validation on the training data for the given param set
+        all_train_ds = get_all_ds(train_ds)
+        all_bench_ds = get_all_bench_ds()
+        results_over_all_ds = train_test_folds(run_name, train_ds, test_ds, data_folder, parameters[0])
+        negative_results, positive_results, avg_epoch = get_avg_results_for_fold(results_over_all_ds)
+
+        # in the end, train on all data and test on benchmark data
+        all_train_ds = get_all_ds(train_ds)
+        all_bench_ds = get_all_bench_ds()
+        results_over_all_ds = train_test_folds(run_name, [all_train_ds], [all_bench_ds], data_folder, parameters[0], fixed_epoch=avg_epoch)
+        bench_negative_results, bench_positive_results, _ = get_avg_results_for_fold(results_over_all_ds)
+
+        print(negative_results, positive_results, bench_negative_results, bench_positive_results)
+
 # for nested cv
 # >>> for i in range(len(a) // tes_ds_n + 1):
 # ...     print(a[i*tes_ds_n : (i+1)*tes_ds_n])

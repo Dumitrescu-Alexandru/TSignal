@@ -2,6 +2,7 @@ import pickle
 import os
 import datetime
 from sp_data.data_utils import SPbinaryData
+from train_scripts.cv_train_cs_predictors import train_cs_predictors
 from train_scripts.cv_train_binary_sp_model import train_bin_sp_mdl
 import argparse
 
@@ -22,14 +23,19 @@ def parse_arguments():
     parser.add_argument("--use_aa_len", default=200, type=int)
     parser.add_argument("--run_name", default="run", type=str)
     parser.add_argument("--lr", default=0.001, type=float)
+    parser.add_argument("--data", default="mammal", type=str)
     parser.add_argument("--param_set_search_number", default=-1, type=int)
+    parser.add_argument("--train_cs_predictor", default=False, action="store_true")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     date_now = str(datetime.datetime.now()).split(".")[0].replace("-", "").replace(":", "").replace(" ", "")
     args = parse_arguments()
-    if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
-        create_parameter_set()
-    run_name = args.run_name + "_" + date_now
-    a = train_bin_sp_mdl(args.run_name, args.use_aa_len, args.lr)
+    if args.train_cs_predictor:
+        a = train_cs_predictors()
+    else:
+        if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
+            create_parameter_set()
+        run_name = args.run_name + "_" + date_now
+        a = train_bin_sp_mdl(args.run_name, args.use_aa_len, args.lr, data=args.data, nested_cv=args.data == "mammal")

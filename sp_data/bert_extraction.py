@@ -1342,7 +1342,7 @@ def remove_duplicates(long, cdr3, epitope):
 def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", test_new_data=False,
                                 extract_cdr3=False, use_only_cdr3=False, use_covid_data="",
                                 add_specific_epitopes_vdj50=[], sum_tcrs=True, extract_unlabeled=True,
-                                add_long_aa=-1, data_file="raw_seq_data_0.15_0.9.bin",seqs_per_ds=4500):
+                                add_long_aa=-1, data_file="raw_seq_data_0.15_0.9.bin",seqs_per_ds=7100):
     """
     Function for various bert-model based embedding extraction
     sum_tcrs: sums tcrs along the sequence dimension, to reduce memory necessary (only useful probably in visualizations
@@ -1466,7 +1466,7 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
             else:
                 vdjdb_embeddings[long_seq] = (features[ind], ld2ep[long_seq])
         print("1", len(vdjdb_embeddings.keys()))
-        if i * 100 % seqs_per_ds == 0 and i != 0:
+        if len(vdjdb_embeddings.keys()) >= seqs_per_ds -1:
             print("2", len(vdjdb_embeddings.keys()))
             pickle.dump(vdjdb_embeddings, open(emb_name + "_{}.bin".format(file_index), "wb"))
             file_index += 1
@@ -1495,8 +1495,8 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
 #                             add_specific_epitopes_vdj50=['NEGVKAAW', 'LLQTGIHVRVSQPSL', 'YSEHPTFTSQY', 'AMFWSVPTV'])
 if os.path.exists("/scratch/work"):
     hparams.embedding_save_name = "/scratch/work/dumitra1/" + hparams.embedding_save_name
-extract_and_save_embeddings(model, emb_name="bert_seq_data_0.9_0.15", test_new_data=True, extract_cdr3=True,
-                            sum_tcrs=False, extract_unlabeled=False,add_long_aa=-1, data_file="raw_seq_data_0.9_0.15.bin")
+extract_and_save_embeddings(model, emb_name="sp6_partitioned_data_2", test_new_data=True, extract_cdr3=True,
+                            sum_tcrs=False, extract_unlabeled=False,add_long_aa=-1, data_file="sp6_partitioned_data_2.bin")
 
 # extract_and_save_embeddings(model, emb_name="vdj50_original_bert_cdr3Only", test_new_data=True, extract_cdr3=True,
 #                             use_only_cdr3=True, use_covid_data="")
