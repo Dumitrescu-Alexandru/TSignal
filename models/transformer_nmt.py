@@ -40,7 +40,7 @@ class InputEmbeddingEncoder(nn.Module):
         # only create dictionaries from sequences to embeddings (as sequence embeddings are already computed by a bert
         # model
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.data_folder = data_folder
+        self.data_folder = get_data_folder()
         super().__init__()
         full_dict = {}
         for p in partitions:
@@ -204,3 +204,11 @@ def create_mask(src, tgt):
 # print(src_padding_mask[-1], tgt_padding_mask[-1])
 # print(a[-1], b[-1])
 # print(src_mask, tgt_mask)
+def get_data_folder():
+    import os
+    if os.path.exists("/scratch/work/dumitra1"):
+        return "/scratch/work/dumitra1/sp_data/"
+    elif os.path.exists("/home/alex"):
+        return "sp_data/"
+    else:
+        return "/scratch/project2003818/dumitra1/sp_data/"
