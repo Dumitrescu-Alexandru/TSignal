@@ -314,7 +314,7 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None):
         model,  src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
     return tgt_tokens
 
-def evaluate(model, lbl2ind):
+def evaluate(model, lbl2ind, run_name=""):
     print("Beginning evaluate")
     logging.info("Beginning evaluate")
     eval_dict = {}
@@ -336,10 +336,10 @@ def evaluate(model, lbl2ind):
         # print("".join([ind2lbl[i] for i in tgt[0]]), len("".join([ind2lbl[i] for i in tgt[0]])))
         # print("\n")
         eval_dict[src] = model_output
-    pickle.dump(eval_dict, open("results.bin", "wb"))
+    pickle.dump(eval_dict, open(run_name+".bin", "wb"))
 
 
-def train_cs_predictors(bs=16, eps=20):
+def train_cs_predictors(bs=16, eps=20, run_name=""):
 
     sp_data = SPCSpredictionData()
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[0,1], data_folder=sp_data.data_folder)
@@ -380,7 +380,7 @@ def train_cs_predictors(bs=16, eps=20):
             losses += loss.item()
         print("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
         logging.info("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
-    evaluate(model, sp_data.lbl2ind)
+    evaluate(model, sp_data.lbl2ind, run_name=run_name)
 
         # loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
         # loss.backward()

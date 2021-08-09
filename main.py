@@ -38,7 +38,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
     if args.train_cs_predictor:
-        a = train_cs_predictors(bs=args.batch_size, eps=args.epochs)
+        a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()
