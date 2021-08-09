@@ -5,7 +5,7 @@ from sp_data.data_utils import SPbinaryData
 from train_scripts.cv_train_cs_predictors import train_cs_predictors
 from train_scripts.cv_train_binary_sp_model import train_bin_sp_mdl
 import argparse
-
+import logging
 
 def create_parameter_set():
     from sklearn.model_selection import ParameterGrid
@@ -21,21 +21,26 @@ def create_parameter_set():
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--use_aa_len", default=200, type=int)
-    parser.add_argument("--run_name", default="run", type=str)
     parser.add_argument("--lr", default=0.001, type=float)
     parser.add_argument("--data", default="mammal", type=str)
     parser.add_argument("--param_set_search_number", default=-1, type=int)
     parser.add_argument("--train_cs_predictor", default=False, action="store_true")
+    parser.add_argument("--batch_size", default=16, type=int)
+    parser.add_argument("--run_name", default="some_run", type=str)
+    parser.add_argument("--epochs", default=20, type=int)
+
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     date_now = str(datetime.datetime.now()).split(".")[0].replace("-", "").replace(":", "").replace(" ", "")
+    logging.getLogger('some_logger')
     args = parse_arguments()
+    logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
     if args.train_cs_predictor:
-        a = train_cs_predictors()
+        a = train_cs_predictors(bs=args.batch_size, eps=args.epochs)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()
         run_name = args.run_name + "_" + date_now
-        a = train_bin_sp_mdl(args.run_name, args.use_aa_len, args.lr, data=args.data, nested_cv=args.data == "mammal")
+        a = train_bin_sp_mdl(args.run_name, args.use_aa_len, args.lr, data=args.data, nested_cv=args.data == "mammal",)

@@ -1,6 +1,5 @@
 import logging
 logging.getLogger('some_logger')
-logging.basicConfig(filename="run_name.log", level=logging.INFO)
 
 import os
 import numpy as np
@@ -325,7 +324,7 @@ def evaluate(model, lbl2ind):
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[2], data_folder=sp_data.data_folder)
 
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=1, shuffle=True,
+                                                 batch_size=1, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
     ind2lbl = {v:k for k,v in lbl2ind.items()}
     for ind, (src, tgt) in enumerate(dataset_loader):
@@ -340,12 +339,12 @@ def evaluate(model, lbl2ind):
     pickle.dump(eval_dict, open("results.bin", "wb"))
 
 
-def train_cs_predictors():
+def train_cs_predictors(bs=16, eps=20):
 
     sp_data = SPCSpredictionData()
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[0,1], data_folder=sp_data.data_folder)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=64, shuffle=True,
+                                                 batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
     print(len(sp_data.lbl2ind.keys()))
     model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0,1], lbl2ind=sp_data.lbl2ind)
@@ -354,7 +353,7 @@ def train_cs_predictors():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.00001, betas=(0.9, 0.98), eps=1e-9)
     ind2lbl = {ind:lbl for lbl, ind in sp_data.lbl2ind.items()}
-    for e in range(50):
+    for e in range(eps):
         losses = 0
         for ind, batch in enumerate(dataset_loader):
             model.eval()
