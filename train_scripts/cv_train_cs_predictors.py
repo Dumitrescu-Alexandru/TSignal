@@ -335,7 +335,7 @@ def evaluate(model, lbl2ind, run_name=""):
         # print("".join([ind2lbl[i] for i in tgt_tokens[0]]), len("".join([ind2lbl[i] for i in tgt_tokens[0]])))
         # print("".join([ind2lbl[i] for i in tgt[0]]), len("".join([ind2lbl[i] for i in tgt[0]])))
         # print("\n")
-        eval_dict[src] = model_output
+        eval_dict[src[0]] = model_output
     pickle.dump(eval_dict, open(run_name+".bin", "wb"))
 
 
