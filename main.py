@@ -28,6 +28,7 @@ def parse_arguments():
     parser.add_argument("--batch_size", default=16, type=int)
     parser.add_argument("--run_name", default="some_run", type=str)
     parser.add_argument("--epochs", default=20, type=int)
+    parser.add_argument("--add_lg_info", default=False, action="store_true")
 
     return parser.parse_args()
 
@@ -38,7 +39,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
     if args.train_cs_predictor:
-        a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name)
+        a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()

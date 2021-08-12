@@ -7,7 +7,8 @@ ind = 0
 def create_labeled_by_sp6_partition(all_ids, all_seqs, all_lbls):
     partition_2_info = {}
     for i, s, l in zip(all_ids, all_seqs, all_lbls):
-        partition = int(i.split("|")[-1])
+
+        life_grp, partition = i.split("|")[1], int(i.split("|")[-1])
         if partition in partition_2_info:
             partition_2_info[partition][0].append(str(s))
             partition_2_info[partition][1].append(str(l))

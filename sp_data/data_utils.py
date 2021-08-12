@@ -11,6 +11,7 @@ class SPCSpredictionData:
     def __init__(self, lbl2ind=None):
         self.lbl2ind = {}
         self.data_folder = self.get_data_folder()
+        self.lg2ind = {}
         if lbl2ind is None:
             self.form_lbl_inds()
         else:
@@ -21,7 +22,7 @@ class SPCSpredictionData:
         all_unique_lbls = set()
         for p in parts:
             part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_0.bin".format(p), "rb"))
-            for (_, lbls) in part_dict.values():
+            for (_, lbls, _) in part_dict.values():
                 all_unique_lbls.update(lbls)
         self.lbl2ind = {l: ind for ind, l in enumerate(all_unique_lbls)}
         # add special tokens at the end of the dictionary
@@ -30,6 +31,13 @@ class SPCSpredictionData:
         self.lbl2ind["PD"] = PAD_IDX
         self.lbl2ind["BS"] = BOS_IDX
         self.lbl2ind["ES"] = EOS_IDX
+
+        all_unique_lgs = set()
+        for p in parts:
+            part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_0.bin".format(p), "rb"))
+            for (_, _, lg) in part_dict.values():
+                all_unique_lgs.add(lg)
+        self.lg2ind = {l: ind for ind, l in enumerate(all_unique_lgs)}
 
     def get_data_folder(self):
         if os.path.exists("/scratch/work/dumitra1"):
@@ -42,17 +50,18 @@ class SPCSpredictionData:
 
 class CSPredsDataset(Dataset):
     def __init__(self, lbl2inds, partitions, data_folder):
-        self.seqs, self.lbls = [], []
+        self.life_grp, self.seqs, self.lbls = [], [], []
         for p in partitions:
             data_dict = pickle.load(open(data_folder + "sp6_partitioned_data_{}_0.bin".format(p), "rb"))
             self.seqs.extend(list(data_dict.keys()))
-            self.lbls.extend([[lbl2inds[l] for l in label] for (_, label) in data_dict.values()])
+            self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _) in data_dict.values()])
+            self.life_grp.extend([life_grp for (_, _, life_grp) in data_dict.values()])
 
     def __len__(self):
         return len(self.seqs)
 
     def __getitem__(self, item):
-        return {"seq": self.seqs[item], "lbl": self.lbls[item]}
+        return {"seq": self.seqs[item], "lbl": self.lbls[item], "lg":self.life_grp[item]}
 
 
 class SPbinaryData:
@@ -231,11 +240,12 @@ class SPbinaryData:
 
 
 def collate_fn(batch):
-    src_batch, tgt_batch = [], []
+    src_batch, tgt_batch, life_grp = [], [], []
     for sample in batch:
         src_batch.append(sample['seq'])
         tgt_batch.append(sample['lbl'])
-    return src_batch, tgt_batch
+        life_grp.append(sample['lg'])
+    return src_batch, tgt_batch, life_grp
 
 
 class BinarySPDataset(Dataset):

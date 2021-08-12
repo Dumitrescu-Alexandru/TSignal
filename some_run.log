@@ -1,3 +1,24 @@
 INFO:root:Beginning evaluate
 INFO:root:Beginning evaluate
 INFO:root:Beginning evaluate
+INFO:root:Beginning evaluate
+INFO:root:On epoch 0 total loss: 0.13223684187549764
+INFO:root:On epoch 1 total loss: 0.09021763036699246
+INFO:root:On epoch 2 total loss: 0.0823229341136525
+INFO:root:On epoch 3 total loss: 0.0781400524022634
+INFO:root:On epoch 4 total loss: 0.07121838946514727
+INFO:root:On epoch 5 total loss: 0.07330424327622442
+INFO:root:On epoch 6 total loss: 0.07236659162870758
+INFO:root:On epoch 7 total loss: 0.07167760128407832
+INFO:root:On epoch 8 total loss: 0.07332563685620075
+INFO:root:On epoch 9 total loss: 0.06816521825750008
+INFO:root:Beginning evaluate
+INFO:root:Beginning evaluate
+INFO:root:Beginning evaluate
+INFO:root:Beginning evaluate
+INFO:root:Beginning evaluate
+INFO:root:Beginning evaluate
+INFO:root:Beginning evaluate
+INFO:root:Beginning evaluate
+INFO:root:Beginning evaluate
+INFO:root:Beginning evaluate

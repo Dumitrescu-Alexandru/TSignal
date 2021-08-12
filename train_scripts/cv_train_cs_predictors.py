@@ -1,3 +1,4 @@
+import time
 import logging
 logging.getLogger('some_logger')
 
@@ -121,9 +122,9 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
     return max_results
 
 
-def init_model(ntoken, partitions,lbl2ind={}):
+def init_model(ntoken, partitions,lbl2ind={}, lg2ind={}):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8,
-                             d_hid=1024, nlayers=3,  partitions=partitions,lbl2ind=lbl2ind)
+                             d_hid=1024, nlayers=3,  partitions=partitions,lbl2ind=lbl2ind, lg2ind=lg2ind)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -327,7 +328,7 @@ def evaluate(model, lbl2ind, run_name=""):
                                                  batch_size=1, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
     ind2lbl = {v:k for k,v in lbl2ind.items()}
-    for ind, (src, tgt) in enumerate(dataset_loader):
+    for ind, (src, tgt, _) in enumerate(dataset_loader):
         src = src
         tgt = tgt
         tgt_tokens = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt)
@@ -339,15 +340,19 @@ def evaluate(model, lbl2ind, run_name=""):
     pickle.dump(eval_dict, open(run_name+".bin", "wb"))
 
 
-def train_cs_predictors(bs=16, eps=20, run_name=""):
+def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False):
 
     sp_data = SPCSpredictionData()
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[0,1], data_folder=sp_data.data_folder)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    print(len(sp_data.lbl2ind.keys()))
-    model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0,1], lbl2ind=sp_data.lbl2ind)
+    if len(sp_data.lg2ind.keys()) <= 1 or not use_lg_info:
+        lg2ind = None
+    elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
+        lg2ind = sp_data.lg2ind
+
+    model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0,1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
 
@@ -358,7 +363,7 @@ def train_cs_predictors(bs=16, eps=20, run_name=""):
         for ind, batch in enumerate(dataset_loader):
             model.eval()
 
-            seqs, lbl_seqs = batch
+            seqs, lbl_seqs, _ = batch
             max_len_s = 0
             some_s = 0
             logits = model(seqs, lbl_seqs)
@@ -368,7 +373,7 @@ def train_cs_predictors(bs=16, eps=20, run_name=""):
             loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
             loss = torch.mean(loss)
 
-            # if ind % 100 == 0:
+            # if "S" in "".join([str(ind2lbl[i.item()]) for i in padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)[0]]):
             #
             #     print("".join([str(ind2lbl[i.item()]) for i in torch.argmax(logits.transpose(1,0),dim=-1)[0]]),"\n",
             #

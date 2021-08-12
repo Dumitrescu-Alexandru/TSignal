@@ -36,20 +36,26 @@ class TokenEmbedding(nn.Module):
 
 
 class InputEmbeddingEncoder(nn.Module):
-    def __init__(self, partitions=[0, 1, 2], data_folder="sp_data/"):
+    def __init__(self, partitions=[0, 1, 2], data_folder="sp_data/", lg2ind=None):
         # only create dictionaries from sequences to embeddings (as sequence embeddings are already computed by a bert
         # model
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.data_folder = get_data_folder()
         super().__init__()
-        full_dict = {}
+        seq2emb = {}
+        seq2lg = {}
+        self.use_lg = lg2ind is not None
         for p in partitions:
             part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_0.bin".format(p), "rb"))
-            full_dict.update({seq: emb for seq, (emb, _) in part_dict.items()})
-        self.full_dict = full_dict
+            seq2emb.update({seq: emb for seq, (emb, _, _) in part_dict.items()})
+            if lg2ind is not None:
+                seq2lg.update({seq: lg2ind[lg] for seq, (_, _, lg) in part_dict.items()})
+        self.seq2lg = seq2lg
+        self.seq2emb = seq2emb
         # we do need the beginning of sequence and end of sequence tokens for the predictions, so we add a linear layer
         # 2x1024 for that
         self.eos_bos_embs = TokenEmbedding(2, 1024)
+        self.lg_embs = TokenEmbedding(len(lg2ind.keys()), 1024) if lg2ind is not None else None
 
     def generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones((sz, sz), device=self.device)) == 1).transpose(0, 1)
@@ -60,15 +66,21 @@ class InputEmbeddingEncoder(nn.Module):
         src_mask = torch.zeros((shape, shape), device=self.device).type(torch.bool)
         return src_mask
 
-    def add_bos_eos_tkns(self, tensor):
+    def add_bos_eos_lg_tkns(self, seq):
+        aa_embedding = torch.tensor(self.seq2emb[seq], device=self.device)
         bos = self.eos_bos_embs(torch.tensor(0, device=self.device)).reshape(1, -1)
         eos = self.eos_bos_embs(torch.tensor(1, device=self.device)).reshape(1, -1)
-        return torch.cat([bos, tensor, eos], dim=0)
+        if self.use_lg:
+            lg_emb = self.lg_embs(torch.tensor([self.seq2lg[seq]], device=self.device))
+            return torch.cat([bos, lg_emb, aa_embedding, eos], dim=0)
+        return torch.cat([bos, aa_embedding, eos])
 
     def forward(self, seqs):
-        tensor_inputs = [self.add_bos_eos_tkns(torch.tensor(self.full_dict[s], device=self.device)) for s in seqs]
+        tensor_inputs = [self.add_bos_eos_lg_tkns(s) for s in seqs]
         input_lens = [ti.shape[0] for ti in tensor_inputs]
-        output_lens = [ti.shape[0] - 1 for ti in tensor_inputs]
+        # additional inputs for life grp and BOS tokens
+        additional_inp_tkns = 2 if self.use_lg else 1
+        output_lens = [ti.shape[0] - additional_inp_tkns for ti in tensor_inputs]
         max_len = max(input_lens)
         max_len_out = max(output_lens)
         padding_mask_src = torch.arange(max_len)[None, :] < torch.tensor(input_lens)[:, None]
@@ -80,17 +92,17 @@ class InputEmbeddingEncoder(nn.Module):
                tensor_inputs
 
     def update(self, partitions=[2]):
-        full_dict = {}
+        seq2emb = {}
         for p in partitions:
             part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_0.bin", "rb"))
-            full_dict.update({seq: emb for seq, (emb, _) in part_dict.items()})
-        self.full_dict = full_dict
+            seq2emb.update({seq: emb for seq, (emb, _) in part_dict.items()})
+        self.seq2emb = seq2emb
 
 
 class TransformerModel(nn.Module):
 
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int,
-                 nlayers: int, dropout: float = 0.5, partitions=[0, 1], data_folder="sp_data/", lbl2ind={}):
+                 nlayers: int, dropout: float = 0.5, partitions=[0, 1], data_folder="sp_data/", lbl2ind={}, lg2ind=None):
         super().__init__()
         self.model_type = 'Transformer'
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -104,7 +116,7 @@ class TransformerModel(nn.Module):
                                        dim_feedforward=d_hid * 4,
                                        dropout=dropout).to(self.device)
         # input_encoder is just a dictionary with {sequence:embedding} with embeddings from bert LM
-        self.input_encoder = InputEmbeddingEncoder(partitions=[0, 1, 2], data_folder=data_folder)
+        self.input_encoder = InputEmbeddingEncoder(partitions=[0, 1, 2], data_folder=data_folder, lg2ind=lg2ind)
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
         self.label_encoder = TokenEmbedding(ntoken, d_hid, lbl2ind=lbl2ind)
         self.d_model = d_model
@@ -112,6 +124,7 @@ class TransformerModel(nn.Module):
 
     def encode(self, src):
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
+        print(src[0].shape)
         if len(src) == 1:
             src = src[0].reshape(1, *src[0].shape).transpose(0,1)
         return self.transformer.encoder(self.pos_encoder(src), src_mask)
@@ -135,7 +148,7 @@ class TransformerModel(nn.Module):
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
         padded_tgt = self.pos_encoder(padded_tgt)
         padded_src, padded_tgt = padded_src.transpose(0, 1), padded_tgt.transpose(0, 1)
-        # print(src_mask.shape)
+        # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
         outs = self.transformer(padded_src, padded_tgt, src_mask, tgt_mask, None, padding_mask_src, padding_mask_tgt,
                                 padding_mask_src)
         return self.generator(outs)

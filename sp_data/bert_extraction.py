@@ -1342,7 +1342,8 @@ def remove_duplicates(long, cdr3, epitope):
 def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", test_new_data=False,
                                 extract_cdr3=False, use_only_cdr3=False, use_covid_data="",
                                 add_specific_epitopes_vdj50=[], sum_tcrs=True, extract_unlabeled=True,
-                                add_long_aa=-1, data_file="raw_seq_data_0.15_0.9.bin",seqs_per_ds=7100):
+                                add_long_aa=-1, data_file="raw_seq_data_0.15_0.9.bin",seqs_per_ds=7100,
+                                add_life_grp=True):
     """
     Function for various bert-model based embedding extraction
     sum_tcrs: sums tcrs along the sequence dimension, to reduce memory necessary (only useful probably in visualizations
@@ -1355,9 +1356,14 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
     """
     # TODO first file seems to have 4599 when it should have 4500 seqs. See what the problems is
     model.cuda()
+    life_grp = []
     if test_new_data:
-        long, epitope, _ = pickle.load(open(data_file, "rb"))
+        long, epitope, ids = pickle.load(open(data_file, "rb"))
         cdr3bs = long
+        if add_life_grp:
+            life_grp = [i.split("|")[1] for i in ids]
+        else:
+            life_grp.append("eukaryote")
         # when extracting covid data, those only hve CDR3B seqs.
     elif use_covid_data:
         file = "../data/ImmuneCODE_MIRA/immuneCODE_MIRA_ci_TCRs.tsv" if use_covid_data == "ci" \
@@ -1403,11 +1409,13 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
         epitope.extend(none_epitopes_tcrb)
         epitope.extend(none_epitopes_emerson)
 
-    ld2ep, l2cdr3 = {}, {}
+    ld2ep, l2cdr3, ld2lifegrp = {}, {}, {}
     u_e = set()
-    for ep, ld in zip(epitope, long):
+    for ep, ld, life_grp in zip(epitope, long, life_grp):
         ld2ep[ld] = ep
         u_e.add(ep)
+        if add_life_grp:
+            ld2lifegrp[ld] = life_grp
     for ld, cdr3 in zip(long, cdr3bs):
         l2cdr3[ld] = cdr3
     cropped_seqs, sequences = [], []
@@ -1462,9 +1470,10 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
         for ind in range(len(seqs)):
             long_seq = seqs[ind]
             if long_seq not in ld2ep:
+                print("SOMETHING'S WRONG")
                 vdjdb_embeddings[long_seq] = (features[ind], "ASD")
             else:
-                vdjdb_embeddings[long_seq] = (features[ind], ld2ep[long_seq])
+                vdjdb_embeddings[long_seq] = (features[ind], ld2ep[long_seq], ld2lifegrp[long_seq])
         print("1", len(vdjdb_embeddings.keys()))
         if len(vdjdb_embeddings.keys()) >= seqs_per_ds -1:
             print("2", len(vdjdb_embeddings.keys()))
@@ -1495,8 +1504,8 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
 #                             add_specific_epitopes_vdj50=['NEGVKAAW', 'LLQTGIHVRVSQPSL', 'YSEHPTFTSQY', 'AMFWSVPTV'])
 if os.path.exists("/scratch/work"):
     hparams.embedding_save_name = "/scratch/work/dumitra1/" + hparams.embedding_save_name
-extract_and_save_embeddings(model, emb_name="sp6_partitioned_data_2", test_new_data=True, extract_cdr3=True,
-                            sum_tcrs=False, extract_unlabeled=False,add_long_aa=-1, data_file="sp6_partitioned_data_2.bin")
+extract_and_save_embeddings(model, emb_name="sp6_partitioned_data_1", test_new_data=True, extract_cdr3=True,
+                            sum_tcrs=False, extract_unlabeled=False,add_long_aa=-1, data_file="sp6_partitioned_data_1.bin")
 
 # extract_and_save_embeddings(model, emb_name="vdj50_original_bert_cdr3Only", test_new_data=True, extract_cdr3=True,
 #                             use_only_cdr3=True, use_covid_data="")
