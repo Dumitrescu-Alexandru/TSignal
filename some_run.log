@@ -60,3 +60,4 @@ INFO:root:Beginning evaluate
 INFO:root:Beginning evaluate
 INFO:root:Beginning evaluate
 INFO:root:On epoch 0 total loss: 0.112449956979231
+INFO:root:On epoch 1 total loss: 0.0823538043224217

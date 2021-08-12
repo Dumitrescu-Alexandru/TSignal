@@ -370,7 +370,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.00001, betas=(0.9, 0.98), eps=1e-9)
     ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
-    evaluate(model, sp_data.lbl2ind, run_name=run_name)
 
     for e in range(eps):
         losses = 0
