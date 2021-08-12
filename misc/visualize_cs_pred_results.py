@@ -35,10 +35,10 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls):
         life_grp, sp_info = l.split("|")
         ind = 0
         if sp_info == "SP":
-            print(p,)
-            print(t)
-            print(s)
-            print("\n")
+            # print(p,)
+            # print(t)
+            # print(s)
+            # print("\n")
             while p[ind] == "S" and ind < len(p)-1:
                 ind += 1
             predictions[grp2_ind[life_grp]] += get_acc_for_tolerence(ind, t, v=p)
@@ -74,7 +74,7 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls):
     for grp, id in grp2_ind.items():
         print("{}: {}".format(grp, predictions[grp2_ind[grp]][0] / predictions[grp2_ind[grp]][1]))
 
-def extract_seq_group_for_predicted_aa_lbls(filename="500ep_run.bin", test_fold=2):
+def extract_seq_group_for_predicted_aa_lbls(filename="100ep_w_grp_run.bin", test_fold=2):
     seq2preds = pickle.load(open(filename, "rb"))
     tested_seqs = set(seq2preds.keys())
     seq2id = {}

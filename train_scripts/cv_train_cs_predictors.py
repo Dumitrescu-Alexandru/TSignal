@@ -348,7 +348,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50):
         for s, t, pt in zip(src, tgt, predicted_tokens):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
             eval_dict[s] = predicted_lbls[:len(t)]
-
+            print(eval_dict)
         # print("".join([ind2lbl[i] for i in tgt_tokens[0]]), len("".join([ind2lbl[i] for i in tgt_tokens[0]])))
         # print("".join([ind2lbl[i] for i in tgt[0]]), len("".join([ind2lbl[i] for i in tgt[0]])))
         # print("\n")
@@ -377,8 +377,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False):
     for e in range(eps):
         losses = 0
         for ind, batch in enumerate(dataset_loader):
-            model.eval()
-
             seqs, lbl_seqs, _ = batch
             max_len_s = 0
             some_s = 0
