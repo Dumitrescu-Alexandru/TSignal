@@ -292,7 +292,7 @@ def generate_square_subsequent_mask(sz):
     return mask
 
 
-def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, test_batch_size=50):
+def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     src = src
@@ -300,10 +300,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, test_batch_size=5
     memory = model.encode(src)
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
     ys = []
-    for _ in range(test_batch_size):
-        ys.append([])
-    preds = []
+    if not ys:
+        for _ in range(len(src)):
+            ys.append([])
     for i in range(max(seq_lens)):
+
         tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
         out = model.decode(ys, memory.to(device), tgt_mask.to(device))
         out = out.transpose(0, 1)
@@ -311,7 +312,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, test_batch_size=5
         _, next_words = torch.max(prob, dim=1)
         next_word = [nw.item() for nw in next_words]
         current_ys = []
-        for bach_ind in range(test_batch_size):
+        for bach_ind in range(len(src)):
             current_ys.append(ys[bach_ind])
             current_ys[-1].append(next_word[bach_ind])
         ys = current_ys
@@ -320,11 +321,10 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, test_batch_size=5
     return ys
 
 
-def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, test_batch_size=50):
+def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None):
     model.eval()
     num_tokens = len(src)
-    tgt_tokens = greedy_decode(
-        model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt, test_batch_size=test_batch_size)
+    tgt_tokens = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
     return tgt_tokens
 
 
@@ -342,16 +342,14 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50):
                                                  num_workers=4, collate_fn=collate_fn)
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     for ind, (src, tgt, _) in enumerate(dataset_loader):
+        print("Number of sequences tested: {}".format(ind * test_batch_size))
         src = src
         tgt = tgt
-        predicted_tokens = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt,test_batch_size=test_batch_size)
+        predicted_tokens = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt)
         for s, t, pt in zip(src, tgt, predicted_tokens):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
             eval_dict[s] = predicted_lbls[:len(t)]
-            print(eval_dict)
-        # print("".join([ind2lbl[i] for i in tgt_tokens[0]]), len("".join([ind2lbl[i] for i in tgt_tokens[0]])))
-        # print("".join([ind2lbl[i] for i in tgt[0]]), len("".join([ind2lbl[i] for i in tgt[0]])))
-        # print("\n")
+
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
 
 
