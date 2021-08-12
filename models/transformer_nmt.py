@@ -124,10 +124,12 @@ class TransformerModel(nn.Module):
 
     def encode(self, src):
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
-        print(src[0].shape)
         if len(src) == 1:
             src = src[0].reshape(1, *src[0].shape).transpose(0,1)
-        return self.transformer.encoder(self.pos_encoder(src), src_mask)
+        else:
+            src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True).transpose(0,1)
+
+        return self.transformer.encoder(self.pos_encoder(src), src_mask, padding_mask_src)
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
         tgt = self.pos_encoder(self.label_encoder(tgt))

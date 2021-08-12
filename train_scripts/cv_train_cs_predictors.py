@@ -1,5 +1,6 @@
 import time
 import logging
+
 logging.getLogger('some_logger')
 
 import os
@@ -60,7 +61,7 @@ def get_pos_neg_for_datasets(test_datasets, model, data_folder, use_aa_len=200, 
     return neg, pos, test_results_for_ds
 
 
-def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fixed_ep_test=-1,pos_weight=4):
+def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fixed_ep_test=-1, pos_weight=4):
     """
 
     :param train_datasets: list of train ds file names
@@ -91,9 +92,9 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
                                                          num_workers=4)
             for ind, batch in enumerate(dataset_loader):
                 x, y = batch['emb'], batch['lbl']
-                weights = torch.ones(y.shape) + y * (pos_weight-1)
+                weights = torch.ones(y.shape) + y * (pos_weight - 1)
                 criterion = nn.BCELoss(weight=weights).to(device)
-                x, y = x.to(device,dtype=torch.float32), y.to(device).to(torch.float)
+                x, y = x.to(device, dtype=torch.float32), y.to(device).to(torch.float)
                 if use_aa_len != 200:
                     x = x[:, :use_aa_len, :]
                 preds = model(x.permute(0, 2, 1))
@@ -111,7 +112,7 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
                                                                      epoch)
             # average results between positive and negative accuracies is taken into account, with more weight on the
             # positive labels
-            avg_pos_neg = neg * 1/3 + pos * 2/3
+            avg_pos_neg = neg * 1 / 3 + pos * 2 / 3
             if avg_pos_neg < max_avg_pos_neg:
                 patience -= 1
             else:
@@ -122,9 +123,9 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
     return max_results
 
 
-def init_model(ntoken, partitions,lbl2ind={}, lg2ind={}):
+def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8,
-                             d_hid=1024, nlayers=3,  partitions=partitions,lbl2ind=lbl2ind, lg2ind=lg2ind)
+                             d_hid=1024, nlayers=3, partitions=partitions, lbl2ind=lbl2ind, lg2ind=lg2ind)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -235,7 +236,8 @@ def train_test_nested_folds(run_name, params, train_ds, test_ds, data_folder, pa
             # validation
             print("final best parameters:", best_results_params_and_epoch)
             model = init_model(best_results_params_and_epoch[0])
-            final_result_current_fold = train_fold(model=model, train_datasets=train_datasets, test_datasets=test_datasets,
+            final_result_current_fold = train_fold(model=model, train_datasets=train_datasets,
+                                                   test_datasets=test_datasets,
                                                    param_set=best_results_params_and_epoch[0],
                                                    fixed_ep_test=best_results_params_and_epoch[1],
                                                    data_folder=data_folder)
@@ -245,6 +247,7 @@ def train_test_nested_folds(run_name, params, train_ds, test_ds, data_folder, pa
                         open("results_fold_{}{}.bin".format(ind, "_" + str(param_set_number) if
                         param_set_number != -1 else ""), "wb"))
 
+
 def get_data_folder():
     if os.path.exists("/scratch/work/dumitra1"):
         return "/scratch/work/dumitra1/sp_data/"
@@ -253,22 +256,25 @@ def get_data_folder():
     else:
         return "/scratch/project2003818/dumitra1/sp_data/"
 
+
 def get_all_ds(ds):
     ds_set = set()
     for d in ds:
         ds_set.update(d)
     return list(ds_set)
 
+
 def get_all_bench_ds():
-    data_folder =get_data_folder()
+    data_folder = get_data_folder()
     test_datasets = []
     for f in os.listdir(data_folder):
         if "raw_sp6_bench_data_" in f:
             test_datasets.append(f)
     return test_datasets
 
+
 def padd_add_eos_tkn(lbl_seqs, lbl2ind):
-    device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     max_len = max([len(l) for l in lbl_seqs])
     label_outpus_tensors = []
     for l_s in lbl_seqs:
@@ -279,43 +285,50 @@ def padd_add_eos_tkn(lbl_seqs, lbl2ind):
         label_outpus_tensors.append(torch.tensor(tokenized_seq, device=device))
     return torch.vstack(label_outpus_tensors)
 
+
 def generate_square_subsequent_mask(sz):
     mask = (torch.triu(torch.ones((sz, sz))) == 1).transpose(0, 1)
     mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
     return mask
 
 
-def greedy_decode(model, src, start_symbol, lbl2ind,tgt=None):
-    ind2lbl = {v:k for k,v in lbl2ind.items()}
+def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, test_batch_size=50):
+    ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     src = src
-    seq_len = len(src[0])
+    seq_lens = [len(src_) for src_ in src]
     memory = model.encode(src)
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
-    ys = [[]]
+    ys = []
+    for _ in range(test_batch_size):
+        ys.append([])
     preds = []
-    for i in range(seq_len):
+    for i in range(max(seq_lens)):
         tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
         out = model.decode(ys, memory.to(device), tgt_mask.to(device))
         out = out.transpose(0, 1)
         prob = model.generator(out[:, -1])
-        _, next_word = torch.max(prob, dim=1)
-        next_word = next_word.item()
-        current_ys = ys[0]
-        current_ys.append(next_word)
-        ys = [current_ys]
+        _, next_words = torch.max(prob, dim=1)
+        next_word = [nw.item() for nw in next_words]
+        current_ys = []
+        for bach_ind in range(test_batch_size):
+            current_ys.append(ys[bach_ind])
+            current_ys[-1].append(next_word[bach_ind])
+        ys = current_ys
         # ys = torch.cat([ys, torch.ones(1, 1, device=device).fill_(next_word)], dim=0)
 
     return ys
 
-def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None):
+
+def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, test_batch_size=50):
     model.eval()
     num_tokens = len(src)
     tgt_tokens = greedy_decode(
-        model,  src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
+        model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt, test_batch_size=test_batch_size)
     return tgt_tokens
 
-def evaluate(model, lbl2ind, run_name=""):
+
+def evaluate(model, lbl2ind, run_name="", test_batch_size=50):
     print("Beginning evaluate")
     logging.info("Beginning evaluate")
     eval_dict = {}
@@ -325,25 +338,26 @@ def evaluate(model, lbl2ind, run_name=""):
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[2], data_folder=sp_data.data_folder)
 
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=1, shuffle=False,
+                                                 batch_size=test_batch_size, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
-    ind2lbl = {v:k for k,v in lbl2ind.items()}
+    ind2lbl = {v: k for k, v in lbl2ind.items()}
     for ind, (src, tgt, _) in enumerate(dataset_loader):
         src = src
         tgt = tgt
-        tgt_tokens = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt)
-        model_output = "".join([ind2lbl[i] for i in tgt_tokens[0]])
+        predicted_tokens = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt,test_batch_size=test_batch_size)
+        for s, t, pt in zip(src, tgt, predicted_tokens):
+            predicted_lbls = "".join([ind2lbl[i] for i in pt])
+            eval_dict[s] = predicted_lbls[:len(t)]
+
         # print("".join([ind2lbl[i] for i in tgt_tokens[0]]), len("".join([ind2lbl[i] for i in tgt_tokens[0]])))
         # print("".join([ind2lbl[i] for i in tgt[0]]), len("".join([ind2lbl[i] for i in tgt[0]])))
         # print("\n")
-        eval_dict[src[0]] = model_output
-    pickle.dump(eval_dict, open(run_name+".bin", "wb"))
+    pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
 
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False):
-
     sp_data = SPCSpredictionData()
-    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[0,1], data_folder=sp_data.data_folder)
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[0, 1], data_folder=sp_data.data_folder)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
@@ -352,12 +366,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False):
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
         lg2ind = sp_data.lg2ind
 
-    model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0,1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind)
+    model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.00001, betas=(0.9, 0.98), eps=1e-9)
-    ind2lbl = {ind:lbl for lbl, ind in sp_data.lbl2ind.items()}
+    ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
+    evaluate(model, sp_data.lbl2ind, run_name=run_name)
+
     for e in range(eps):
         losses = 0
         for ind, batch in enumerate(dataset_loader):
@@ -387,9 +403,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False):
         logging.info("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
     evaluate(model, sp_data.lbl2ind, run_name=run_name)
 
-        # loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
-        # loss.backward()
-        #
-        # optimizer.step()
-        # losses += loss.item()
-
+    # loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+    # loss.backward()
+    #
+    # optimizer.step()
+    # losses += loss.item()
