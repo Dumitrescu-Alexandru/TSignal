@@ -21,7 +21,7 @@ def create_parameter_set():
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--use_aa_len", default=200, type=int)
-    parser.add_argument("--lr", default=0.001, type=float)
+    parser.add_argument("--lr", default=0.0001, type=float)
     parser.add_argument("--data", default="mammal", type=str)
     parser.add_argument("--param_set_search_number", default=-1, type=int)
     parser.add_argument("--train_cs_predictor", default=False, action="store_true")
@@ -29,6 +29,7 @@ def parse_arguments():
     parser.add_argument("--run_name", default="some_run", type=str)
     parser.add_argument("--epochs", default=20, type=int)
     parser.add_argument("--add_lg_info", default=False, action="store_true")
+    parser.add_argument("--dropout", default=0.5, type=float)
 
     return parser.parse_args()
 
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
     if args.train_cs_predictor:
-        a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info)
+        a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info, lr=args.lr, dropout=args.dropout)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()

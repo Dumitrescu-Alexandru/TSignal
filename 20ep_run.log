@@ -1,0 +1,24 @@
+INFO:root:On epoch 0 total loss: 0.19002706951002027
+INFO:root:On epoch 1 total loss: 0.12343589556605919
+INFO:root:On epoch 2 total loss: 0.11206279694557647
+INFO:root:On epoch 0 total loss: 0.12739771206284423
+INFO:root:On epoch 1 total loss: 0.08661702047566623
+INFO:root:On epoch 2 total loss: 0.07639211209972038
+INFO:root:On epoch 3 total loss: 0.07254697465816574
+INFO:root:On epoch 4 total loss: 0.06922129826510653
+INFO:root:On epoch 5 total loss: 0.0669521992726018
+INFO:root:On epoch 6 total loss: 0.06517169799874811
+INFO:root:On epoch 7 total loss: 0.06362532354567361
+INFO:root:On epoch 8 total loss: 0.06270649585672809
+INFO:root:On epoch 9 total loss: 0.06018696762049747
+INFO:root:On epoch 10 total loss: 0.06018257163026754
+INFO:root:On epoch 11 total loss: 0.05947558316723694
+INFO:root:On epoch 12 total loss: 0.058563778748559524
+INFO:root:On epoch 13 total loss: 0.0574778771632925
+INFO:root:On epoch 14 total loss: 0.057598179184815
+INFO:root:On epoch 15 total loss: 0.056896948658139504
+INFO:root:On epoch 16 total loss: 0.05613006543739677
+INFO:root:On epoch 17 total loss: 0.05573796803879616
+INFO:root:On epoch 18 total loss: 0.05550522499186609
+INFO:root:On epoch 19 total loss: 0.05462968297769575
+INFO:root:Beginning evaluate

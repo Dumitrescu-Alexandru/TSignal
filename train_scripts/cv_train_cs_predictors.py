@@ -123,9 +123,9 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
     return max_results
 
 
-def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}):
+def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}, dropout=0.5):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8,
-                             d_hid=1024, nlayers=3, partitions=partitions, lbl2ind=lbl2ind, lg2ind=lg2ind)
+                             d_hid=1024, nlayers=3, partitions=partitions, lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -297,18 +297,19 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     src = src
     seq_lens = [len(src_) for src_ in src]
-    memory = model.encode(src)
+    with torch.no_grad():
+        memory = model.encode(src)
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
     ys = []
     if not ys:
         for _ in range(len(src)):
             ys.append([])
     for i in range(max(seq_lens)):
-
-        tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
-        out = model.decode(ys, memory.to(device), tgt_mask.to(device))
-        out = out.transpose(0, 1)
-        prob = model.generator(out[:, -1])
+        with torch.no_grad():
+            tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
+            out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+            out = out.transpose(0, 1)
+            prob = model.generator(out[:, -1])
         _, next_words = torch.max(prob, dim=1)
         next_word = [nw.item() for nw in next_words]
         current_ys = []
@@ -353,7 +354,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50):
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
 
 
-def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False):
+def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5):
     sp_data = SPCSpredictionData()
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[0, 1], data_folder=sp_data.data_folder)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
@@ -364,11 +365,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False):
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
         lg2ind = sp_data.lg2ind
 
-    model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind)
+    model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind, dropout=dropout)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.00001, betas=(0.9, 0.98), eps=1e-9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
     ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
 
     for e in range(eps):
