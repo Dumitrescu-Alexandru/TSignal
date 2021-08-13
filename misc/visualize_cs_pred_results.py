@@ -1,3 +1,4 @@
+import os
 import pickle
 from Bio import SeqIO
 import numpy as np
@@ -79,7 +80,7 @@ def extract_seq_group_for_predicted_aa_lbls(filename="100ep_nonbatch_test.bin", 
     tested_seqs = set(seq2preds.keys())
     seq2id = {}
     life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
-    for seq_record in SeqIO.parse("sp_data/sp6_data/train_set.fasta", "fasta"):
+    for seq_record in SeqIO.parse(get_data_folder() + "sp6_data/train_set.fasta", "fasta"):
         seq, lbls = seq_record.seq[:len(seq_record.seq) // 2], seq_record.seq[len(seq_record.seq) // 2:]
         if seq in tested_seqs:
             life_grp.append("|".join(str(seq_record.id).split("|")[1:-1]))
@@ -87,6 +88,15 @@ def extract_seq_group_for_predicted_aa_lbls(filename="100ep_nonbatch_test.bin", 
             true_lbls.append(lbls)
             pred_lbls.append(seq2preds[seq])
     return life_grp, seqs, true_lbls, pred_lbls
+
+def get_data_folder():
+    if os.path.exists("/scratch/work/dumitra1"):
+        return "/scratch/work/dumitra1/sp_data/"
+    elif os.path.exists("/home/alex"):
+        return "sp_data/"
+    else:
+        return "/scratch/project2003818/dumitra1/sp_data/"
+
 
 life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls()
 get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls)

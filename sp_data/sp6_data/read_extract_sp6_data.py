@@ -2,8 +2,6 @@ import pickle
 import random
 from Bio import SeqIO
 
-ind = 0
-
 def create_labeled_by_sp6_partition(all_ids, all_seqs, all_lbls):
     partition_2_info = {}
     for i, s, l in zip(all_ids, all_seqs, all_lbls):
