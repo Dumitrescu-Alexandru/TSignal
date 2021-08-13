@@ -22,3 +22,4 @@ INFO:root:On epoch 17 total loss: 0.05573796803879616
 INFO:root:On epoch 18 total loss: 0.05550522499186609
 INFO:root:On epoch 19 total loss: 0.05462968297769575
 INFO:root:Beginning evaluate
+INFO:root:On epoch 0 total loss: 0.19434515907026617
