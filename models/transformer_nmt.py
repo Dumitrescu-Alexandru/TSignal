@@ -132,8 +132,8 @@ class TransformerModel(nn.Module):
         return self.transformer.encoder(self.pos_encoder(src), src_mask, padding_mask_src)
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
-        tgt = self.pos_encoder(self.label_encoder(tgt))
-        return self.transformer.decoder(tgt.transpose(0,1), memory, tgt_mask)
+        tgt = self.pos_encoder(self.label_encoder(tgt).transpose(0,1))
+        return self.transformer.decoder(tgt, memory, tgt_mask)
 
     def forward(self, src: Tensor, tgt: list) -> Tensor:
         """
@@ -146,10 +146,9 @@ class TransformerModel(nn.Module):
 
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
-        padded_src = self.pos_encoder(padded_src)
+        padded_src = self.pos_encoder(padded_src.transpose(0,1))
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
-        padded_tgt = self.pos_encoder(padded_tgt)
-        padded_src, padded_tgt = padded_src.transpose(0, 1), padded_tgt.transpose(0, 1)
+        padded_tgt = self.pos_encoder(padded_tgt.transpose(0,1))
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
         outs = self.transformer(padded_src, padded_tgt, src_mask, tgt_mask, None, padding_mask_src, padding_mask_tgt,
                                 padding_mask_src)

@@ -350,7 +350,6 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50):
         for s, t, pt in zip(src, tgt, predicted_tokens):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
             eval_dict[s] = predicted_lbls[:len(t)]
-
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
 
 
@@ -371,7 +370,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
     ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
-
     for e in range(eps):
         losses = 0
         for ind, batch in enumerate(dataset_loader):
@@ -384,7 +382,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
             loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
             loss = torch.mean(loss)
-
+            #
             # if "S" in "".join([str(ind2lbl[i.item()]) for i in padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)[0]]):
             #
             #     print("".join([str(ind2lbl[i.item()]) for i in torch.argmax(logits.transpose(1,0),dim=-1)[0]]),"\n",

@@ -75,7 +75,7 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls):
     for grp, id in grp2_ind.items():
         print("{}: {}".format(grp, predictions[grp2_ind[grp]][0] / predictions[grp2_ind[grp]][1]))
 
-def extract_seq_group_for_predicted_aa_lbls(filename="100ep_nonbatch_test.bin", test_fold=2):
+def extract_seq_group_for_predicted_aa_lbls(filename="20ep_run.bin", test_fold=2):
     seq2preds = pickle.load(open(filename, "rb"))
     tested_seqs = set(seq2preds.keys())
     seq2id = {}

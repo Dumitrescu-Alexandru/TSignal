@@ -94,5 +94,6 @@ for seq_record in SeqIO.parse("train_set.fasta", "fasta"):
 
 
 partition_2_info = create_labeled_by_sp6_partition(ids, seqs, lbls)
-for part_no, info in partition_2_info.items():
-    pickle.dump(info, open("sp6_partitioned_data_{}.bin".format(part_no), "wb"))
+
+# for part_no, info in partition_2_info.items():
+#     pickle.dump(info, open("sp6_partitioned_data_{}.bin".format(part_no), "wb"))
