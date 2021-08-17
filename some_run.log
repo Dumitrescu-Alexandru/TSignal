@@ -61,3 +61,10 @@ INFO:root:Beginning evaluate
 INFO:root:Beginning evaluate
 INFO:root:On epoch 0 total loss: 0.112449956979231
 INFO:root:On epoch 1 total loss: 0.0823538043224217
+INFO:root:On epoch 0 total loss: 0.12118627166947221
+INFO:root:On epoch 1 total loss: 0.04925167869613144
+INFO:root:On epoch 0 total loss: 0.11832798695154857
+INFO:root:On epoch 1 total loss: 0.04941944158741417
+INFO:root:On epoch 0 total loss: 0.11749296291181989
+INFO:root:On epoch 1 total loss: 0.05187956330233386
+INFO:root:On epoch 0 total loss: 0.15278289377647267

@@ -9,3 +9,4 @@ sp_data/*fasta
 sp_data/sp5_outputs/*
 sp_data/results/*
 *.bin
+*.log

@@ -10,10 +10,14 @@ import os
 class SPCSpredictionData:
     def __init__(self, lbl2ind=None):
         self.lbl2ind = {}
+        self.glbl_lbl_2ind = {}
         self.data_folder = self.get_data_folder()
         self.lg2ind = {}
         if lbl2ind is None:
-            self.form_lbl_inds()
+            if os.path.exists("sp6_dicts.bin"):
+                self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind = pickle.load(open("sp6_dicts.bin", "rb"))
+            else:
+                self.form_lbl_inds()
         else:
             self.lbl2ind = lbl2ind
 
@@ -21,9 +25,10 @@ class SPCSpredictionData:
         parts = [0, 1, 2]
         all_unique_lbls = set()
         for p in parts:
-            part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_0.bin".format(p), "rb"))
-            for (_, lbls, _) in part_dict.values():
-                all_unique_lbls.update(lbls)
+            for t in ["train", "test"]:
+                part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
+                for (_, lbls, _, _) in part_dict.values():
+                    all_unique_lbls.update(lbls)
         self.lbl2ind = {l: ind for ind, l in enumerate(all_unique_lbls)}
         # add special tokens at the end of the dictionary
         unique_tkns = len(self.lbl2ind.keys())
@@ -33,11 +38,17 @@ class SPCSpredictionData:
         self.lbl2ind["ES"] = EOS_IDX
 
         all_unique_lgs = set()
+        all_unique_global_inds = set()
         for p in parts:
-            part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_0.bin".format(p), "rb"))
-            for (_, _, lg) in part_dict.values():
-                all_unique_lgs.add(lg)
+            for t in ["train", "test"]:
+                part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
+                for (_, _, lg, glb_ind) in part_dict.values():
+                    all_unique_lgs.add(lg)
+                    all_unique_global_inds.add(glb_ind)
         self.lg2ind = {l: ind for ind, l in enumerate(all_unique_lgs)}
+        self.glbl_lbl_2ind = {l:ind for ind,l in enumerate(all_unique_global_inds)}
+        pickle.dump([self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind], open("sp6_dicts.bin", "wb"))
+
 
     def get_data_folder(self):
         if os.path.exists("/scratch/work/dumitra1"):
@@ -49,19 +60,21 @@ class SPCSpredictionData:
 
 
 class CSPredsDataset(Dataset):
-    def __init__(self, lbl2inds, partitions, data_folder):
-        self.life_grp, self.seqs, self.lbls = [], [], []
+    def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True):
+        t = "train" if train else "test"
+        self.life_grp, self.seqs, self.lbls, self.glbl_lbl = [], [], [], []
         for p in partitions:
-            data_dict = pickle.load(open(data_folder + "sp6_partitioned_data_{}_0.bin".format(p), "rb"))
+            data_dict = pickle.load(open(data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
             self.seqs.extend(list(data_dict.keys()))
-            self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _) in data_dict.values()])
-            self.life_grp.extend([life_grp for (_, _, life_grp) in data_dict.values()])
+            self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
+            self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
+            self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
 
     def __len__(self):
         return len(self.seqs)
 
     def __getitem__(self, item):
-        return {"seq": self.seqs[item], "lbl": self.lbls[item], "lg":self.life_grp[item]}
+        return {"seq": self.seqs[item], "lbl": self.lbls[item], "lg":self.life_grp[item], "glbl_lbl":self.glbl_lbl[item]}
 
 
 class SPbinaryData:
@@ -240,12 +253,13 @@ class SPbinaryData:
 
 
 def collate_fn(batch):
-    src_batch, tgt_batch, life_grp = [], [], []
+    src_batch, tgt_batch, life_grp, glbl_lbl = [], [], [], []
     for sample in batch:
         src_batch.append(sample['seq'])
         tgt_batch.append(sample['lbl'])
         life_grp.append(sample['lg'])
-    return src_batch, tgt_batch, life_grp
+        glbl_lbl.append(sample['glbl_lbl'])
+    return src_batch, tgt_batch, life_grp, glbl_lbl
 
 
 class BinarySPDataset(Dataset):

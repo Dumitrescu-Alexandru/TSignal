@@ -30,6 +30,8 @@ def parse_arguments():
     parser.add_argument("--epochs", default=20, type=int)
     parser.add_argument("--add_lg_info", default=False, action="store_true")
     parser.add_argument("--dropout", default=0.5, type=float)
+    parser.add_argument("--test_freq", default=5, type=int)
+    parser.add_argument("--use_glbl_lbls", default=False, action="store_true")
 
     return parser.parse_args()
 
@@ -40,7 +42,8 @@ if __name__ == "__main__":
     args = parse_arguments()
     logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
     if args.train_cs_predictor:
-        a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info, lr=args.lr, dropout=args.dropout)
+        a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
+                                lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()

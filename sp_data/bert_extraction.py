@@ -1343,7 +1343,7 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
                                 extract_cdr3=False, use_only_cdr3=False, use_covid_data="",
                                 add_specific_epitopes_vdj50=[], sum_tcrs=True, extract_unlabeled=True,
                                 add_long_aa=-1, data_file="raw_seq_data_0.15_0.9.bin",seqs_per_ds=7100,
-                                add_life_grp=True):
+                                add_life_grp=True, add_sp_lbl=True):
     """
     Function for various bert-model based embedding extraction
     sum_tcrs: sums tcrs along the sequence dimension, to reduce memory necessary (only useful probably in visualizations
@@ -1357,6 +1357,7 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
     # TODO first file seems to have 4599 when it should have 4500 seqs. See what the problems is
     model.cuda()
     life_grp = []
+    sp_lbls = []
     if test_new_data:
         long, epitope, ids = pickle.load(open(data_file, "rb"))
         cdr3bs = long
@@ -1364,7 +1365,11 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
             life_grp = [i.split("|")[1] for i in ids]
         else:
             life_grp.append("eukaryote")
-        # when extracting covid data, those only hve CDR3B seqs.
+        if add_sp_lbl:
+            sp_lbls = [i.split("|")[2] for i in ids]
+        else:
+            sp_lbls.append("NA")
+# when extracting covid data, those only hve CDR3B seqs.
     elif use_covid_data:
         file = "../data/ImmuneCODE_MIRA/immuneCODE_MIRA_ci_TCRs.tsv" if use_covid_data == "ci" \
             else "../data/ImmuneCODE_MIRA/immuneCODE_MIRA_cii_TCRs.tsv"
@@ -1409,13 +1414,15 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
         epitope.extend(none_epitopes_tcrb)
         epitope.extend(none_epitopes_emerson)
 
-    ld2ep, l2cdr3, ld2lifegrp = {}, {}, {}
+    ld2ep, l2cdr3, ld2lifegrp, ld2splbl = {}, {}, {}, {}
     u_e = set()
-    for ep, ld, life_grp in zip(epitope, long, life_grp):
+    for ep, ld, life_grp, global_lbl in zip(epitope, long, life_grp, sp_lbls):
         ld2ep[ld] = ep
         u_e.add(ep)
         if add_life_grp:
             ld2lifegrp[ld] = life_grp
+        if add_sp_lbl:
+            ld2splbl[ld] = global_lbl
     for ld, cdr3 in zip(long, cdr3bs):
         l2cdr3[ld] = cdr3
     cropped_seqs, sequences = [], []
@@ -1473,39 +1480,26 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
                 print("SOMETHING'S WRONG")
                 vdjdb_embeddings[long_seq] = (features[ind], "ASD")
             else:
-                vdjdb_embeddings[long_seq] = (features[ind], ld2ep[long_seq], ld2lifegrp[long_seq])
+                vdjdb_embeddings[long_seq] = (features[ind], ld2ep[long_seq], ld2lifegrp[long_seq], ld2splbl[long_seq])
         print("1", len(vdjdb_embeddings.keys()))
         if len(vdjdb_embeddings.keys()) >= seqs_per_ds -1:
             print("2", len(vdjdb_embeddings.keys()))
-            pickle.dump(vdjdb_embeddings, open(emb_name + "_{}.bin".format(file_index), "wb"))
+            # temporarily removed the file index from save name since all seqs in sp6 data can be contained in a single
+            # file.  For large sp6 file data change below to
+            # pickle.dump(vdjdb_embeddings, open(emb_name + "_{}.bin".format(file_index), "wb"))
+            pickle.dump(vdjdb_embeddings, open(emb_name + ".bin".format(file_index), "wb"))
             file_index += 1
             vdjdb_embeddings = {}
     if vdjdb_embeddings:
-        pickle.dump(vdjdb_embeddings, open(emb_name + "_{}.bin".format(file_index), "wb"))
-    # print("Count", count)
-    #
-    #     vdjdb_embeddings = {}
-    # for ind in range(len(sequences)):
-    #     vdjdb_embeddings[sequences[ind].replace(" ","")] = features[ind]
-    # pickle.dump(vdjdb_embeddings, open(emb_name + ".bin", "wb"))
+        # temporarily removed the file index from save name since all seqs in sp6 data can be contained in a single
+        # file.  For large sp6 file data change below to
+        # pickle.dump(vdjdb_embeddings, open(emb_name + "_{}.bin".format(file_index), "wb"))
+        pickle.dump(vdjdb_embeddings, open(emb_name + ".bin".format(file_index), "wb"))
 
-
-# trainer.fit(model)
-# best_checkpoint_path = "experiments/lightning_logs/version_08-02-2021--14-24-31/" \
-#                        "checkpoints/epoch=19-val_loss=2.73-val_acc=0.33.ckpt"
-# model = model.load_from_checkpoint(best_checkpoint_path)
-# extract_perp_score(model)
-
-# model.eval()
-# model.freeze()
-# extract_and_save_embeddings(model, emb_name="MIRA_ci_original_bert_cdr3Only", test_new_data=False, extract_cdr3=True,
-#                             use_only_cdr3=True, use_covid_data="ci")
-# extract_and_save_embeddings(model, emb_name="MIRA_cii_original_bert_cdr3Only", test_new_data=False, extract_cdr3=True,
-#                             add_specific_epitopes_vdj50=['NEGVKAAW', 'LLQTGIHVRVSQPSL', 'YSEHPTFTSQY', 'AMFWSVPTV'])
 if os.path.exists("/scratch/work"):
     hparams.embedding_save_name = "/scratch/work/dumitra1/" + hparams.embedding_save_name
-extract_and_save_embeddings(model, emb_name="sp6_partitioned_data_1", test_new_data=True, extract_cdr3=True,
-                            sum_tcrs=False, extract_unlabeled=False,add_long_aa=-1, data_file="sp6_partitioned_data_1.bin")
+extract_and_save_embeddings(model, emb_name="sp6_partitioned_data_test_0", test_new_data=True, extract_cdr3=True,
+                            sum_tcrs=False, extract_unlabeled=False,add_long_aa=-1, data_file="sp6_partitioned_data_test_0.bin")
 
 # extract_and_save_embeddings(model, emb_name="vdj50_original_bert_cdr3Only", test_new_data=True, extract_cdr3=True,
 #                             use_only_cdr3=True, use_covid_data="")

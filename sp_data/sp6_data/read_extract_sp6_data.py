@@ -2,11 +2,50 @@ import pickle
 import random
 from Bio import SeqIO
 
+def split_train_test_partitions(partition, split_perc=0.1):
+    lgrp_and_sptype_2_inds = {}
+    for ind, (seq, lbls, glbl_info) in enumerate(zip(*partition)):
+        life_grp_and_sp_type = "_".join(glbl_info.split("|")[1:3])
+        if life_grp_and_sp_type in lgrp_and_sptype_2_inds:
+            lgrp_and_sptype_2_inds[life_grp_and_sp_type].append(ind)
+        else:
+            lgrp_and_sptype_2_inds[life_grp_and_sp_type] = [ind]
+    seq_test, seq_train, lbls_test, lbls_train, glbl_info_train, glbl_info_test = [],[],[],[],[],[]
+    for lgrp_and_sp_type, inds in lgrp_and_sptype_2_inds.items():
+        if int(len(inds) * split_perc) > 0:
+            no_of_test_items = int(len(inds) * split_perc)
+            test_inds = random.sample(inds, no_of_test_items)
+            train_inds = set(inds) - set(test_inds)
+
+            seq_train.extend([partition[0][tri] for tri in train_inds])
+            lbls_train.extend([partition[1][tri] for tri in train_inds])
+            glbl_info_train.extend([partition[2][tri] for tri in train_inds])
+            seq_test.extend([partition[0][tsi] for tsi in test_inds])
+            lbls_test.extend([partition[1][tsi] for tsi in test_inds])
+            glbl_info_test.extend([partition[2][tsi] for tsi in test_inds])
+        else:
+            # if not enough samples for the life group with the specific global SP type, add samples only to the train
+            # set of the partition
+            seq_train.extend([partition[0][i] for i in inds])
+            lbls_train.extend([partition[1][i] for i in inds])
+            glbl_info_train.extend([partition[2][i] for i in inds])
+    return [seq_train, lbls_train, glbl_info_train], [seq_test, lbls_test, glbl_info_test]
+
+
 def create_labeled_by_sp6_partition(all_ids, all_seqs, all_lbls):
+    count_types = {}
+    type2someseq = {}
     partition_2_info = {}
     for i, s, l in zip(all_ids, all_seqs, all_lbls):
 
         life_grp, partition = i.split("|")[1], int(i.split("|")[-1])
+        if i.split("|")[2] in count_types:
+            count_types[i.split("|")[2]] += 1
+        else:
+            count_types[i.split("|")[2]] = 1
+        if i.split("|")[2] not in type2someseq:
+            type2someseq[i.split("|")[2]] = l
+
         if partition in partition_2_info:
             partition_2_info[partition][0].append(str(s))
             partition_2_info[partition][1].append(str(l))
@@ -16,6 +55,11 @@ def create_labeled_by_sp6_partition(all_ids, all_seqs, all_lbls):
             partition_2_info[partition][0] = [str(s)]
             partition_2_info[partition][1] = [str(l)]
             partition_2_info[partition][2] = [i]
+    train_partitions, test_partitions = {}, {}
+    for part, info in partition_2_info.items():
+        train_current_part, test_current_part = split_train_test_partitions(info)
+        train_partitions[part] = train_current_part
+        test_partitions[part] = test_current_part
     return partition_2_info
 
 def create_labeled_sp6_seqs(id_and_seqs):
@@ -95,5 +139,8 @@ for seq_record in SeqIO.parse("train_set.fasta", "fasta"):
 
 partition_2_info = create_labeled_by_sp6_partition(ids, seqs, lbls)
 
-# for part_no, info in partition_2_info.items():
-#     pickle.dump(info, open("sp6_partitioned_data_{}.bin".format(part_no), "wb"))
+for part_no, info in partition_2_info.items():
+    train_part_info, test_part_info = split_train_test_partitions(info)
+    # the split is done evenely across all global labels in conjunction with the life group information
+    pickle.dump(train_part_info, open("sp6_partitioned_data_train_{}.bin".format(part_no), "wb"))
+    pickle.dump(test_part_info, open("sp6_partitioned_data_test_{}.bin".format(part_no), "wb"))

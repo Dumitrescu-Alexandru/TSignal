@@ -1,5 +1,6 @@
 import time
 import logging
+import sys
 
 logging.getLogger('some_logger')
 
@@ -10,7 +11,8 @@ import pickle
 import torch.nn as nn
 import torch.optim as optim
 import torch
-
+sys.path.append(os.path.abspath(".."))
+from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn
 from models.transformer_nmt import TransformerModel
 
@@ -123,9 +125,10 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
     return max_results
 
 
-def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}, dropout=0.5):
-    model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8,
-                             d_hid=1024, nlayers=3, partitions=partitions, lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout)
+def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6):
+    model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8, d_hid=1024, nlayers=3, partitions=partitions,
+                             lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
+                             no_glbl_lbls=no_glbl_lbls)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -304,6 +307,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
     if not ys:
         for _ in range(len(src)):
             ys.append([])
+    model.eval()
     for i in range(max(seq_lens)):
         with torch.no_grad():
             tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
@@ -343,7 +347,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50):
                                                  num_workers=4, collate_fn=collate_fn)
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     for ind, (src, tgt, _) in enumerate(dataset_loader):
-        print("Number of sequences tested: {}".format(ind * test_batch_size))
+        # print("Number of sequences tested: {}".format(ind * test_batch_size))
         src = src
         tgt = tgt
         predicted_tokens = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt)
@@ -353,9 +357,12 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50):
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
 
 
-def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5):
+def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
+                        test_freq=1, use_glbl_lbls=False):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData()
-    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[0, 1], data_folder=sp_data.data_folder)
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[0, 1], data_folder=sp_data.data_folder,
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
@@ -363,17 +370,18 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         lg2ind = None
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
         lg2ind = sp_data.lg2ind
+    model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
+                       dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()))
 
-    model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind, dropout=dropout)
-
-    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
-
+    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
+    loss_fn_glbl = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
     ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
     for e in range(eps):
         losses = 0
+        losses_glbl = 0
         for ind, batch in enumerate(dataset_loader):
-            seqs, lbl_seqs, _ = batch
+            seqs, lbl_seqs, _, glbl_lbls = batch
             max_len_s = 0
             some_s = 0
             logits = model(seqs, lbl_seqs)
@@ -381,22 +389,34 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             optimizer.zero_grad()
             targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
             loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
-            loss = torch.mean(loss)
+            if use_glbl_lbls:
+                cls_tkn_embs = model.encode(seqs).transpose(0,1)[:,1,:]
+                glbl_preds = model.glbl_generator(cls_tkn_embs)
+                loss_glbl = loss_fn_glbl(glbl_preds, torch.tensor(glbl_lbls, device=device))
+                loss_glbl.backward()
+                losses_glbl += loss_glbl.item()
+
             #
-            # if "S" in "".join([str(ind2lbl[i.item()]) for i in padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)[0]]):
+            # if "S" in "".join([str(ind2lbl[i.item()]) for i in padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)[0]])[:10] and e > 0:
             #
             #     print("".join([str(ind2lbl[i.item()]) for i in torch.argmax(logits.transpose(1,0),dim=-1)[0]]),"\n",
             #
             #           "".join([str(ind2lbl[i.item()]) for i in padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)[0]]), "\n\n")
             #     print(loss)
             loss.backward()
-
             optimizer.step()
             losses += loss.item()
-        print("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
-        logging.info("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
-    evaluate(model, sp_data.lbl2ind, run_name=run_name)
-
+        if use_glbl_lbls:
+            print("On epoch {} total loss: {}, {}".format(e, losses / len(dataset_loader), losses_glbl / len(dataset_loader)))
+            logging.info("On epoch {} total loss: {}, {}".format(e, losses / len(dataset_loader), losses_glbl / len(dataset_loader)))
+        else:
+            print("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
+            logging.info("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
+        if e != 0 and e % test_freq == 0:
+            evaluate(model, sp_data.lbl2ind, run_name=run_name)
+            sp_pred_accs, all_cs_preds, totals = get_cs_and_sp_pred_results(filename=run_name+".bin", v=False)
+            sp_pred_mean_acc, sp_pred_euk_acc = get_summary_sp_acc(sp_pred_accs)
+            mean_all_tol_all_lg_cs_preds, mean_all_tol_euk_cs_preds, tol0_acc_euk = get_summary_cs_acc(all_cs_preds)
     # loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
     # loss.backward()
     #
