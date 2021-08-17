@@ -338,15 +338,15 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50):
     logging.info("Beginning evaluate")
     eval_dict = {}
     model.eval()
-    losses = 0
-    sp_data = SPCSpredictionData(lbl2ind=lbl2ind)
-    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[2], data_folder=sp_data.data_folder)
+    sp_data = SPCSpredictionData()
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[2], data_folder=sp_data.data_folder,
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
 
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=test_batch_size, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
     ind2lbl = {v: k for k, v in lbl2ind.items()}
-    for ind, (src, tgt, _) in enumerate(dataset_loader):
+    for ind, (src, tgt, _, _) in enumerate(dataset_loader):
         # print("Number of sequences tested: {}".format(ind * test_batch_size))
         src = src
         tgt = tgt
@@ -377,6 +377,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     loss_fn_glbl = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
     ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
+    evaluate(model, sp_data.lbl2ind, run_name=run_name)
     for e in range(eps):
         losses = 0
         losses_glbl = 0

@@ -72,3 +72,4 @@ INFO:root:On epoch 0 total loss: 0.10769972445622171
 INFO:root:On epoch 0 total loss: 0.10176689192484327, 0.6101498856382855
 INFO:root:On epoch 1 total loss: 0.038198287309394716, 0.3081084988421976
 INFO:root:On epoch 0 total loss: 0.10448082374924489
+INFO:root:On epoch 1 total loss: 0.03870974432434992

@@ -13,13 +13,10 @@ class SPCSpredictionData:
         self.glbl_lbl_2ind = {}
         self.data_folder = self.get_data_folder()
         self.lg2ind = {}
-        if lbl2ind is None:
-            if os.path.exists("sp6_dicts.bin"):
-                self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind = pickle.load(open("sp6_dicts.bin", "rb"))
-            else:
-                self.form_lbl_inds()
+        if os.path.exists("sp6_dicts.bin"):
+            self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind = pickle.load(open("sp6_dicts.bin", "rb"))
         else:
-            self.lbl2ind = lbl2ind
+            self.form_lbl_inds()
 
     def form_lbl_inds(self):
         parts = [0, 1, 2]
