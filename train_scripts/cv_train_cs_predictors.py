@@ -456,7 +456,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             best_epoch = e
             best_avg_mcc = np.mean(sp_pred_mccs)
             save_model(model, run_name)
-            if e == eps:
+            if e == eps - 1:
                 patience = 0
         elif e > 10 and euk_importance_avg(sp_pred_mccs) < best_avg_mcc and eps == -1:
             patience -= 1
