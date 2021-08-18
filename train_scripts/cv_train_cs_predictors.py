@@ -357,14 +357,17 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0,1], 
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
 
 def save_model(model, model_name=""):
+    folder = get_data_folder()
     model.input_encoder.seq2emb = {}
-    torch.save(model, model_name+"_best_eval.pth")
+    torch.save(model, folder + model_name+"_best_eval.pth")
+    model.input_encoder.update()
 
 def load_model(model_path, ntoken, partitions, lbl2ind, lg2ind, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6, ff_dim=1024*4):
-    model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8, d_hid=1024, nlayers=3, partitions=partitions,
-                             lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
-                             no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim)
-    model.load_state_dict(torch.load(model_path))
+    # model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8, d_hid=1024, nlayers=3, partitions=partitions,
+    #                          lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
+    #                          no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim)
+    folder = get_data_folder()
+    model= torch.load(folder + model_path)
     model.input_encoder.update()
     return model
 
@@ -447,11 +450,13 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if best_avg_mcc < np.mean(sp_pred_mccs):
             best_epoch = e
             best_avg_mcc = np.mean(sp_pred_mccs)
-            save_model(model, run_name + "_best.bin")
+            save_model(model, run_name)
+            if e == 10:
+                patience = 0
         elif e > 10 and np.mean(sp_pred_mccs) < best_avg_mcc:
             patience -= 1
             patience = 0
-    model = load_model(run_name + "_best.bin", len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
+    model = load_model(run_name + "_best_eval.pth", len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()))
     evaluate(model, sp_data.lbl2ind, run_name=run_name+"_best.bin", partitions=test_partition, sets=["train", "test"])
     sp_pred_mccs, all_recalls, all_precisions, totals = \
