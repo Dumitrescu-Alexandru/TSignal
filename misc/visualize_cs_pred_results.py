@@ -16,13 +16,13 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
         while t_lbl[true_cs] == "S" and true_cs < len(t_lbl):
             true_cs += 1
         if np.abs(true_cs - ind) == 0:
-            return np.array([1, 1, 1, 1, 1, 1])
+            return np.array([1, 1, 1, 1, 1, 0])
         elif np.abs(true_cs - ind) == 1:
-            return np.array([0, 1, 1, 1, 1, 1])
+            return np.array([0, 1, 1, 1, 1, 0])
         elif np.abs(true_cs - ind) == 2:
-            return np.array([0, 0, 1, 1, 1, 1])
+            return np.array([0, 0, 1, 1, 1, 0])
         elif np.abs(true_cs - ind) == 3:
-            return np.array([0, 0, 0, 1, 1, 1])
+            return np.array([0, 0, 0, 1, 1, 0])
         else:
             return np.array([0, 0, 0, 0, 1, 0])
 
@@ -51,10 +51,12 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
                 ind += 1
             predictions[grp2_ind[life_grp]] += get_acc_for_tolerence(ind, t, v=p)
         elif sp_info != "SP" and p[ind] == "S" and l.split("|")[0] == "EUKARYA":
+            # count false positive predictions
             predictions[grp2_ind[life_grp]] += np.array([0, 0, 0, 0, 0, 1])
     all_recalls = []
     all_precisions = []
-    totals = []
+    total_positives = []
+    false_positives = []
     for life_grp, ind in grp2_ind.items():
         current_preds = predictions[grp2_ind[life_grp]]
         if v:
@@ -66,9 +68,10 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
             if current_preds[-1] + current_preds[i] == 0:
                 all_precisions[-1].append(0.)
             else:
-                all_precisions[-1].append(current_preds[i]/current_preds[-1])
-        totals.append(current_preds[-2])
-    return all_recalls, all_precisions, totals
+                all_precisions[-1].append(current_preds[i]/(current_preds[-1] + current_preds[i]))
+        total_positives.append(current_preds[-2])
+        false_positives.append(current_preds[-1])
+    return all_recalls, all_precisions, total_positives, false_positives, predictions
 
 def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False):
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
@@ -143,8 +146,8 @@ def get_data_folder():
 def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False):
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename=filename)
     sp_pred_accs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v)
-    all_recalls, all_precisions, totals = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v)
-    return sp_pred_accs, all_recalls, all_precisions, totals
+    all_recalls, all_precisions, total_positives, false_positives, predictions = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v)
+    return sp_pred_accs, all_recalls, all_precisions, total_positives, false_positives, predictions
 
 def get_summary_sp_acc(sp_pred_accs):
     return np.mean(sp_pred_accs), sp_pred_accs[0]
@@ -155,5 +158,5 @@ def get_summary_cs_acc(all_cs_preds):
 if __name__ == "__main__":
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin")
     sp_pred_accs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls,v=True)
-    all_recalls, all_precisions, totals = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls)
+    all_recalls, all_precisions, total_positives, false_positives, predictions = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls)
 

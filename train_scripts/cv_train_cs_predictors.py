@@ -415,6 +415,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         losses = 0
         losses_glbl = 0
         for ind, batch in enumerate(dataset_loader):
+            continue
             seqs, lbl_seqs, _, glbl_lbls = batch
             max_len_s = 0
             some_s = 0
@@ -434,11 +435,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             loss.backward()
             optimizer.step()
         evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
-        sp_pred_mccs, all_recalls, all_precisions, totals = get_cs_and_sp_pred_results(filename=run_name + ".bin",
-                                                                                       v=False)
-        all_recalls, all_precisions, totals = list(np.array(all_recalls).flatten()), \
-                              list(np.array(all_precisions).flatten()), list(np.array(totals).flatten())
-        print(sp_pred_mccs, all_recalls, all_precisions, totals)
+        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives\
+            = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
+        all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
+                              list(np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
         if use_glbl_lbls:
             print("On epoch {} total loss: {}, {}".format(e, losses / len(dataset_loader), losses_glbl / len(dataset_loader)))
             logging.info("On epoch {} total loss: {}, {}".format(e, losses / len(dataset_loader), losses_glbl / len(dataset_loader)))
@@ -447,10 +447,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e)
 
-        if best_avg_mcc < np.mean(sp_pred_mccs):
+        # if best_avg_mcc < np.mean(sp_pred_mccs):
+        if 1 == 1:
             best_epoch = e
             best_avg_mcc = np.mean(sp_pred_mccs)
             save_model(model, run_name)
+            patience = 0
             if e == 10:
                 patience = 0
         elif e > 10 and np.mean(sp_pred_mccs) < best_avg_mcc:
@@ -458,10 +460,17 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             patience = 0
     model = load_model(run_name + "_best_eval.pth", len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()))
-    evaluate(model, sp_data.lbl2ind, run_name=run_name+"_best.bin", partitions=test_partition, sets=["train", "test"])
-    sp_pred_mccs, all_recalls, all_precisions, totals = \
+    
+    evaluate(model, sp_data.lbl2ind, run_name=run_name+"_best", partitions=test_partition, sets=["train", "test"])
+    sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
         get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False)
-    all_recalls, all_precisions, totals = list(np.array(all_recalls).flatten()), list(
-        np.array(all_precisions).flatten()), list(np.array(totals).flatten())
+    all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
+        np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
     log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch)
+    print("TEST: Total positives and false positives: {}/{}".format(total_positives, false_positives))
+    print("TEST: True positive predictions", predictions)
+    print("TEST: False positive predictions", false_positives)
+    logging.info("TEST: Total positives and false positives: {}/{}".format(total_positives, false_positives))
+    logging.info("TEST: True positive predictions", predictions)
+    logging.info("TEST: False positive predictions", false_positives)
 
