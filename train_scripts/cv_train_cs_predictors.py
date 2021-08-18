@@ -334,8 +334,6 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None):
 
 
 def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0,1], sets=["train"]):
-    print("Beginning evaluate")
-    logging.info("Beginning evaluate")
     eval_dict = {}
     model.eval()
     sp_data = SPCSpredictionData()
@@ -383,6 +381,9 @@ def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, 
     logging.info("{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         test_on, ep, *all_precisions))
 
+def euk_importance_avg(cs_mcc):
+    return (3/4) * cs_mcc[0] + (1/4) * np.mean(cs_mcc[1:])
+
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1]):
     test_partition = list({0,1,2} - set(partitions))
@@ -410,33 +411,37 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     best_epoch = 0
     patience = 5
     e = -1
+    save_model(model, run_name)
+    patience = 0
     while patience != 0:
         e += 1
         losses = 0
         losses_glbl = 0
         for ind, batch in enumerate(dataset_loader):
-            continue
             seqs, lbl_seqs, _, glbl_lbls = batch
-            max_len_s = 0
-            some_s = 0
-            logits = model(seqs, lbl_seqs)
-
-            optimizer.zero_grad()
-            targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
-            loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
-            losses += loss.item()
-
             if use_glbl_lbls:
-                cls_tkn_embs = model.encode(seqs).transpose(0,1)[:,1,:]
-                glbl_preds = model.glbl_generator(cls_tkn_embs)
-                loss_glbl = loss_fn_glbl(glbl_preds, torch.tensor(glbl_lbls, device=device))
+                logits, glbl_logits = model(seqs, lbl_seqs)
+                optimizer.zero_grad()
+                targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
+                loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
+                losses += loss.item()
+
+                loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
                 losses_glbl += loss_glbl.item()
                 loss += loss_glbl
+            else:
+                logits = model(seqs, lbl_seqs)
+                optimizer.zero_grad()
+                targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
+                loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
+                losses += loss.item()
+
             loss.backward()
             optimizer.step()
         evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions\
             = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
+        print(euk_importance_avg(sp_pred_mccs), sp_pred_mccs)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                               list(np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
         if use_glbl_lbls:
@@ -447,17 +452,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e)
 
-        # if best_avg_mcc < np.mean(sp_pred_mccs):
-        if 1 == 1:
+        if best_avg_mcc < euk_importance_avg(sp_pred_mccs) or eps != -1 and e == eps-1:
             best_epoch = e
             best_avg_mcc = np.mean(sp_pred_mccs)
             save_model(model, run_name)
-            patience = 0
-            if e == 10:
+            if e == eps:
                 patience = 0
-        elif e > 10 and np.mean(sp_pred_mccs) < best_avg_mcc:
+        elif e > 10 and euk_importance_avg(sp_pred_mccs) < best_avg_mcc and eps == -1:
             patience -= 1
-            patience = 0
     model = load_model(run_name + "_best_eval.pth", len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()))
     
@@ -467,10 +469,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
         np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
     log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch)
-    print("TEST: Total positives and false positives: {}/{}".format(total_positives, false_positives))
+    print("TEST: Total positives and false positives: ", total_positives, false_positives)
     print("TEST: True positive predictions", predictions)
-    print("TEST: False positive predictions", false_positives)
-    logging.info("TEST: Total positives and false positives: {}/{}".format(total_positives, false_positives))
+    logging.info("TEST: Total positives and false positives: ", total_positives, false_positives)
     logging.info("TEST: True positive predictions", predictions)
-    logging.info("TEST: False positive predictions", false_positives)
 

@@ -38,7 +38,8 @@ def parse_arguments():
     parser.add_argument("--train_cs_predictor", default=False, action="store_true")
     parser.add_argument("--batch_size", default=16, type=int)
     parser.add_argument("--run_name", default="some_run", type=str)
-    parser.add_argument("--epochs", default=20, type=int)
+    parser.add_argument("--epochs", default=-1, type=int, help="By default, model uses tolerence. Set this for a fixed"
+                                                               "number of epochs training")
     parser.add_argument("--add_lg_info", default=False, action="store_true")
     parser.add_argument("--dropout", default=0.5, type=float)
     parser.add_argument("--test_freq", default=5, type=int)

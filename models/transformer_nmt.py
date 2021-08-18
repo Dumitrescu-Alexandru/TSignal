@@ -87,7 +87,7 @@ class InputEmbeddingEncoder(nn.Module):
     def forward(self, seqs):
         tensor_inputs = [self.add_bos_eos_lg_glb_cls_tkns(s) for s in seqs]
         input_lens = [ti.shape[0] for ti in tensor_inputs]
-        # additional inputs BOS tokens, and then, lg and glbl_lbl (<cls> token)
+        # additional inputs BOS tokens, glbl_lbl (<cls> token), and lg
         additional_inp_tkns = 1
         if self.use_lg:
             additional_inp_tkns +=1
@@ -135,6 +135,7 @@ class TransformerModel(nn.Module):
         self.label_encoder = TokenEmbedding(ntoken, d_hid, lbl2ind=lbl2ind)
         self.d_model = d_model
         self.generator = nn.Linear(d_model, ntoken).to(self.device)
+        self.use_glbl_lbls = use_glbl_lbls
         if use_glbl_lbls:
             self.glbl_generator = nn.Linear(d_model, no_glbl_lbls).to(self.device)
 
@@ -151,6 +152,17 @@ class TransformerModel(nn.Module):
         tgt = self.pos_encoder(self.label_encoder(tgt).transpose(0,1))
         return self.transformer.decoder(tgt, memory, tgt_mask)
 
+    def forward_glb_lbls(self, src, tgt):
+        src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
+        padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
+        padded_src = self.pos_encoder(padded_src.transpose(0,1))
+        padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
+        padded_tgt = self.pos_encoder(padded_tgt.transpose(0,1))
+        # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
+        memory = self.transformer.encoder(padded_src, src_mask, padding_mask_src)
+        outs = self.transformer.decoder(padded_tgt, memory, tgt_mask, tgt_key_padding_mask=padding_mask_tgt)
+        return self.generator(outs), self.glbl_generator(memory.transpose(0,1)[:,1,:])
+
     def forward(self, src: Tensor, tgt: list) -> Tensor:
         """
         Args:
@@ -159,6 +171,8 @@ class TransformerModel(nn.Module):
         Returns:
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
+        if self.use_glbl_lbls:
+            return self.forward_glb_lbls(src, tgt)
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
         padded_src = self.pos_encoder(padded_src.transpose(0,1))
