@@ -104,11 +104,12 @@ class InputEmbeddingEncoder(nn.Module):
         return src_mask, tgt_mask, ~padding_mask_src.to(self.device), ~padding_mask_tgt.to(self.device), \
                tensor_inputs
 
-    def update(self, partitions=[2]):
+    def update(self, partitions=[0,1,2]):
         seq2emb = {}
         for p in partitions:
-            part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_0.bin", "rb"))
-            seq2emb.update({seq: emb for seq, (emb, _) in part_dict.items()})
+            for t in ["test", "train"]:
+                part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
+                seq2emb.update({seq: emb for seq, (emb, _, _, _) in part_dict.items()})
         self.seq2emb = seq2emb
 
 
@@ -116,7 +117,7 @@ class TransformerModel(nn.Module):
 
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5, 
                  partitions=[0, 1], data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
-                 no_glbl_lbls=6):
+                 no_glbl_lbls=6, ff_dim=4096):
         super().__init__()
         self.model_type = 'Transformer'
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -125,7 +126,7 @@ class TransformerModel(nn.Module):
                                        nhead=nhead,
                                        num_encoder_layers=nlayers,
                                        num_decoder_layers=nlayers,
-                                       dim_feedforward=d_hid * 4,
+                                       dim_feedforward=ff_dim,
                                        dropout=dropout).to(self.device)
         # input_encoder is just a dictionary with {sequence:embedding} with embeddings from bert LM
         self.input_encoder = InputEmbeddingEncoder(partitions=[0, 1, 2], data_folder=data_folder, lg2ind=lg2ind, 

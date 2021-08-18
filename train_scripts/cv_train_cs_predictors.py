@@ -125,10 +125,10 @@ def train_fold(train_datasets, test_datasets, data_folder, model, param_set, fix
     return max_results
 
 
-def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6):
+def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6, ff_dim=1024*4):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8, d_hid=1024, nlayers=3, partitions=partitions,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
-                             no_glbl_lbls=no_glbl_lbls)
+                             no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -333,14 +333,14 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None):
     return tgt_tokens
 
 
-def evaluate(model, lbl2ind, run_name="", test_batch_size=50):
+def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0,1], sets=["train"]):
     print("Beginning evaluate")
     logging.info("Beginning evaluate")
     eval_dict = {}
     model.eval()
     sp_data = SPCSpredictionData()
-    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[2], data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets)
 
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=test_batch_size, shuffle=False,
@@ -356,9 +356,33 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50):
             eval_dict[s] = predicted_lbls[:len(t)]
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
 
+def save_model(model, model_name=""):
+    model.input_encoder.seq2emb = {}
+    torch.save(model, model_name+"_best_eval.pth")
+
+def load_model(model_path, ntoken, partitions, lbl2ind, lg2ind, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6, ff_dim=1024*4):
+    model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8, d_hid=1024, nlayers=3, partitions=partitions,
+                             lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
+                             no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim)
+    model.load_state_dict(torch.load(model_path))
+    model.input_encoder.update()
+    return model
+
+def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1):
+    print("{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(test_on, *sp_pred_mccs))
+    print("{}, epoch {} Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+        test_on, *all_recalls))
+    print("{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+        test_on, *all_precisions))
+    logging.info("{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(test_on, *sp_pred_mccs))
+    logging.info("{}, epoch {}: Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+        test_on, *all_recalls))
+    logging.info("{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+        test_on, *all_precisions))
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
-                        test_freq=1, use_glbl_lbls=False):
+                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1]):
+    test_partition = list({0,1,2} - set(partitions))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData()
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[0, 1], data_folder=sp_data.data_folder,
@@ -376,8 +400,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_glbl = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
+
     ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
-    for e in range(eps):
+
+    best_avg_mcc = 0
+    patience = 5
+    e = -1
+    while patience != 0:
+        e += 1
         losses = 0
         losses_glbl = 0
         for ind, batch in enumerate(dataset_loader):
@@ -389,36 +419,42 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             optimizer.zero_grad()
             targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
             loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
+            losses += loss.item()
+
             if use_glbl_lbls:
                 cls_tkn_embs = model.encode(seqs).transpose(0,1)[:,1,:]
                 glbl_preds = model.glbl_generator(cls_tkn_embs)
                 loss_glbl = loss_fn_glbl(glbl_preds, torch.tensor(glbl_lbls, device=device))
-                loss_glbl.backward()
                 losses_glbl += loss_glbl.item()
-
-            #
-            # if "S" in "".join([str(ind2lbl[i.item()]) for i in padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)[0]])[:10] and e > 0:
-            #
-            #     print("".join([str(ind2lbl[i.item()]) for i in torch.argmax(logits.transpose(1,0),dim=-1)[0]]),"\n",
-            #
-            #           "".join([str(ind2lbl[i.item()]) for i in padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)[0]]), "\n\n")
-            #     print(loss)
+                loss += loss_glbl
             loss.backward()
             optimizer.step()
-            losses += loss.item()
+        evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
+        sp_pred_mccs, all_recalls, all_precisions, totals = get_cs_and_sp_pred_results(filename=run_name + ".bin",
+                                                                                       v=False)
+        all_recalls, all_precisions, totals = list(np.array(all_recalls).flatten()), list(
+            np.array(all_precisions).flatten()), \
+                                              list(np.array(totals).flatten())
         if use_glbl_lbls:
             print("On epoch {} total loss: {}, {}".format(e, losses / len(dataset_loader), losses_glbl / len(dataset_loader)))
             logging.info("On epoch {} total loss: {}, {}".format(e, losses / len(dataset_loader), losses_glbl / len(dataset_loader)))
         else:
             print("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
             logging.info("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
-        if e != 0 and e % test_freq == 0:
-            evaluate(model, sp_data.lbl2ind, run_name=run_name)
-            sp_pred_accs, all_cs_preds, totals = get_cs_and_sp_pred_results(filename=run_name+".bin", v=False)
-            sp_pred_mean_acc, sp_pred_euk_acc = get_summary_sp_acc(sp_pred_accs)
-            mean_all_tol_all_lg_cs_preds, mean_all_tol_euk_cs_preds, tol0_acc_euk = get_summary_cs_acc(all_cs_preds)
-    # loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
-    # loss.backward()
-    #
-    # optimizer.step()
-    # losses += loss.item()
+        log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e)
+
+        if best_avg_mcc < np.mean(sp_pred_mccs):
+            best_avg_mcc = np.mean(sp_pred_mccs)
+            save_model(model, run_name + "_best.bin")
+        elif e > 10 and np.mean(sp_pred_mccs) < best_avg_mcc:
+            patience = 0
+            patience -= 1
+    model = load_model(run_name + "_best.bin", len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
+                       dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()))
+    evaluate(model, sp_data.lbl2ind, run_name=run_name+"_best.bin", partitions=test_partition, sets=["train", "test"])
+    sp_pred_mccs, all_recalls, all_precisions, totals = \
+        get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False)
+    all_recalls, all_precisions, totals = list(np.array(all_recalls).flatten()), list(
+        np.array(all_precisions).flatten()), list(np.array(totals).flatten())
+    log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST")
+

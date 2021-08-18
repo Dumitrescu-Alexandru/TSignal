@@ -7,6 +7,17 @@ from train_scripts.cv_train_binary_sp_model import train_bin_sp_mdl
 import argparse
 import logging
 
+def create_param_set_cs_predictors():
+
+    from sklearn.model_selection import ParameterGrid
+    parameters = {"dos": [0, 0.1, 0.2], "ff_d": [2048,4096],
+                  "lr": [0.00001, 0.0001], "train_folds":[[0,1],[0,2],[1,2]]}
+    group_params = list(ParameterGrid(parameters))
+    grpid_2_params = {}
+    for i in range(len(group_params) // 5 + 1):
+        grpid_2_params[i] = group_params[i * 5:(i + 1) * 5]
+    pickle.dump(grpid_2_params, open("param_groups_by_id.bin", "wb"))
+
 def create_parameter_set():
     from sklearn.model_selection import ParameterGrid
     parameters = {"dos": [[0.1, 0.2], [0.3, 0.3]], "filters":[[100, 80, 60, 40],
@@ -16,12 +27,12 @@ def create_parameter_set():
     grpid_2_params = {}
     for i in range(len(group_params) // 5  + 1):
         grpid_2_params[i] = group_params[i*5:(i+1)*5]
-    pickle.dump(grpid_2_params, open("param_groups_by_id.bin", "wb"))
+    pickle.dump(grpid_2_params, open("param_groups_by_id_cs.bin", "wb"))
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--use_aa_len", default=200, type=int)
-    parser.add_argument("--lr", default=0.0001, type=float)
+    parser.add_argument("--lr", default=0.00001, type=float)
     parser.add_argument("--data", default="mammal", type=str)
     parser.add_argument("--param_set_search_number", default=-1, type=int)
     parser.add_argument("--train_cs_predictor", default=False, action="store_true")
@@ -42,6 +53,8 @@ if __name__ == "__main__":
     args = parse_arguments()
     logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
     if args.train_cs_predictor:
+        # if not os.path.exists("param_groups_by_id_cs.bin"):
+        #     create_param_set_cs_predictors()
         a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls)
     else:
