@@ -1,3 +1,4 @@
+from sklearn.metrics import matthews_corrcoef as  compute_mcc
 import os
 import pickle
 from Bio import SeqIO
@@ -66,10 +67,6 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
         totals.append(current_preds[-1])
     return all_recalls, all_precisions, totals
 
-def compute_mcc(vec):
-    tp, tn, fp, fn = vec
-    return ((tp * tn)-(fp*fn))/np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
-
 def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False):
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
     # order of elemnts in below list:
@@ -80,28 +77,34 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False):
     # Matthews correlation coefficient (MCC) both true and false positive and negative predictions are counted at
     # the sequence level
     grp2_ind = {"EUKARYA": 0, "NEGATIVE": 1, "POSITIVE": 2, "ARCHAEA": 3}
-    predictions = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+    predictions = [[[], []], [[], []], [[], []], [[], []]]
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         life_grp, sp_info = l.split("|")
         ind = 0
         life_grp, sp_info = l.split("|")
-        if sp_info == "SP":# or sp_info == "NO_SP":
+        if sp_info == "SP" or sp_info == "NO_SP":
             p = p.replace("ES", "J")
             len_ = min(len(p), len(t))
             t, p = t[:len_], p[:len_]
             for ind in range(len(t)):
                 if t[ind] == "S" and p[ind] == "S":
-                    predictions[grp2_ind[life_grp]][0] +=1
+                    predictions[grp2_ind[life_grp]][1].append(1)
+                    predictions[grp2_ind[life_grp]][0].append(1)
                 elif t[ind] == "S" and p[ind] != "S":
-                    predictions[grp2_ind[life_grp]][3] +=1
+                    predictions[grp2_ind[life_grp]][1].append(1)
+                    predictions[grp2_ind[life_grp]][0].append(-1)
                 elif t[ind] != "S" and p[ind] == "S":
-                    predictions[grp2_ind[life_grp]][2] += 1
+                    predictions[grp2_ind[life_grp]][1].append(-1)
+                    predictions[grp2_ind[life_grp]][0].append(1)
                 elif t[ind] != "S" and p[ind] != "S":
-                    predictions[grp2_ind[life_grp]][1] += 1
+                    predictions[grp2_ind[life_grp]][1].append(-1)
+                    predictions[grp2_ind[life_grp]][0].append(-1)
 
     for grp, id in grp2_ind.items():
-        print( "{}: {}".format(grp, compute_mcc(predictions[grp2_ind[grp]])) )
-    return [compute_mcc(predictions[grp2_ind[grp]]) for grp, id in grp2_ind.items()]
+        print( "{}: {}".format(grp, compute_mcc(predictions[grp2_ind[grp]][0]
+                                                ,predictions[grp2_ind[grp]][1])) )
+    return [compute_mcc(predictions[grp2_ind[grp]][0]
+                                                ,predictions[grp2_ind[grp]][1]) for grp, id in grp2_ind.items()]
 
 
 def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_fold=2):
@@ -143,8 +146,6 @@ def get_summary_cs_acc(all_cs_preds):
 if __name__ == "__main__":
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="wo_lg_wo_glb_lbl_100ep.bin")
     sp_pred_accs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls,v=True)
-    print("sp_pred_accs", sp_pred_accs)
     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls,v=True)
     all_recalls, all_precisions, totals = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls)
-    print("all_recalls, all_precisions, totals", all_recalls, all_precisions, totals)
-    print("all_recalls, all_precisions, totals", )
+
