@@ -64,9 +64,9 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
         all_precisions.append([])
         for i in range(4):
             if current_preds[-1] + current_preds[i] == 0:
-                all_precisions[-1].append(0)
+                all_precisions[-1].append(0.)
             else:
-                all_precisions.append(current_preds[i]/current_preds[-1])
+                all_precisions[-1].append(current_preds[i]/current_preds[-1])
         totals.append(current_preds[-2])
     return all_recalls, all_precisions, totals
 
