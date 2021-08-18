@@ -412,7 +412,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     patience = 5
     e = -1
     save_model(model, run_name)
-    patience = 0
     while patience != 0:
         e += 1
         losses = 0
@@ -452,7 +451,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e)
 
-        if best_avg_mcc < euk_importance_avg(sp_pred_mccs) or eps != -1 and e == eps-1:
+        if (best_avg_mcc < euk_importance_avg(sp_pred_mccs) and eps == -1) or (eps != -1 and e == eps-1):
             best_epoch = e
             best_avg_mcc = np.mean(sp_pred_mccs)
             save_model(model, run_name)
@@ -470,7 +469,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
     log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch)
     print("TEST: Total positives and false positives: ", total_positives, false_positives)
-    print("TEST: True positive predictions", predictions)
+    print("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
+          "{}, {}, {}, {}, {},", *np.concatenate(predictions))
     logging.info("TEST: Total positives and false positives: ", total_positives, false_positives)
-    logging.info("TEST: True positive predictions", predictions)
+    logging.info("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
+          "{}, {}, {}, {}, {},", *np.concatenate(predictions))
 
