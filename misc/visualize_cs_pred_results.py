@@ -42,7 +42,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
         life_grp, sp_info = l.split("|")
         ind = 0
         if sp_info == "SP":
-            count2 += 1
+            count+=1
             # print(p,)
             # print(t)
             # print(s)
@@ -51,20 +51,23 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
                 ind += 1
             predictions[grp2_ind[life_grp]] += get_acc_for_tolerence(ind, t, v=p)
         elif sp_info != "SP" and p[ind] == "S" and l.split("|")[0] == "EUKARYA":
-            count += 1
             predictions[grp2_ind[life_grp]] += np.array([0, 0, 0, 0, 0, 1])
     all_recalls = []
     all_precisions = []
     totals = []
-
     for life_grp, ind in grp2_ind.items():
         current_preds = predictions[grp2_ind[life_grp]]
         if v:
             print("{}: {}".format(life_grp, [current_preds[i] / current_preds[-2] for i in range(len(current_preds) - 2)]))
             print("{}: {}".format(life_grp, [current_preds[i] / current_preds[-1] for i in range(len(current_preds) - 2)]))
         all_recalls.append([current_preds[i]/current_preds[-2] for i in range(len(current_preds) -2)])
-        all_precisions.append([current_preds[i]/current_preds[-1] for i in range(len(current_preds) -2)])
-        totals.append(current_preds[-1])
+        all_precisions.append([])
+        for i in range(4):
+            if current_preds[-1] + current_preds[i] == 0:
+                all_precisions[-1].append(0)
+            else:
+                all_precisions.append(current_preds[i]/current_preds[-1])
+        totals.append(current_preds[-2])
     return all_recalls, all_precisions, totals
 
 def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False):
@@ -99,12 +102,18 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False):
                 elif t[ind] != "S" and p[ind] != "S":
                     predictions[grp2_ind[life_grp]][1].append(-1)
                     predictions[grp2_ind[life_grp]][0].append(-1)
-
+    mccs = []
     for grp, id in grp2_ind.items():
-        print( "{}: {}".format(grp, compute_mcc(predictions[grp2_ind[grp]][0]
-                                                ,predictions[grp2_ind[grp]][1])) )
-    return [compute_mcc(predictions[grp2_ind[grp]][0]
-                                                ,predictions[grp2_ind[grp]][1]) for grp, id in grp2_ind.items()]
+        if sum(predictions[grp2_ind[grp]][0]) == -len(predictions[grp2_ind[grp]][0]) or \
+                sum(predictions[grp2_ind[grp]][0]) == len(predictions[grp2_ind[grp]][0]):
+            mccs.append(-1)
+        else:
+            mccs.append(compute_mcc(predictions[grp2_ind[grp]][0]
+                                                ,predictions[grp2_ind[grp]][1]))
+        if v:
+            print("{}: {}".format(grp, mccs[-1] ))
+
+    return mccs
 
 
 def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_fold=2):
@@ -144,8 +153,7 @@ def get_summary_cs_acc(all_cs_preds):
     return np.mean(np.array(all_cs_preds)), np.mean(all_cs_preds[0]), all_cs_preds[0][0]
 
 if __name__ == "__main__":
-    life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="wo_lg_wo_glb_lbl_100ep.bin")
+    life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin")
     sp_pred_accs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls,v=True)
-    get_cs_acc(life_grp, seqs, true_lbls, pred_lbls,v=True)
     all_recalls, all_precisions, totals = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls)
 
