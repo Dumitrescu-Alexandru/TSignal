@@ -369,16 +369,16 @@ def load_model(model_path, ntoken, partitions, lbl2ind, lg2ind, dropout=0.5, use
     return model
 
 def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1):
-    print("{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(test_on, *sp_pred_mccs))
+    print("{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(test_on, ep, *sp_pred_mccs))
     print("{}, epoch {} Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-        test_on, *all_recalls))
+        ep, test_on, *all_recalls))
     print("{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-        test_on, *all_precisions))
-    logging.info("{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(test_on, *sp_pred_mccs))
+        ep, test_on, *all_precisions))
+    logging.info("{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(test_on, ep, *sp_pred_mccs))
     logging.info("{}, epoch {}: Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-        test_on, *all_recalls))
+        ep, test_on, *all_recalls))
     logging.info("{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-        test_on, *all_precisions))
+        ep, test_on, *all_precisions))
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1]):
@@ -404,6 +404,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
 
     best_avg_mcc = 0
+    best_epoch = 0
     patience = 5
     e = -1
     while patience != 0:
@@ -444,11 +445,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e)
 
         if best_avg_mcc < np.mean(sp_pred_mccs):
+            best_epoch = e
             best_avg_mcc = np.mean(sp_pred_mccs)
             save_model(model, run_name + "_best.bin")
         elif e > 10 and np.mean(sp_pred_mccs) < best_avg_mcc:
-            patience = 0
             patience -= 1
+            patience = 0
     model = load_model(run_name + "_best.bin", len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()))
     evaluate(model, sp_data.lbl2ind, run_name=run_name+"_best.bin", partitions=test_partition, sets=["train", "test"])
@@ -456,5 +458,5 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False)
     all_recalls, all_precisions, totals = list(np.array(all_recalls).flatten()), list(
         np.array(all_precisions).flatten()), list(np.array(totals).flatten())
-    log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST")
+    log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch)
 
