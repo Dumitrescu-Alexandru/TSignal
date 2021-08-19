@@ -3,7 +3,7 @@
 #SBATCH --mem=20G
 #SBATCH --array=0-35
 #SBATCH --partition=gpu
-#SBTACH --gres=gpu:1 --constraint='pascal|volta'
+#SBTACH --gres=gpu:1
 #SBATCH -o sp_data/results/param_search_results.out
 
 module load anaconda/2020-05-tf2
