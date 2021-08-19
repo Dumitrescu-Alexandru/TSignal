@@ -385,11 +385,11 @@ def euk_importance_avg(cs_mcc):
     return (3/4) * cs_mcc[0] + (1/4) * np.mean(cs_mcc[1:])
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
-                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1]):
+                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096):
     test_partition = list({0,1,2} - set(partitions))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData()
-    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=[0, 1], data_folder=sp_data.data_folder,
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
@@ -399,7 +399,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
         lg2ind = sp_data.lg2ind
     model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
-                       dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()))
+                       dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
+                       ff_dim=ff_d)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_glbl = torch.nn.CrossEntropyLoss()
@@ -409,7 +410,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
     best_avg_mcc = 0
     best_epoch = 0
-    patience = 5
+    patience = 10
     e = -1
     save_model(model, run_name)
     while patience != 0:
@@ -470,8 +471,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch)
     print("TEST: Total positives and false positives: ", total_positives, false_positives)
     print("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
-          "{}, {}, {}, {}, {},", *np.concatenate(predictions))
+          "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
     logging.info("TEST: Total positives and false positives: ", total_positives, false_positives)
     logging.info("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
-          "{}, {}, {}, {}, {},", *np.concatenate(predictions))
+          "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
 
