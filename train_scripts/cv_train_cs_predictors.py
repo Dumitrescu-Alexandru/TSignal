@@ -308,12 +308,14 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
         for _ in range(len(src)):
             ys.append([])
     model.eval()
-    for i in range(max(seq_lens)):
+    all_probs = []
+    for i in range(max(seq_lens) + 1):
         with torch.no_grad():
             tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
             out = model.decode(ys, memory.to(device), tgt_mask.to(device))
             out = out.transpose(0, 1)
             prob = model.generator(out[:, -1])
+        all_probs.append(prob)
         _, next_words = torch.max(prob, dim=1)
         next_word = [nw.item() for nw in next_words]
         current_ys = []
@@ -321,19 +323,17 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
             current_ys.append(ys[bach_ind])
             current_ys[-1].append(next_word[bach_ind])
         ys = current_ys
-        # ys = torch.cat([ys, torch.ones(1, 1, device=device).fill_(next_word)], dim=0)
-
-    return ys
+    return ys, torch.stack(all_probs).transpose(0,1)
 
 
 def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None):
     model.eval()
-    num_tokens = len(src)
-    tgt_tokens = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
-    return tgt_tokens
+    tgt_tokens, probs = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
+    return tgt_tokens, probs
 
 
 def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0,1], sets=["train"]):
+    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
     model.eval()
     sp_data = SPCSpredictionData()
@@ -344,15 +344,19 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0,1], 
                                                  batch_size=test_batch_size, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
     ind2lbl = {v: k for k, v in lbl2ind.items()}
+    total_loss = 0
     for ind, (src, tgt, _, _) in enumerate(dataset_loader):
         # print("Number of sequences tested: {}".format(ind * test_batch_size))
         src = src
         tgt = tgt
-        predicted_tokens = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt)
+        predicted_tokens, probs = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt)
+        true_targets = padd_add_eos_tkn(tgt, sp_data.lbl2ind)
+        total_loss += loss_fn(probs.reshape(-1,10), true_targets.reshape(-1)).item()
         for s, t, pt in zip(src, tgt, predicted_tokens):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
             eval_dict[s] = predicted_lbls[:len(t)]
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
+    return total_loss/len(dataset_loader)
 
 def save_model(model, model_name=""):
     folder = get_data_folder()
@@ -409,10 +413,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
 
     best_avg_mcc = -1
+    best_valid_loss = 5**10
     best_epoch = 0
     patience = 10
     e = -1
-    save_model(model, run_name)
+
     while patience != 0:
         e += 1
         losses = 0
@@ -438,28 +443,30 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
             loss.backward()
             optimizer.step()
-        evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
+        valid_loss = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions\
             = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
         print(euk_importance_avg(sp_pred_mccs), sp_pred_mccs)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                               list(np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
         if use_glbl_lbls:
-            print("On epoch {} total loss: {}, {}".format(e, losses / len(dataset_loader), losses_glbl / len(dataset_loader)))
-            logging.info("On epoch {} total loss: {}, {}".format(e, losses / len(dataset_loader), losses_glbl / len(dataset_loader)))
+            print("On epoch {} total train/validation loss and glbl loss: {}/{}, {}".format(e, losses / len(dataset_loader),
+                                                                                valid_loss, losses_glbl / len(dataset_loader)))
+            logging.info("On epoch {} total train/validation loss and glbl loss: {}/{}, {}".format(e, losses / len(dataset_loader),
+                                                                                   valid_loss, losses_glbl / len(dataset_loader)))
         else:
-            print("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
-            logging.info("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
+            print("On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
+            logging.info("On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e)
 
         print("VALIDATION: avg mcc on epoch {}: {}".format(e, euk_importance_avg(sp_pred_mccs)))
-        if (best_avg_mcc < euk_importance_avg(sp_pred_mccs) and eps == -1) or (eps != -1 and e == eps-1):
+        if (valid_loss < best_valid_loss and eps == -1) or (eps != -1 and e == eps-1):
             best_epoch = e
-            best_avg_mcc = euk_importance_avg(sp_pred_mccs)
+            best_valid_loss = valid_loss
             save_model(model, run_name)
             if e == eps - 1:
                 patience = 0
-        elif e > 10 and euk_importance_avg(sp_pred_mccs) < best_avg_mcc and eps == -1:
+        elif e > 10 and valid_loss < best_valid_loss and eps == -1:
             print("On epoch {} dropped patience to {} because on mcc result {} compared to best {}.".
                   format(e, patience, euk_importance_avg(sp_pred_mccs), best_avg_mcc))
             logging.info("On epoch {} dropped patience to {} because on mcc result {} compared to best {}.".
@@ -477,7 +484,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     print("TEST: Total positives and false positives: ", total_positives, false_positives)
     print("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
           "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
-    logging.info("TEST: Total positives and false positives: ", total_positives, false_positives)
+    pos_fp_info  = total_positives
+    pos_fp_info.extend(false_positives)
+    logging.info("TEST: Total positives and false positives: {}, {}, {}, {}, {}, {}, {}, {}", pos_fp_info)
     logging.info("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
           "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
 
