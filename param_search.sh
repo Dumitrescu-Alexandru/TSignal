@@ -2,6 +2,7 @@
 #SBATCH -t 24:00:00
 #SBATCH --mem=20G
 #SBATCH --array=0-35
+#SBATCH --partition=gpu
 #SBTACH --gres=gpu:1 --constraint='pascal|volta'
 #SBATCH -o sp_data/results/param_search_results.out
 
