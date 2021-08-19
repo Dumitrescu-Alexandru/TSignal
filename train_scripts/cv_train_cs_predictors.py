@@ -419,6 +419,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     e = -1
 
     while patience != 0:
+        model.train()
         e += 1
         losses = 0
         losses_glbl = 0
@@ -466,10 +467,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             save_model(model, run_name)
             if e == eps - 1:
                 patience = 0
-        elif e > 10 and valid_loss < best_valid_loss and eps == -1:
-            print("On epoch {} dropped patience to {} because on mcc result {} compared to best {}.".
+        elif e > 10 and valid_loss > best_valid_loss and eps == -1:
+            print("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                   format(e, patience, euk_importance_avg(sp_pred_mccs), best_avg_mcc))
-            logging.info("On epoch {} dropped patience to {} because on mcc result {} compared to best {}.".
+            logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                   format(e, patience, euk_importance_avg(sp_pred_mccs), best_avg_mcc))
             patience -= 1
     model = load_model(run_name + "_best_eval.pth", len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
