@@ -408,7 +408,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
     ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
 
-    best_avg_mcc = 0
+    best_avg_mcc = -1
     best_epoch = 0
     patience = 10
     e = -1
@@ -452,6 +452,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} total loss: {}".format(e, losses / len(dataset_loader)))
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e)
 
+        print("VALIDATION: avg mcc on epoch {}: {}".format(e, euk_importance_avg(sp_pred_mccs)))
         if (best_avg_mcc < euk_importance_avg(sp_pred_mccs) and eps == -1) or (eps != -1 and e == eps-1):
             best_epoch = e
             best_avg_mcc = euk_importance_avg(sp_pred_mccs)
