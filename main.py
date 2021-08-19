@@ -52,7 +52,6 @@ if __name__ == "__main__":
     date_now = str(datetime.datetime.now()).split(".")[0].replace("-", "").replace(":", "").replace(" ", "")
     logging.getLogger('some_logger')
     args = parse_arguments()
-    logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
     if args.train_cs_predictor:
         if not os.path.exists("param_groups_by_id_cs.bin"):
             create_param_set_cs_predictors()
@@ -66,6 +65,7 @@ if __name__ == "__main__":
             args.dropout = param_set['dos']
             args.lr = param_set['lr']
             ff_d = param_set['ff_d']
+        logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
         a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
                                 ff_d=ff_d, partitions=train_folds)
