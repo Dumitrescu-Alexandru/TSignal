@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH -t 24:00:00
+#SBATCH -t 5:00:00
 #SBATCH --mem=20G
 #SBATCH --array=0-35
 #SBATCH --partition=gpu
