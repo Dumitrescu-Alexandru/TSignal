@@ -62,8 +62,8 @@ if __name__ == "__main__":
         if args.param_set_search_number != -1:
             params = pickle.load(open("param_groups_by_id_cs.bin" ,"rb"))
             param_set = params[args.param_set_search_number]
-            args.run_name = args.run_name + "_{}_{}_{}_{}_{}".format(param_set['dos'], param_set['ff_d'] ,param_set['lr'],
-                                                                    param_set['train_folds'][0], param_set['train_folds'][1])
+            args.run_name = args.run_name + "_{}_{}_{}_{}_{}_{}_{}".format(param_set['dos'], param_set['ff_d'] ,param_set['lr'],
+                                                                           param_set['nlayers'], param_set['nheads'], param_set['train_folds'][0], param_set['train_folds'][1])
             args.dropout = param_set['dos']
             args.lr = param_set['lr']
             ff_d = param_set['ff_d']
