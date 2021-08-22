@@ -73,7 +73,7 @@ if __name__ == "__main__":
         logging.info("Started training")
         a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
-                                ff_d=ff_d, partitions=train_folds)
+                                ff_d=ff_d, partitions=train_folds, nlayers=args.nlayers, nheads=args.nheads)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()
