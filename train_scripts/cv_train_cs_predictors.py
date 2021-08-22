@@ -17,8 +17,8 @@ from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData
 from models.transformer_nmt import TransformerModel
 
 
-def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6, ff_dim=1024*4):
-    model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8, d_hid=1024, nlayers=3, partitions=partitions,
+def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6, ff_dim=1024*4, nlayers=3, nheads=8):
+    model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers, partitions=partitions,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim)
     for p in model.parameters():
@@ -151,9 +151,6 @@ def save_model(model, model_name=""):
     model.input_encoder.update()
 
 def load_model(model_path, ntoken, partitions, lbl2ind, lg2ind, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6, ff_dim=1024*4):
-    # model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=8, d_hid=1024, nlayers=3, partitions=partitions,
-    #                          lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
-    #                          no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim)
     folder = get_data_folder()
     model= torch.load(folder + model_path)
     model.input_encoder.update()
@@ -175,7 +172,7 @@ def euk_importance_avg(cs_mcc):
     return (3/4) * cs_mcc[0] + (1/4) * np.mean(cs_mcc[1:])
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
-                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096):
+                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8):
     logging.info("Log from here...")
     test_partition = list({0,1,2} - set(partitions))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -191,7 +188,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         lg2ind = sp_data.lg2ind
     model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
-                       ff_dim=ff_d)
+                       ff_dim=ff_d, nlayers=nlayers, nheads=nheads)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_glbl = torch.nn.CrossEntropyLoss()
@@ -202,10 +199,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     best_avg_mcc = -1
     best_valid_loss = 5**10
     best_epoch = 0
-    patience = 10
+    patience = 30
     e = -1
-    valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
-    print(valid_loss)
     while patience != 0:
         model.train()
         e += 1

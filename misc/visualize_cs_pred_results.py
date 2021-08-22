@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 from sklearn.metrics import matthews_corrcoef as  compute_mcc
 import os
 import pickle
@@ -42,14 +43,16 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
         life_grp, sp_info = l.split("|")
         ind = 0
         if sp_info == "SP":
-            count+=1
-            # print(p,)
-            # print(t)
-            # print(s)
-            # print("\n")
             while p[ind] == "S" and ind < len(p) - 1:
                 ind += 1
             predictions[grp2_ind[life_grp]] += get_acc_for_tolerence(ind, t, v=p)
+            # if get_acc_for_tolerence(ind, t, v=p)[3] == 0:
+            #     count += 1
+            #     print(life_grp)
+            #     print(p)
+            #     print(t)
+            #     print(s)
+            #     print("\n")
         elif sp_info != "SP" and p[ind] == "S" and l.split("|")[0] == "EUKARYA":
             # count false positive predictions
             predictions[grp2_ind[life_grp]] += np.array([0, 0, 0, 0, 0, 1])
@@ -60,8 +63,8 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
     for life_grp, ind in grp2_ind.items():
         current_preds = predictions[grp2_ind[life_grp]]
         if v:
-            print("{}: {}".format(life_grp, [current_preds[i] / current_preds[-2] for i in range(len(current_preds) - 2)]))
-            print("{}: {}".format(life_grp, [current_preds[i] / current_preds[-1] for i in range(len(current_preds) - 2)]))
+            print("Recall {}: {}".format(life_grp, [current_preds[i] / current_preds[-2] for i in range(len(current_preds) - 2)]))
+            print("Prec {}: {}".format(life_grp, [current_preds[i] / (current_preds[i] +current_preds[-1]) for i in range(len(current_preds) - 2)]))
         all_recalls.append([current_preds[i]/current_preds[-2] for i in range(len(current_preds) -2)])
         all_precisions.append([])
         for i in range(4):
@@ -119,8 +122,8 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False):
     return mccs
 
 
-def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_fold=2):
-    seq2preds = pickle.load(open(filename, "rb"))
+def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_fold=2, dict_=None):
+    seq2preds = pickle.load(open(filename, "rb")) if dict_ is None else dict_
     tested_seqs = set(seq2preds.keys())
     seq2id = {}
     life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
@@ -135,7 +138,9 @@ def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_
 
 
 def get_data_folder():
-    if os.path.exists("/scratch/work/dumitra1"):
+    if os.path.exists("results"):
+        return "../sp_data/"
+    elif os.path.exists("/scratch/work/dumitra1"):
         return "/scratch/work/dumitra1/sp_data/"
     elif os.path.exists("/home/alex"):
         return "sp_data/"
@@ -155,8 +160,173 @@ def get_summary_sp_acc(sp_pred_accs):
 def get_summary_cs_acc(all_cs_preds):
     return np.mean(np.array(all_cs_preds)), np.mean(all_cs_preds[0]), all_cs_preds[0][0]
 
+def plot_losses(losses, name="param_search_0.2_2048_0.0001_"):
+    train_loss, valid_loss = losses
+    fig, axs = plt.subplots(1,1,figsize=(12,8))
+
+    axs.set_title("Train and validation loss over epochs")
+    axs.plot(train_loss, label="Train loss")
+    axs.plot(valid_loss, label="Validation loss")
+    axs.set_xlabel("Epochs")
+    axs.set_ylabel("Loss")
+    axs.legend()
+    axs.set_ylim(0,2.5)
+    plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/" + name+"loss.png")
+
+def plot_mcc(mccs, name="param_search_0.2_2048_0.0001_"):
+    euk_mcc, neg_mcc, pos_mcc, arc_mcc = mccs
+    fig, axs = plt.subplots(2,2,figsize=(12,8))
+    axs[0,0].plot(euk_mcc, label="Eukaryote mcc")
+    axs[0,0].set_ylabel("mcc")
+    axs[0,0].set_ylim(-1.1, 1.1)
+    axs[0,0].legend()
+
+    axs[0, 1].plot(neg_mcc, label="Negative mcc")
+    axs[0, 1].set_ylabel("mcc")
+    axs[0, 1].set_ylim(-1.1, 1.1)
+    axs[0, 1].legend()
+
+    axs[1, 0].plot(pos_mcc, label="Positive mcc")
+    axs[1, 0].legend()
+    axs[1, 0].set_ylim(-1.1, 1.1)
+    axs[1, 0].set_xlabel("epochs")
+
+    axs[1, 1].plot(arc_mcc, label="Archaea mcc")
+    axs[1, 1].legend()
+    axs[1, 1].set_ylim(-1.1, 1.1)
+    axs[1, 1].set_xlabel("epochs")
+
+    plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, "mcc"))
+
+def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.2_2048_0.0001_"):
+    cs_res_euk, cs_res_neg, cs_res_pos, cs_res_arc = results
+    fig, axs = plt.subplots(2,2,figsize=(12,8))
+    for i in range(4):
+        axs[0,0].plot(cs_res_euk[i], label="Eukaryote {} tol={}".format(metric, i))
+        axs[0,0].set_ylabel(metric)
+        axs[0,0].legend()
+        axs[0,0].set_ylim(-0.1, 1.1)
+
+        axs[0, 1].plot(cs_res_neg[i], label="Negative {} tol={}".format(metric, i))
+        axs[0, 1].set_ylabel(metric)
+        axs[0, 1].legend()
+        axs[0, 1].set_ylim(-0.1, 1.1)
+
+        axs[1, 0].plot(cs_res_pos[i], label="Positive {} tol={}".format(metric, i))
+        axs[1, 0].legend()
+        axs[1, 0].set_xlabel("epochs")
+        axs[1, 0].set_ylim(-0.1, 1.1)
+
+        axs[1, 1].plot(cs_res_arc[i], label="Archaea {} tol={}".format(metric, i))
+        axs[1, 1].legend()
+        axs[1, 1].set_xlabel("epochs")
+        axs[1, 1].set_ylim(-0.1, 1.1)
+
+    plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, metric))
+
+def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0,1]):
+    all_results = []
+    euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, \
+        cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = extract_results(run, folds=folds)
+    plot_mcc([euk_mcc, neg_mcc, pos_mcc, arc_mcc], name=run)
+    plot_losses([train_loss, valid_loss], name=run)
+    extract_and_plot_prec_recall([cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, cs_recalls_arc], metric="recall", name=run)
+    extract_and_plot_prec_recall([cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc], metric="precision", name=run)
+    # extract_and_plot_losses(lines)
+
+
+def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1]):
+    euk_mcc, neg_mcc, pos_mcc, arc_mcc = [], [], [] ,[]
+    train_loss, valid_loss = [], []
+    cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, cs_recalls_arc = [[], [], [], []], [[], [], [], []], \
+                                                                                 [[], [], [], []], [[], [], [], []]
+    cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = [[], [], [], []], [[], [], [], []], \
+                                                                         [[], [], [], []], [[], [], [], []]
+    with open("results/" + run + "{}_{}.log".format(folds[0], folds[1]), "rt") as f:
+        lines = f.readlines()
+    for l in lines:
+        if "sp_pred mcc" in l and "VALIDATION" in l:
+            mccs = l.split(":")[-1].replace(" ","").split(",")
+            euk_mcc.append(float(mccs[0]))
+            neg_mcc.append(float(mccs[1]))
+            pos_mcc.append(float(mccs[2]))
+            arc_mcc.append(float(mccs[3]))
+        elif "train/validation" in l:
+            train_l, valid_l = l.split(":")[-1].replace(" ","").split("/")
+            train_l, valid_l = float(train_l), float(valid_l)
+            train_loss.append(train_l)
+            valid_loss.append(valid_l)
+        elif "cs recall" in l and "VALIDATION" in l:
+            cs_res = l.split(":")[-1].replace(" ", "").split(",")
+            cs_res = [float(c_r) for c_r in cs_res]
+            cs_recalls_euk[0].append(cs_res[0])
+            cs_recalls_euk[1].append(cs_res[1])
+            cs_recalls_euk[2].append(cs_res[2])
+            cs_recalls_euk[3].append(cs_res[3])
+
+            cs_recalls_neg[0].append(cs_res[4])
+            cs_recalls_neg[1].append(cs_res[5])
+            cs_recalls_neg[2].append(cs_res[6])
+            cs_recalls_neg[3].append(cs_res[7])
+
+            cs_recalls_pos[0].append(cs_res[8])
+            cs_recalls_pos[1].append(cs_res[9])
+            cs_recalls_pos[2].append(cs_res[10])
+            cs_recalls_pos[3].append(cs_res[11])
+
+            cs_recalls_arc[0].append(cs_res[12])
+            cs_recalls_arc[1].append(cs_res[13])
+            cs_recalls_arc[2].append(cs_res[14])
+            cs_recalls_arc[3].append(cs_res[15])
+
+        elif "cs precision" in l and "VALIDATION" in l:
+            prec_res = l.split(":")[-1].replace(" ", "").split(",")
+            prec_res = [float(c_r) for c_r in prec_res]
+            cs_precs_euk[0].append(prec_res[0])
+            cs_precs_euk[1].append(prec_res[1])
+            cs_precs_euk[2].append(prec_res[2])
+            cs_precs_euk[3].append(prec_res[3])
+
+            cs_precs_neg[0].append(prec_res[4])
+            cs_precs_neg[1].append(prec_res[5])
+            cs_precs_neg[2].append(prec_res[6])
+            cs_precs_neg[3].append(prec_res[7])
+
+            cs_precs_pos[0].append(prec_res[8])
+            cs_precs_pos[1].append(prec_res[9])
+            cs_precs_pos[2].append(prec_res[10])
+            cs_precs_pos[3].append(prec_res[11])
+
+            cs_precs_arc[0].append(prec_res[12])
+            cs_precs_arc[1].append(prec_res[13])
+            cs_precs_arc[2].append(prec_res[14])
+            cs_precs_arc[3].append(prec_res[15])
+
+    return euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos,\
+           cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc
+
+def extract_mean_test_results(run="param_search_0.2_2048_0.0001_"):
+    full_dict_results = {}
+    epochs = []
+    for tr_folds in [[0,1],[1,2],[0,2]]:
+        with open("results/"+run+"{}_{}.log".format(tr_folds[0], tr_folds[1]), "rt") as f:
+            lines = f.readlines()
+            epochs.append(int(lines[-2].split(" ")[2]))
+    print("Results found on epochs: {}, {}, {}".format(*epochs))
+
+    for tr_folds in [[0,1],[1,2],[0,2]]:
+        res_dict = pickle.load(open("results/" + run + "{}_{}.bin".format(tr_folds[0], tr_folds[1]), "rb"))
+        full_dict_results.update(res_dict)
+    life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin", dict_=full_dict_results)
+    get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls,v=True)
+    get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=True)
+
 if __name__ == "__main__":
-    life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin")
-    sp_pred_accs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls,v=True)
-    all_recalls, all_precisions, total_positives, false_positives, predictions = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls)
+    extract_mean_test_results(run="param_search_0_2048_1e-05_")
+    visualize_validation(run="param_search_0_4096_1e-05_", folds=[0,1])
+    # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[0,2])
+    # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[1,2])
+    # life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin")
+    # sp_pred_accs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls,v=True)
+    # all_recalls, all_precisions, total_positives, false_positives, predictions = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls)
 

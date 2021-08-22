@@ -68,3 +68,11 @@ INFO:root:On epoch 1 total loss: 0.04941944158741417
 INFO:root:On epoch 0 total loss: 0.11749296291181989
 INFO:root:On epoch 1 total loss: 0.05187956330233386
 INFO:root:On epoch 0 total loss: 0.15278289377647267
+INFO:root:Started training
+INFO:root:Log from here...
+INFO:root:On epoch 0 total train/validation loss: 0.1616172834059887/0.10401466875695266
+INFO:root:VALIDATION, epoch 0: Mean sp_pred mcc for life groups: -1, -1, -1, -1
+INFO:root:VALIDATION, epoch 0: Mean cs recall: 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+INFO:root:VALIDATION, epoch 0 Mean cs precision: 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+INFO:root:Started training
+INFO:root:Log from here...

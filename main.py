@@ -10,8 +10,8 @@ import logging
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
-    parameters = {"dos": [0, 0.1, 0.2], "ff_d": [2048,4096],
-                  "lr": [0.00001, 0.0001], "train_folds":[[0,1],[0,2],[1,2]]}
+    parameters = {"dos":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
+                  "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
     group_params = list(ParameterGrid(parameters))
     grpid_2_params = {}
     for i in range(len(group_params)):
@@ -44,6 +44,8 @@ def parse_arguments():
     parser.add_argument("--dropout", default=0.5, type=float)
     parser.add_argument("--test_freq", default=5, type=int)
     parser.add_argument("--use_glbl_lbls", default=False, action="store_true")
+    parser.add_argument("--nlayers", default=3, type=int)
+    parser.add_argument("--nheads", default=8, type=int)
 
     return parser.parse_args()
 
@@ -65,6 +67,8 @@ if __name__ == "__main__":
             args.dropout = param_set['dos']
             args.lr = param_set['lr']
             ff_d = param_set['ff_d']
+            args.nlayers = param_set['nlayers']
+            args.nheads = param_set['nheads']
         logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
         logging.info("Started training")
         a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
