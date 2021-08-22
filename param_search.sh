@@ -4,7 +4,6 @@
 #SBATCH --array=0-71
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:1
-#SBATCH -o slurm_out_folder/p_search.out
 
 module load anaconda
 
