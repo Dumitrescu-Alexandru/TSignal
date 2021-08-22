@@ -4,6 +4,7 @@
 #SBATCH --array=0-71
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:1
+#SBATCH --constraint='volta'
 
 module load anaconda
 
