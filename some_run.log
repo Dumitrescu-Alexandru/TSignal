@@ -76,3 +76,9 @@ INFO:root:VALIDATION, epoch 0: Mean cs recall: 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 INFO:root:VALIDATION, epoch 0 Mean cs precision: 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 INFO:root:Started training
 INFO:root:Log from here...
+INFO:root:Started training
+INFO:root:Log from here...
+INFO:root:On epoch 0 total train/validation loss: 0.00439229166330633/0.0007498668313312989
+INFO:root:VALIDATION, epoch 0: Mean sp_pred mcc for life groups: 0.2466955933502535, -1, -1, -1
+INFO:root:VALIDATION, epoch 0: Mean cs recall: 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+INFO:root:VALIDATION, epoch 0 Mean cs precision: 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
