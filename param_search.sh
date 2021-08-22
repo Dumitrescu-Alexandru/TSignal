@@ -7,4 +7,4 @@
 
 module load anaconda
 
-python main.py --param_set_search_number $SLURM_ARRAY_TASK_ID --batch_size 32 --run_name param_search --train_cs_predictor --add_lg_info
+python main.py --param_set_search_number $SLURM_ARRAY_TASK_ID --batch_size 32 --run_name param_search_2nd --train_cs_predictor --add_lg_info
