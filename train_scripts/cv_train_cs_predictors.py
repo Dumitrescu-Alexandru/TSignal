@@ -96,6 +96,28 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None):
     return tgt_tokens, probs
 
 
+def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0,1], sets=["train"]):
+    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
+    model.eval()
+    sp_data = SPCSpredictionData()
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets)
+
+    dataset_loader = torch.utils.data.DataLoader(sp_dataset,
+                                                 batch_size=test_batch_size, shuffle=False,
+                                                 num_workers=4, collate_fn=collate_fn)
+    ind2lbl = {v: k for k, v in lbl2ind.items()}
+    total_loss = 0
+    for ind, (src, tgt, _, _) in enumerate(dataset_loader):
+        with torch.no_grad():
+            logits = model(src, tgt)
+        targets = padd_add_eos_tkn(tgt, sp_data.lbl2ind)
+        loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
+        total_loss += loss.item()
+        # print("Number of sequences tested: {}".format(ind * test_batch_size))
+    return total_loss / len(dataset_loader)
+
+
 def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0,1], sets=["train"]):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
@@ -182,7 +204,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     best_epoch = 0
     patience = 10
     e = -1
-
+    valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
+    print(valid_loss)
     while patience != 0:
         model.train()
         e += 1
@@ -209,7 +232,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
             loss.backward()
             optimizer.step()
-        valid_loss = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
+        _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
+        valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions\
             = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
         print(euk_importance_avg(sp_pred_mccs), sp_pred_mccs)
