@@ -206,7 +206,7 @@ class PositionalEncoding(nn.Module):
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
         x = x + self.pe[:x.size(0)]
-        return self.dropout(x)
+        return x
 
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
