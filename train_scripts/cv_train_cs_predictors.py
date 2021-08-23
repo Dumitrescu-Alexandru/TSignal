@@ -110,7 +110,10 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
     total_loss = 0
     for ind, (src, tgt, _, _) in enumerate(dataset_loader):
         with torch.no_grad():
-            logits = model(src, tgt)
+            if model.use_glbl_lbls:
+                logits, _  = model(src, tgt)
+            else:
+                logits = model(src, tgt)
         targets = padd_add_eos_tkn(tgt, sp_data.lbl2ind)
         loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
         total_loss += loss.item()
