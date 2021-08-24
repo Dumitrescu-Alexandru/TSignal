@@ -46,32 +46,9 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
         if sp_info == "SP":
             while p[ind] == "S" and ind < len(p) - 1:
                 ind += 1
-            if ind == 0 and life_grp == "POSITIVE" and v and ('L' not in p and 'T' not in p and 'P' not in p and 'M' not in p):
-                count_complete_fn += 1
-                print(p)
-                print(t)
-                print(s)
-                print("\n")
-                count_tol_fn += 1
-            elif ind == 0 and life_grp == "POSITIVE" and v and ('L' in p or 'T' in p  or 'P' in p or 'M' in p):
-                count_otherSPpred += 1
-            elif get_acc_for_tolerence(ind, t)[3] == 0 and v and life_grp == "POSITIVE":
-                count += 1
-                print(p)
-                print(t)
-                print(s)
-                print("\n")
-                count_tol_fn += 1
             predictions[grp2_ind[life_grp]] += get_acc_for_tolerence(ind, t)
 
         elif sp_info != "SP" and p[ind] == "S":
-            # count false positive predictions
-            # if v and life_grp=="ARCHAEA":
-            #     print(life_grp)
-            #     print(p)
-            #     print(t)
-            #     print(s)
-            #     print("\n")
             predictions[grp2_ind[life_grp]] += np.array([0, 0, 0, 0, 0, 1])
     if v:
         print(" count_tol_fn, count_complete_fn, count_otherSPpred",  count_tol_fn, count_complete_fn, count_otherSPpred)
@@ -243,10 +220,10 @@ def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.
 
     plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, metric))
 
-def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0,1]):
+def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0,1], folder=""):
     all_results = []
     euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, \
-        cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = extract_results(run, folds=folds)
+        cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = extract_results(run, folds=folds, folder=folder)
     plot_mcc([euk_mcc, neg_mcc, pos_mcc, arc_mcc], name=run)
     plot_losses([train_loss, valid_loss], name=run)
     extract_and_plot_prec_recall([cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, cs_recalls_arc], metric="recall", name=run)
@@ -272,6 +249,7 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
             arc_mcc.append(float(mccs[3]))
         elif "train/validation" in l:
             train_l, valid_l = l.split(":")[-1].replace(" ","").split("/")
+            valid_l = valid_l.split(",")[0].replace(" ", "")
             train_l, valid_l = float(train_l), float(valid_l)
             train_loss.append(train_l)
             valid_loss.append(valid_l)
@@ -412,7 +390,7 @@ def extract_all_param_results(result_folder="results_param_s_2/"):
 if __name__ == "__main__":
     # extract_all_param_results()
     # extract_mean_test_results(run="param_search_0_2048_1e-05")
-    visualize_validation(run="param_search_w_nl_nh_0.0_4096_1e-05_4_4_", folds=[0,1])
+    visualize_validation(run="w_lg_wo_glbl_lbl_100ep_w_drop_", folds=[0,1])
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[0,2])
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[1,2])
     # life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin")
