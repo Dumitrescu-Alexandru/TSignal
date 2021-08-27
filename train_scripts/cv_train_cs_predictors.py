@@ -175,7 +175,7 @@ def euk_importance_avg(cs_mcc):
     return (3/4) * cs_mcc[0] + (1/4) * np.mean(cs_mcc[1:])
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
-                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8):
+                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8, patience=30):
     logging.info("Log from here...")
     test_partition = list({0,1,2} - set(partitions))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -202,7 +202,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     best_avg_mcc = -1
     best_valid_loss = 5**10
     best_epoch = 0
-    patience = 30
     e = -1
     while patience != 0:
         model.train()

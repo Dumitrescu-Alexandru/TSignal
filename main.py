@@ -10,8 +10,10 @@ import logging
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
-    parameters = {"dos":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
-                  "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
+    # parameters = {"dos":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
+    #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
+    parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
+                  "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
     group_params = list(ParameterGrid(parameters))
     grpid_2_params = {}
     for i in range(len(group_params)):
@@ -46,6 +48,7 @@ def parse_arguments():
     parser.add_argument("--use_glbl_lbls", default=False, action="store_true")
     parser.add_argument("--nlayers", default=3, type=int)
     parser.add_argument("--nheads", default=8, type=int)
+    parser.add_argument("--patience", default=30, type=int)
 
     return parser.parse_args()
 
@@ -62,18 +65,21 @@ if __name__ == "__main__":
         if args.param_set_search_number != -1:
             params = pickle.load(open("param_groups_by_id_cs.bin" ,"rb"))
             param_set = params[args.param_set_search_number]
-            args.run_name = args.run_name + "_{}_{}_{}_{}_{}_{}_{}".format(param_set['dos'], param_set['ff_d'] ,param_set['lr'],
-                                                                           param_set['nlayers'], param_set['nheads'], param_set['train_folds'][0], param_set['train_folds'][1])
+            run_no = "run_number_{}".format(param_set["run_number"]) if "run_number" in param_set else ""
+            args.run_name = args.run_name + "_{}_{}_{}_{}_{}_{}_folds_{}_{}".format(param_set['dos'], param_set['ff_d'] ,param_set['lr'],
+                                                                           param_set['nlayers'], param_set['nheads'], run_no,
+                                                                         param_set['train_folds'][0], param_set['train_folds'][1])
             args.dropout = param_set['dos']
             args.lr = param_set['lr']
             ff_d = param_set['ff_d']
             args.nlayers = param_set['nlayers']
             args.nheads = param_set['nheads']
+
         logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
         logging.info("Started training")
         a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
-                                ff_d=ff_d, partitions=train_folds, nlayers=args.nlayers, nheads=args.nheads)
+                                ff_d=ff_d, partitions=train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()

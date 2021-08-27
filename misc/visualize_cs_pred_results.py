@@ -17,15 +17,20 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
         while t_lbl[true_cs] == "S" and true_cs < len(t_lbl):
             true_cs += 1
         if np.abs(true_cs - ind) == 0:
-            return np.array([1, 1, 1, 1, 1, 0])
+            return np.array([1, 1, 1, 1, 1, 0, 0, 0, 0, 0])
         elif np.abs(true_cs - ind) == 1:
-            return np.array([0, 1, 1, 1, 1, 0])
+            return np.array([0, 1, 1, 1, 1, 0, 1, 0, 0, 0])
         elif np.abs(true_cs - ind) == 2:
-            return np.array([0, 0, 1, 1, 1, 0])
+            return np.array([0, 0, 1, 1, 1, 0, 1, 1, 0, 0])
         elif np.abs(true_cs - ind) == 3:
-            return np.array([0, 0, 0, 1, 1, 0])
+            return np.array([0, 0, 0, 1, 1, 0, 1, 1, 1, 0])
+        elif ind != 0:
+            # if ind==0, SP was predicted, but CS prediction is off for all tolerence levels, meaning it's a false positive
+            return np.array([0, 0, 0, 0, 1, 0, 1, 1, 1, 1])
         else:
-            return np.array([0, 0, 0, 0, 1, 0])
+            # if ind==0, SP was not even predicted (so there is no CS prediction) and this affects precision metric
+            # tp/(tp+fp). It means this isnt a tp or a fp, its a fn
+            return np.array([0, 0, 0, 0, 1, 0, 0, 0, 0, 0])
 
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
     # order of elemnts in below list:
@@ -36,7 +41,8 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
     # We used precision and recall to assess CS predictions, where precision is defined as the fraction of CS predictions
     # that are correct, and recall is the fraction of real SPs that are predicted as the correct SP type and have the correct CS assigned.
     grp2_ind = {"EUKARYA": 0, "NEGATIVE": 1, "POSITIVE": 2, "ARCHAEA": 3}
-    predictions = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]
+    predictions = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
     predictions = [np.array(p) for p in predictions]
     count, count2 = 0, 0
     count_tol_fn, count_complete_fn, count_otherSPpred = 0, 0, 0
@@ -49,7 +55,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
             predictions[grp2_ind[life_grp]] += get_acc_for_tolerence(ind, t)
 
         elif sp_info != "SP" and p[ind] == "S":
-            predictions[grp2_ind[life_grp]] += np.array([0, 0, 0, 0, 0, 1])
+            predictions[grp2_ind[life_grp]] += np.array([0, 0, 0, 0, 0, 1, 0, 0, 0, 0])
     if v:
         print(" count_tol_fn, count_complete_fn, count_otherSPpred",  count_tol_fn, count_complete_fn, count_otherSPpred)
     all_recalls = []
@@ -59,17 +65,19 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
     for life_grp, ind in grp2_ind.items():
         current_preds = predictions[grp2_ind[life_grp]]
         if v:
-            print("Recall {}: {}".format(life_grp, [current_preds[i] / current_preds[-2] for i in range(len(current_preds) - 2)]))
-            print("Prec {}: {}".format(life_grp, [current_preds[i] / (current_preds[i] +current_preds[-1]) for i in range(len(current_preds) - 2)]))
-        all_recalls.append([current_preds[i]/current_preds[-2] for i in range(len(current_preds) -2)])
+            print("Recall {}: {}".format(life_grp, [current_preds[i] / current_preds[4] for i in range(4)]))
+            print("Prec {}: {}".format(life_grp,
+                                       [current_preds[i] / (current_preds[i] + current_preds[5]) for i in range(4)]))
+        all_recalls.append([current_preds[i] / current_preds[4] for i in range(4)])
         all_precisions.append([])
         for i in range(4):
-            if current_preds[-1] + current_preds[i] == 0:
+            if current_preds[5] + current_preds[i] == 0:
                 all_precisions[-1].append(0.)
             else:
-                all_precisions[-1].append(current_preds[i]/(current_preds[-1] + current_preds[i]))
-        total_positives.append(current_preds[-2])
-        false_positives.append(current_preds[-1])
+                all_precisions[-1].append(
+                    current_preds[i] / (current_preds[-1] + current_preds[i] + current_preds[i + 6]))
+        total_positives.append(current_preds[4])
+        false_positives.append(current_preds[5])
     return all_recalls, all_precisions, total_positives, false_positives, predictions
 
 def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False):
@@ -178,20 +186,21 @@ def plot_mcc(mccs, name="param_search_0.2_2048_0.0001_"):
     axs[0,0].legend()
 
     axs[0, 1].plot(neg_mcc, label="Negative mcc")
-    axs[0, 1].set_ylabel("mcc")
     axs[0, 1].set_ylim(-1.1, 1.1)
     axs[0, 1].legend()
 
     axs[1, 0].plot(pos_mcc, label="Positive mcc")
     axs[1, 0].legend()
     axs[1, 0].set_ylim(-1.1, 1.1)
+    axs[1, 0].set_ylabel("mcc")
+
     axs[1, 0].set_xlabel("epochs")
 
     axs[1, 1].plot(arc_mcc, label="Archaea mcc")
     axs[1, 1].legend()
+
     axs[1, 1].set_ylim(-1.1, 1.1)
     axs[1, 1].set_xlabel("epochs")
-
     plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, "mcc"))
 
 def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.2_2048_0.0001_"):
@@ -204,7 +213,6 @@ def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.
         axs[0,0].set_ylim(-0.1, 1.1)
 
         axs[0, 1].plot(cs_res_neg[i], label="Negative {} tol={}".format(metric, i))
-        axs[0, 1].set_ylabel(metric)
         axs[0, 1].legend()
         axs[0, 1].set_ylim(-0.1, 1.1)
 
@@ -212,10 +220,13 @@ def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.
         axs[1, 0].legend()
         axs[1, 0].set_xlabel("epochs")
         axs[1, 0].set_ylim(-0.1, 1.1)
+        axs[1, 0].set_ylabel(metric)
+
 
         axs[1, 1].plot(cs_res_arc[i], label="Archaea {} tol={}".format(metric, i))
         axs[1, 1].legend()
         axs[1, 1].set_xlabel("epochs")
+
         axs[1, 1].set_ylim(-0.1, 1.1)
 
     plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, metric))
@@ -387,10 +398,41 @@ def extract_all_param_results(result_folder="results_param_s_2/"):
               " & ".join([str(round(rec,3)) for rec in mdl2results[mdl_ind][2]]), "&", round(mdl2results[mdl_ind][-1],3), "\\\\ \\hline")
 
 
+def sanity_checks(run="param_search_0_2048_0.0001_", folder="results/"):
+    # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
+
+    def get_last_contiguous_index(seq, signal_peptide):
+        ind = 0
+        while seq[ind] == signal_peptide and ind < len(seq) -1:
+            ind += 1
+        return ind - 1
+
+    def check_contiguous_sp(lbl_seqs):
+        for l in lbl_seqs:
+            signal_peptide = None
+            l = l.replace("ES", "")
+            if "S" in l:
+                signal_peptide = "S"
+            elif "T" in l:
+                signal_peptide = "T"
+            elif "L" in l:
+                signal_peptide = "L"
+            elif "P" in l:
+                signal_peptide = "P"
+            if signal_peptide is not None:
+
+                if l.rfind(signal_peptide) != get_last_contiguous_index(l, signal_peptide):
+                    print(l,l.rfind(signal_peptide), get_last_contiguous_index(l, signal_peptide), signal_peptide)
+
+    for tr_fold in [[0, 1], [1,2], [0, 2]]:
+        labels = pickle.load(open(folder + run + "{}_{}.bin".format(tr_fold[0],tr_fold[1]), "rb")).values()
+        check_contiguous_sp(labels)
+
 if __name__ == "__main__":
     # extract_all_param_results()
     # extract_mean_test_results(run="param_search_0_2048_1e-05")
-    visualize_validation(run="w_lg_wo_glbl_lbl_100ep_w_drop_", folds=[0,1])
+    sanity_checks()
+    # visualize_validation(run="w_lg_wo_glbl_lbl_100ep_", folds=[0,1])
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[0,2])
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[1,2])
     # life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin")
