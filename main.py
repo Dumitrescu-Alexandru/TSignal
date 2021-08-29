@@ -50,6 +50,7 @@ def parse_arguments():
     parser.add_argument("--nheads", default=8, type=int)
     parser.add_argument("--patience", default=30, type=int)
     parser.add_argument("--train_oh", default=False, action="store_true")
+    parser.add_argument("--train_folds", default=[0,1], nargs="+")
 
     return parser.parse_args()
 
@@ -75,12 +76,14 @@ if __name__ == "__main__":
             ff_d = param_set['ff_d']
             args.nlayers = param_set['nlayers']
             args.nheads = param_set['nheads']
+            args.train_folds = param_set['train_folds']
 
         logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
         logging.info("Started training")
+        args.train_folds = [int(tf) for tf in args.train_folds]
         a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
-                                ff_d=ff_d, partitions=train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
+                                ff_d=ff_d, partitions=args.train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
                                 train_oh=args.train_oh)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
