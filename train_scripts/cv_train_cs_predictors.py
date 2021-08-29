@@ -17,10 +17,11 @@ from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData
 from models.transformer_nmt import TransformerModel
 
 
-def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6, ff_dim=1024*4, nlayers=3, nheads=8):
+def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6, ff_dim=1024*4, nlayers=3, nheads=8,
+               aa2ind = {}, train_oh = False):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers, partitions=partitions,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
-                             no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim)
+                             no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -175,7 +176,8 @@ def euk_importance_avg(cs_mcc):
     return (3/4) * cs_mcc[0] + (1/4) * np.mean(cs_mcc[1:])
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
-                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8, patience=30):
+                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8, patience=30,
+                        train_oh=False):
     logging.info("Log from here...")
     test_partition = list({0,1,2} - set(partitions))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -189,9 +191,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         lg2ind = None
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
         lg2ind = sp_data.lg2ind
+    aa2ind = sp_data.aa2ind if train_oh else None
     model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
-                       ff_dim=ff_d, nlayers=nlayers, nheads=nheads)
+                       ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_glbl = torch.nn.CrossEntropyLoss()

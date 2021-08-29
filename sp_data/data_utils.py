@@ -9,24 +9,33 @@ import os
 
 class SPCSpredictionData:
     def __init__(self, lbl2ind=None):
+        self.aa2ind = {}
         self.lbl2ind = {}
         self.glbl_lbl_2ind = {}
         self.data_folder = self.get_data_folder()
         self.lg2ind = {}
         if os.path.exists("sp6_dicts.bin"):
-            self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind = pickle.load(open("sp6_dicts.bin", "rb"))
+            self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
         else:
             self.form_lbl_inds()
 
     def form_lbl_inds(self):
         parts = [0, 1, 2]
         all_unique_lbls = set()
+        unique_aas = set()
         for p in parts:
             for t in ["train", "test"]:
                 part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
-                for (_, lbls, _, _) in part_dict.values():
+                for seq, (_, lbls, _, _) in part_dict.items():
                     all_unique_lbls.update(lbls)
+                    unique_aas.update(seq)
+        self.aa2ind = {aa: ind for ind, aa in enumerate(unique_aas)}
         self.lbl2ind = {l: ind for ind, l in enumerate(all_unique_lbls)}
+        unique_aas = len(self.aa2ind.keys())
+        PAD_IDX, BOS_IDX, EOS_IDX = unique_aas, unique_aas + 1, unique_aas + 2
+        self.aa2ind['PD'] = PAD_IDX
+        self.aa2ind["BS"] = BOS_IDX
+        self.aa2ind["ES"] = EOS_IDX
         # add special tokens at the end of the dictionary
         unique_tkns = len(self.lbl2ind.keys())
         PAD_IDX, BOS_IDX, EOS_IDX = unique_tkns, unique_tkns + 1, unique_tkns + 2
@@ -44,8 +53,7 @@ class SPCSpredictionData:
                     all_unique_global_inds.add(glb_ind)
         self.lg2ind = {l: ind for ind, l in enumerate(all_unique_lgs)}
         self.glbl_lbl_2ind = {l:ind for ind,l in enumerate(all_unique_global_inds)}
-        pickle.dump([self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind], open("sp6_dicts.bin", "wb"))
-
+        pickle.dump([self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind], open("sp6_dicts.bin", "wb"))
 
     def get_data_folder(self):
         if os.path.exists("/scratch/work/dumitra1"):

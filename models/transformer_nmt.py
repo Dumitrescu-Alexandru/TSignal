@@ -36,7 +36,7 @@ class TokenEmbedding(nn.Module):
 
 
 class InputEmbeddingEncoder(nn.Module):
-    def __init__(self, partitions=[0, 1, 2], data_folder="sp_data/", lg2ind=None, use_glbl_lbls=False):
+    def __init__(self, partitions=[0, 1, 2], data_folder="sp_data/", lg2ind=None, use_glbl_lbls=False, aa2ind=None):
         # only create dictionaries from sequences to embeddings (as sequence embeddings are already computed by a bert
         # model
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -45,20 +45,32 @@ class InputEmbeddingEncoder(nn.Module):
         seq2emb = {}
         seq2lg = {}
         self.use_lg = lg2ind is not None
-        for p in partitions:
-            for t in ["test", "train"]:
-                part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
-                seq2emb.update({seq: emb for seq, (emb, _, _, _) in part_dict.items()})
-                if lg2ind is not None:
-                    seq2lg.update({seq: lg2ind[lg] for seq, (_, _, lg, _) in part_dict.items()})
-        self.seq2lg = seq2lg
-        self.seq2emb = seq2emb
-        # we do need the beginning of sequence and end of sequence tokens for the predictions, so we add a linear layer
-        # 2x1024 for that. When using global classification, an additional <CLS> token will be added during training,
-        # that will be used for global classification
-        self.eos_bos_cls_embs = TokenEmbedding(3, 1024) if use_glbl_lbls else TokenEmbedding(2, 1024)
-        self.lg_embs = TokenEmbedding(len(lg2ind.keys()), 1024) if lg2ind is not None else None
-        self.use_glbl_lbls = use_glbl_lbls
+        if aa2ind is None:
+            # if aa2ind is None, train on oh using an InputEmbeddingLayer. A single emb layer having everything (EOS, BOS,
+            # CLS, LG) embs should be good
+            for p in partitions:
+                for t in ["test", "train"]:
+                    part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
+                    seq2emb.update({seq: emb for seq, (emb, _, _, _) in part_dict.items()})
+                    if lg2ind is not None:
+                        seq2lg.update({seq: lg2ind[lg] for seq, (_, _, lg, _) in part_dict.items()})
+            self.seq2lg = seq2lg
+            self.seq2emb = seq2emb
+            self.aa2ind = aa2ind
+            # we do need the beginning of sequence and end of sequence tokens for the predictions, so we add a linear layer
+            # 2x1024 for that. When using global classification, an additional <CLS> token will be added during training,
+            # that will be used for global classification
+            self.eos_bos_cls_embs = TokenEmbedding(3, 1024) if use_glbl_lbls else TokenEmbedding(2, 1024)
+            self.lg_embs = TokenEmbedding(len(lg2ind.keys()), 1024) if lg2ind is not None else None
+            self.use_glbl_lbls = use_glbl_lbls
+        else:
+            # add CLS, LG tokens:
+            self.use_glbl_lbls = use_glbl_lbls
+            self.use_lg = lg2ind is not None
+            self.aa2ind = aa2ind
+            no_of_tokens = len(self.aa2ind.keys())
+            self.aa2ind['CLS'], self.aa2ind['LG'] = no_of_tokens, no_of_tokens+1
+            self.emb_layer = TokenEmbedding(len(self.aa2ind.items()), 1024)
 
     def generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones((sz, sz), device=self.device)) == 1).transpose(0, 1)
@@ -84,7 +96,39 @@ class InputEmbeddingEncoder(nn.Module):
         input_tensor.append(eos)
         return torch.cat(input_tensor, dim=0)
 
+    def oh_forward(self, seqs):
+        # add BOS, EOS token and , cls, lg tkns if necessary
+        tensor_inputs=[]
+        for s in seqs:
+            current_s = [self.aa2ind['BS']]
+            if self.use_glbl_lbls:
+                current_s.append(self.aa2ind['CLS'])
+            if self.use_lg:
+                current_s.append(self.aa2ind['LG'])
+            current_s.extend([self.aa2ind[aa] for aa in s])
+            current_s.append(self.aa2ind['ES'])
+            tensor_inputs.append(self.emb_layer(torch.tensor(current_s, device=self.device)))
+        input_lens = [ti.shape[0] for ti in tensor_inputs]
+        # additional inputs BOS tokens, glbl_lbl (<cls> token), and lg
+        additional_inp_tkns = 1
+        if self.use_lg:
+            additional_inp_tkns += 1
+        if self.use_glbl_lbls:
+            additional_inp_tkns += 1
+        output_lens = [ti.shape[0] - additional_inp_tkns for ti in tensor_inputs]
+        max_len = max(input_lens)
+        max_len_out = max(output_lens)
+        padding_mask_src = torch.arange(max_len)[None, :] < torch.tensor(input_lens)[:, None]
+        # src and padding are always of the same size
+        padding_mask_tgt = torch.arange(max_len_out)[None, :] < torch.tensor(output_lens)[:, None]
+        tgt_mask = self.generate_square_subsequent_mask(max_len_out)
+        src_mask = self.create_empty_mask(max_len)
+        return src_mask, tgt_mask, ~padding_mask_src.to(self.device), ~padding_mask_tgt.to(self.device), \
+               tensor_inputs
+
     def forward(self, seqs):
+        if self.aa2ind is not None:
+            return self.oh_forward(seqs)
         tensor_inputs = [self.add_bos_eos_lg_glb_cls_tkns(s) for s in seqs]
         input_lens = [ti.shape[0] for ti in tensor_inputs]
         # additional inputs BOS tokens, glbl_lbl (<cls> token), and lg
@@ -117,7 +161,7 @@ class TransformerModel(nn.Module):
 
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5, 
                  partitions=[0, 1], data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
-                 no_glbl_lbls=6, ff_dim=4096):
+                 no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False):
         super().__init__()
         self.model_type = 'Transformer'
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -129,8 +173,9 @@ class TransformerModel(nn.Module):
                                        dim_feedforward=ff_dim,
                                        dropout=dropout).to(self.device)
         # input_encoder is just a dictionary with {sequence:embedding} with embeddings from bert LM
+        aa2ind = None if not train_oh else aa2ind
         self.input_encoder = InputEmbeddingEncoder(partitions=[0, 1, 2], data_folder=data_folder, lg2ind=lg2ind, 
-                                                   use_glbl_lbls=use_glbl_lbls)
+                                                   use_glbl_lbls=use_glbl_lbls, aa2ind=aa2ind)
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
         self.label_encoder = TokenEmbedding(ntoken, d_hid, lbl2ind=lbl2ind)
         self.d_model = d_model

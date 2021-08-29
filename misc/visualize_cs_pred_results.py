@@ -6,7 +6,7 @@ from Bio import SeqIO
 import numpy as np
 
 
-def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
+def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False,only_cs_position=False):
     def is_cs(predicted_cs_ind, true_lbl_seq):
         if true_lbl_seq[predicted_cs_ind] == "S" and true_lbl_seq[predicted_cs_ind + 1] != "S":
             return True
@@ -31,7 +31,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
             # if ind==0, SP was not even predicted (so there is no CS prediction) and this affects precision metric
             # tp/(tp+fp). It means this isnt a tp or a fp, its a fn
             return np.array([0, 0, 0, 0, 1, 0, 0, 0, 0, 0])
-
+    sp_types = ["S", "T", "L", "P"]
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
     # order of elemnts in below list:
     # (eukaria_correct_tollerence_0, eukaria_correct_tollerence_1, eukaria_correct_tollerence_2, ..3, eukaria_total, eukaria_all_pos_preds)
@@ -49,8 +49,13 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False):
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         life_grp, sp_info = l.split("|")
         ind = 0
+        predicted_sp = p[0]
+        is_sp = predicted_sp in sp_types
         if sp_info == "SP":
-            while p[ind] == "S" and ind < len(p) - 1:
+
+            while (p[ind] == "S" or (p[ind] == predicted_sp and is_sp and only_cs_position) )   and ind < len(p) - 1:
+                # when only_cs_position=True, the cleavage site positions will be taken into account irrespective of
+                # whether the predicted SP is the correct kind
                 ind += 1
             predictions[grp2_ind[life_grp]] += get_acc_for_tolerence(ind, t)
 
@@ -313,7 +318,7 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
     return euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos,\
            cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc
 
-def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder="results_param_s_2/"):
+def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder="results_param_s_2/", only_cs_position=False):
     full_dict_results = {}
     epochs = []
     for tr_folds in [[0,1],[1,2],[0,2]]:
@@ -333,7 +338,7 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
     else:
         v=False
     all_recalls, all_precisions, _, _, _ = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v)
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position)
     return mccs, all_recalls, all_precisions, avg_epoch
 
 def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""):
@@ -365,7 +370,7 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
 
 
 
-def extract_all_param_results(result_folder="results_param_s_2/"):
+def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False):
     files = os.listdir(result_folder)
     unique_params = set()
     for f in files:
@@ -376,7 +381,7 @@ def extract_all_param_results(result_folder="results_param_s_2/"):
     # order results by the eukaryote mcc
     eukaryote_mcc = []
     for ind, u_p in enumerate(unique_params):
-        mccs, all_recalls, all_precisions, avg_epoch= extract_mean_test_results(run=u_p, result_folder=result_folder)
+        mccs, all_recalls, all_precisions, avg_epoch= extract_mean_test_results(run=u_p, result_folder=result_folder, only_cs_position=only_cs_position)
         mdl2results[ind] = (mccs, list(np.reshape(np.array(all_recalls),-1)),
                             list(np.reshape(np.array(all_precisions),-1)), avg_epoch)
         mdlind2mdlparams[ind] = u_p
@@ -429,9 +434,9 @@ def sanity_checks(run="param_search_0_2048_0.0001_", folder="results/"):
         check_contiguous_sp(labels)
 
 if __name__ == "__main__":
-    # extract_all_param_results()
+    extract_all_param_results(only_cs_position=True)
     # extract_mean_test_results(run="param_search_0_2048_1e-05")
-    sanity_checks()
+    # sanity_checks()
     # visualize_validation(run="w_lg_wo_glbl_lbl_100ep_", folds=[0,1])
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[0,2])
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[1,2])
