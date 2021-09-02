@@ -186,7 +186,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         train_oh=False, deployment_model=False):
     logging.info("Log from here...")
     test_partition = set() if deployment_model else ({0, 1, 2} - set(partitions))
-    partitions = partitions if deployment_model else [0, 1, 2]
+    partitions = [0,1,2] if deployment_model else partitions
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData()
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
