@@ -51,7 +51,7 @@ def parse_arguments():
     parser.add_argument("--patience", default=30, type=int)
     parser.add_argument("--train_oh", default=False, action="store_true")
     parser.add_argument("--train_folds", default=[0,1], nargs="+")
-    parser.add_argument("--deployment_model", default=[0,1], nargs="+")
+    parser.add_argument("--deployment_model", default=False, action="store_true")
 
     return parser.parse_args()
 
