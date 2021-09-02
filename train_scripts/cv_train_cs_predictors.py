@@ -1,4 +1,4 @@
-import time
+from tqdm import tqdm
 import logging
 import sys
 
@@ -11,23 +11,23 @@ import pickle
 import torch.nn as nn
 import torch.optim as optim
 import torch
+
 sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn
 from models.transformer_nmt import TransformerModel
 
 
-def init_model(ntoken, partitions, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6, ff_dim=1024*4, nlayers=3, nheads=8,
-               aa2ind = {}, train_oh = False):
-    model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers, partitions=partitions,
+def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
+               ff_dim=1024 * 4, nlayers=3, nheads=8,
+               aa2ind={}, train_oh=False):
+    model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
     return model
-
-
 
 
 def get_data_folder():
@@ -37,8 +37,6 @@ def get_data_folder():
         return "sp_data/"
     else:
         return "/scratch/project2003818/dumitra1/sp_data/"
-
-
 
 
 def padd_add_eos_tkn(lbl_seqs, lbl2ind):
@@ -88,7 +86,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
             current_ys.append(ys[bach_ind])
             current_ys[-1].append(next_word[bach_ind])
         ys = current_ys
-    return ys, torch.stack(all_probs).transpose(0,1)
+    return ys, torch.stack(all_probs).transpose(0, 1)
 
 
 def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None):
@@ -97,7 +95,7 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None):
     return tgt_tokens, probs
 
 
-def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0,1], sets=["train"]):
+def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"]):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     model.eval()
     sp_data = SPCSpredictionData()
@@ -112,7 +110,7 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
     for ind, (src, tgt, _, _) in enumerate(dataset_loader):
         with torch.no_grad():
             if model.use_glbl_lbls:
-                logits, _  = model(src, tgt)
+                logits, _ = model(src, tgt)
             else:
                 logits = model(src, tgt)
         targets = padd_add_eos_tkn(tgt, sp_data.lbl2ind)
@@ -122,7 +120,7 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
     return total_loss / len(dataset_loader)
 
 
-def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0,1], sets=["train"]):
+def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
     model.eval()
@@ -135,30 +133,34 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0,1], 
                                                  num_workers=4, collate_fn=collate_fn)
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     total_loss = 0
-    for ind, (src, tgt, _, _) in enumerate(dataset_loader):
+    for ind, (src, tgt, _, _) in tqdm(enumerate(dataset_loader), "Epoch {} validation".format(epoch), total=len(dataset_loader)):
         # print("Number of sequences tested: {}".format(ind * test_batch_size))
         src = src
         tgt = tgt
         predicted_tokens, probs = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt)
         true_targets = padd_add_eos_tkn(tgt, sp_data.lbl2ind)
-        total_loss += loss_fn(probs.reshape(-1,10), true_targets.reshape(-1)).item()
+        total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
         for s, t, pt in zip(src, tgt, predicted_tokens):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
             eval_dict[s] = predicted_lbls[:len(t)]
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
-    return total_loss/len(dataset_loader)
+    return total_loss / len(dataset_loader)
+
 
 def save_model(model, model_name=""):
     folder = get_data_folder()
     model.input_encoder.seq2emb = {}
-    torch.save(model, folder + model_name+"_best_eval.pth")
+    torch.save(model, folder + model_name + "_best_eval.pth")
     model.input_encoder.update()
 
-def load_model(model_path, ntoken, partitions, lbl2ind, lg2ind, dropout=0.5, use_glbl_lbls=False,no_glbl_lbls=6, ff_dim=1024*4):
+
+def load_model(model_path, ntoken, partitions, lbl2ind, lg2ind, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
+               ff_dim=1024 * 4):
     folder = get_data_folder()
-    model= torch.load(folder + model_path)
+    model = torch.load(folder + model_path)
     model.input_encoder.update()
     return model
+
 
 def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1):
     print("{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(test_on, ep, *sp_pred_mccs))
@@ -169,17 +171,22 @@ def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, 
     logging.info("{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(test_on, ep, *sp_pred_mccs))
     logging.info("{}, epoch {}: Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         test_on, ep, *all_recalls))
-    logging.info("{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-        test_on, ep, *all_precisions))
+    logging.info(
+        "{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+            test_on, ep, *all_precisions))
+
 
 def euk_importance_avg(cs_mcc):
-    return (3/4) * cs_mcc[0] + (1/4) * np.mean(cs_mcc[1:])
+    return (3 / 4) * cs_mcc[0] + (1 / 4) * np.mean(cs_mcc[1:])
+
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
-                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8, patience=30,
-                        train_oh=False):
+                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
+                        patience=30,
+                        train_oh=False, deployment_model=False):
     logging.info("Log from here...")
-    test_partition = list({0,1,2} - set(partitions))
+    test_partition = set() if deployment_model else ({0, 1, 2} - set(partitions))
+    partitions = partitions if deployment_model else [0, 1, 2]
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData()
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
@@ -192,7 +199,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
         lg2ind = sp_data.lg2ind
     aa2ind = sp_data.aa2ind if train_oh else None
-    model = init_model(len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
+    model = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
                        ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind)
 
@@ -203,7 +210,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
 
     best_avg_mcc = -1
-    best_valid_loss = 5**10
+    best_valid_loss = 5 ** 10
     best_epoch = 0
     e = -1
     while patience != 0:
@@ -211,7 +218,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         e += 1
         losses = 0
         losses_glbl = 0
-        for ind, batch in enumerate(dataset_loader):
+        for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
             seqs, lbl_seqs, _, glbl_lbls = batch
             if use_glbl_lbls:
                 logits, glbl_logits = model(seqs, lbl_seqs)
@@ -232,25 +239,34 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
             loss.backward()
             optimizer.step()
-        _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
-        valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"])
-        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions\
+        _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"], epoch=e)
+        valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions,
+                                         sets=["test"])
+        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions \
             = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
         print(euk_importance_avg(sp_pred_mccs), sp_pred_mccs)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
-                              list(np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
+                                                       list(np.array(all_precisions).flatten()), list(
+            np.array(total_positives).flatten())
         if use_glbl_lbls:
-            print("On epoch {} total train/validation loss and glbl loss: {}/{}, {}".format(e, losses / len(dataset_loader),
-                                                                                valid_loss, losses_glbl / len(dataset_loader)))
-            logging.info("On epoch {} total train/validation loss and glbl loss: {}/{}, {}".format(e, losses / len(dataset_loader),
-                                                                                   valid_loss, losses_glbl / len(dataset_loader)))
+            print("On epoch {} total train/validation loss and glbl loss: {}/{}, {}".format(e, losses / len(
+                dataset_loader),
+                                                                                            valid_loss,
+                                                                                            losses_glbl / len(
+                                                                                                dataset_loader)))
+            logging.info("On epoch {} total train/validation loss and glbl loss: {}/{}, {}".format(e, losses / len(
+                dataset_loader),
+                                                                                                   valid_loss,
+                                                                                                   losses_glbl / len(
+                                                                                                       dataset_loader)))
         else:
             print("On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
-            logging.info("On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
+            logging.info(
+                "On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e)
 
         print("VALIDATION: avg mcc on epoch {}: {}".format(e, euk_importance_avg(sp_pred_mccs)))
-        if (valid_loss < best_valid_loss and eps == -1) or (eps != -1 and e == eps-1):
+        if (valid_loss < best_valid_loss and eps == -1) or (eps != -1 and e == eps - 1):
             best_epoch = e
             best_valid_loss = valid_loss
             save_model(model, run_name)
@@ -260,23 +276,23 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             print("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                   format(e, patience, valid_loss, best_valid_loss))
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
-                  format(e, patience, valid_loss, best_valid_loss))
+                         format(e, patience, valid_loss, best_valid_loss))
             patience -= 1
-    model = load_model(run_name + "_best_eval.pth", len(sp_data.lbl2ind.keys()), partitions=[0, 1], lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
-                       dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()))
-    
-    evaluate(model, sp_data.lbl2ind, run_name=run_name+"_best", partitions=test_partition, sets=["train", "test"])
-    sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
-        get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False)
-    all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
-        np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
-    log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch)
-    print("TEST: Total positives and false positives: ", total_positives, false_positives)
-    print("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
-          "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
-    pos_fp_info  = total_positives
-    pos_fp_info.extend(false_positives)
-    logging.info("TEST: Total positives and false positives: {}, {}, {}, {}, {}, {}, {}, {}", pos_fp_info)
-    logging.info("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
-          "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
-
+    if not deployment_model:
+        model = load_model(run_name + "_best_eval.pth", len(sp_data.lbl2ind.keys()), partitions=[0, 1],
+                           lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
+                           dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()))
+        evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"])
+        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+            get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False)
+        all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
+            np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
+        log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch)
+        print("TEST: Total positives and false positives: ", total_positives, false_positives)
+        print("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
+              "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
+        pos_fp_info = total_positives
+        pos_fp_info.extend(false_positives)
+        logging.info("TEST: Total positives and false positives: {}, {}, {}, {}, {}, {}, {}, {}", pos_fp_info)
+        logging.info("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
+                     "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))

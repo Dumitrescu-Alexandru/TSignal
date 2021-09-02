@@ -1,3 +1,4 @@
+from scipy import stats
 import matplotlib.pyplot as plt
 from sklearn.metrics import matthews_corrcoef as  compute_mcc
 import os
@@ -334,7 +335,7 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin", dict_=full_dict_results)
     mccs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls,v=False)
     if "param_search_w_nl_nh_0.0_4096_1e-05_4_4" in run:
-        v = True
+        v = False
     else:
         v=False
     all_recalls, all_precisions, _, _, _ = \
@@ -363,11 +364,6 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
                 best_mcc = ep2mcc[best_ep]
         all_best_mccs.append(best_mcc)
     return np.mean(all_best_mccs)
-
-
-
-
-
 
 
 def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False):
@@ -402,6 +398,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
               " & ".join([str(round(rec,3)) for rec in mdl2results[mdl_ind][2]]), "&", round(mdl2results[mdl_ind][-1],3), "\\\\ \\hline")
 
+    return mdl2results
 
 def sanity_checks(run="param_search_0_2048_0.0001_", folder="results/"):
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
@@ -433,8 +430,151 @@ def sanity_checks(run="param_search_0_2048_0.0001_", folder="results/"):
         labels = pickle.load(open(folder + run + "{}_{}.bin".format(tr_fold[0],tr_fold[1]), "rb")).values()
         check_contiguous_sp(labels)
 
+def extract_all_mdl_results(mdl2results):
+    euk_mcc, neg_mcc, pos_mcc, arch_mcc = [], [], [], []
+    euk_rec, neg_rec, pos_rec, arch_rec = [[],[],[],[]], [[],[],[],[]], [[],[],[],[]] ,[[],[],[],[]]
+    euk_prec, neg_prec, pos_prec, arch_prec = [[],[],[],[]], [[],[],[],[]], [[],[],[],[]] ,[[],[],[],[]]
+    for _, (mccs, recalls, precisions, epochs) in mdl2results.items():
+        euk_mcc.append(mccs[0])
+        neg_mcc.append(mccs[1])
+        pos_mcc.append(mccs[2])
+        arch_mcc.append(mccs[3])
+        euk_rec[0].append(recalls[0])
+        euk_rec[1].append(recalls[1])
+        euk_rec[2].append(recalls[2])
+        euk_rec[3].append(recalls[3])
+        neg_rec[0].append(recalls[4])
+        neg_rec[1].append(recalls[5])
+        neg_rec[2].append(recalls[6])
+        neg_rec[3].append(recalls[7])
+        pos_rec[0].append(recalls[8])
+        pos_rec[1].append(recalls[9])
+        pos_rec[2].append(recalls[10])
+        pos_rec[3].append(recalls[11])
+        arch_rec[0].append(recalls[12])
+        arch_rec[1].append(recalls[13])
+        arch_rec[2].append(recalls[14])
+        arch_rec[3].append(recalls[15])
+
+        euk_prec[0].append(precisions[0])
+        euk_prec[1].append(precisions[1])
+        euk_prec[2].append(precisions[2])
+        euk_prec[3].append(precisions[3])
+        neg_prec[0].append(precisions[4])
+        neg_prec[1].append(precisions[5])
+        neg_prec[2].append(precisions[6])
+        neg_prec[3].append(precisions[7])
+        pos_prec[0].append(precisions[8])
+        pos_prec[1].append(precisions[9])
+        pos_prec[2].append(precisions[10])
+        pos_prec[3].append(precisions[11])
+        arch_prec[0].append(precisions[12])
+        arch_prec[1].append(precisions[13])
+        arch_prec[2].append(precisions[14])
+        arch_prec[3].append(precisions[15])
+    return euk_mcc, neg_mcc, pos_mcc, arch_mcc, euk_rec, neg_rec, pos_rec, arch_rec, euk_prec, neg_prec, pos_prec, arch_prec
+
+
+def visualize_training_variance(mdl2results, mdl2results_hps=None):
+    def plot_4_figs(measures, sp6_measure, hp_s_measures=None, name="", plot_hps=False):
+        euk, neg, pos, arch = measures
+        if plot_hps:
+            euk_hps, neg_hps, pos_hps, arch_hps = hp_s_measures
+
+        fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+        fig.suptitle(name)
+        x = np.linspace(0, 1, 1000)
+        kde = stats.gaussian_kde(euk)
+        # axs[0, 0].plot(x, kde(x), color = "blue", label="Eukaryote {}".format(name))
+        axs[0, 0].hist(euk,color = "blue",bins=10, label="Eukaryote {}".format(name))
+        if plot_hps:
+            kde = stats.gaussian_kde(euk_hps)
+            axs[0, 0].hist(euk_hps, alpha=0.5,color = "red", bins=10, label="Eukaryote {} param search".format(name))
+            # axs[0, 0].plot(x, kde(x), color = "red", label="Eukaryote {} param search".format(name))
+        axs[0, 0].set_ylabel("No of models")
+        axs[0, 0].set_xlim(0,1)
+        axs[0, 0].plot([sp6_measure[0], sp6_measure[0]], [0, 5], 'r--', label="SP6 result")
+        axs[0, 0].legend()
+
+        kde = stats.gaussian_kde(neg)
+        axs[0, 1].hist(neg,bins=10, color = "blue", label="Negative {}".format(name))
+        # axs[0, 1].plot(x, kde(x), color = "blue", label="Negative {}".format(name))
+        if plot_hps:
+            kde =stats.gaussian_kde(neg_hps)
+            axs[0, 1].hist(neg_hps, alpha=0.5, bins=10,color = "red", label="Negative {} param search".format(name))
+            # axs[0, 1].plot(x, kde(x), color = "red", label="Negative {} param search".format(name))
+        axs[0, 1].set_xlim(0,1)
+        axs[0, 1].plot([sp6_measure[1], sp6_measure[1]], [0, 5], 'r--', label="SP6 result")
+
+        axs[0, 1].legend()
+
+        # axs[1, 0].hist(pos,bins=10,color = "blue", label="Positive {}".format(name))
+        kde = stats.gaussian_kde(pos)
+        axs[1, 0].hist(pos,bins=10,color = "blue", label="Positive {}".format(name))
+        # axs[1, 0].plot(x, kde(x), color = "blue", label="Positive {}".format(name))
+
+        if plot_hps:
+            # kde = stats.gaussian_kde(pos_hps)
+            axs[1, 0].hist(pos_hps,color = "red", alpha=0.5, bins=10, label="Positive {} param search".format(name))
+            axs[1, 0].plot(x, kde(x), color = "red", label="Positive {} param search".format(name))
+
+        axs[1, 0].set_xlim(0,1)
+        axs[1, 0].set_ylabel("No of models")
+        axs[1, 0].plot([sp6_measure[2], sp6_measure[2]], [0, 5], 'r--', label="SP6 result")
+        axs[1, 0].legend()
+        axs[1, 0].set_xlabel(name.split(" ")[0])
+
+        kde = stats.gaussian_kde(arch)
+        axs[1, 1].hist(arch,bins=10, color = "blue",label="Archaea {}".format(name))
+        # axs[1, 1].plot(x, kde(x), color = "blue",label="Archaea {}".format(name))
+        if plot_hps:
+            kde = stats.gaussian_kde(arch_hps)
+            axs[1, 1].hist(arch_hps, alpha=0.5,color = "red",bins=10, label="Archaea {} param search".format(name))
+            # axs[1, 1].plot(x, kde(x), color = "red", label="Archaea {} param search".format(name))
+        axs[1, 1].set_xlim(0,1)
+        axs[1, 1].plot([sp6_measure[3], sp6_measure[3]], [0, 5], 'r--', label="SP6 result")
+
+        axs[1, 1].legend()
+        axs[1, 1].set_xlabel(name.split(" ")[0])
+        plt.show()
+        # plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, "mcc"))
+    euk_mcc_sp6, neg_mcc_sp6, pos_mcc_sp6, arch_mcc_sp6 = 0.868, 0.811, 0.878, 0.737
+    euk_rec_sp6, neg_rec_sp6, pos_rec_sp6, arch_rec_sp6 = [0.747, 0.774, 0.808, 0.829], [0.639, 0.672, 0.689, 0.721], \
+                                                          [0.800, 0.800, 0.800, 0.800] ,[0.500, 0.556, 0.556, 0.583]
+    euk_prec_sp6, neg_prec_sp6, pos_prec_sp6, arch_prec_sp6 = [0.661, 0.685, 0.715, 0.733], [0.534, 0.562, 0.575, 0.603], \
+                                                              [0.632, 0.632, 0.632, 0.632] ,[0.643, 0.714, 0.714, 0.75]
+    euk_mcc, neg_mcc, pos_mcc, arch_mcc, euk_rec, neg_rec, \
+        pos_rec, arch_rec, euk_prec, neg_prec, pos_prec, arch_prec = extract_all_mdl_results(mdl2results)
+    if mdl2results_hps is not None:
+        euk_hps_mcc, neg_hps_mcc, pos_hps_mcc, arch_hps_mcc, euk_hps_rec, neg_hps_rec, pos_hps_rec, arch_hps_rec,\
+            euk_hps_prec, neg_hps_prec, pos_hps_prec, arch_hps_prec = extract_all_mdl_results(mdl2results_hps)
+    else:
+        euk_hps_mcc, neg_hps_mcc, pos_hps_mcc, arch_hps_mcc, euk_hps_rec, neg_hps_rec, pos_hps_rec, arch_hps_rec, \
+            euk_hps_prec, neg_hps_prec, pos_hps_prec, arch_hps_prec = None, None, None, None, [None, None, None, None], \
+                                                                      [None, None, None, None],[None, None, None, None],\
+                                                                      [None, None, None, None],[None, None, None, None],\
+                                                                      [None, None, None, None],[None, None, None, None],\
+                                                                      [None, None, None, None]
+    plot_hps = mdl2results_hps is not None
+    plot_4_figs([euk_mcc, neg_mcc, pos_mcc, arch_mcc],
+                [euk_mcc_sp6, neg_mcc_sp6, pos_mcc_sp6, arch_mcc_sp6],
+                [euk_hps_mcc, neg_hps_mcc, pos_hps_mcc, arch_hps_mcc],
+                name='mcc', plot_hps=plot_hps)
+    for i in range(4):
+        plot_4_figs([euk_rec[i], neg_rec[i], pos_rec[i], arch_rec[i]],
+                    [euk_rec_sp6[i], neg_rec_sp6[i], pos_rec_sp6[i], arch_rec_sp6[i]],
+                    [euk_hps_rec[i], neg_hps_rec[i], pos_hps_rec[i], arch_hps_rec[i]],
+                    name='recall tol={}'.format(i), plot_hps=plot_hps)
+        plot_4_figs([euk_prec[i], neg_prec[i], pos_prec[i], arch_prec[i]],
+                    [euk_prec_sp6[i], neg_prec_sp6[i], pos_prec_sp6[i], arch_prec_sp6[i]],
+                    [euk_hps_prec[i], neg_hps_prec[i], pos_hps_prec[i], arch_hps_prec[i]],
+                    name='precision tol={}'.format(i),plot_hps=plot_hps)
+
+
 if __name__ == "__main__":
-    extract_all_param_results(only_cs_position=True)
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="consistency_results/")
+    # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
+    visualize_training_variance(mdl2results)#, mdl2results_hps)
     # extract_mean_test_results(run="param_search_0_2048_1e-05")
     # sanity_checks()
     # visualize_validation(run="w_lg_wo_glbl_lbl_100ep_", folds=[0,1])

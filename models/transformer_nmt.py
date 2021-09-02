@@ -159,8 +159,8 @@ class InputEmbeddingEncoder(nn.Module):
 
 class TransformerModel(nn.Module):
 
-    def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5, 
-                 partitions=[0, 1], data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
+    def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5,
+                 data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False):
         super().__init__()
         self.model_type = 'Transformer'

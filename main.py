@@ -10,10 +10,10 @@ import logging
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
-    # parameters = {"dos":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
-    #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
-    parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
-                  "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
+    parameters = {"dos":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
+                  "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
+    # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
+    #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
     group_params = list(ParameterGrid(parameters))
     grpid_2_params = {}
     for i in range(len(group_params)):
@@ -51,6 +51,7 @@ def parse_arguments():
     parser.add_argument("--patience", default=30, type=int)
     parser.add_argument("--train_oh", default=False, action="store_true")
     parser.add_argument("--train_folds", default=[0,1], nargs="+")
+    parser.add_argument("--deployment_model", default=[0,1], nargs="+")
 
     return parser.parse_args()
 
@@ -84,7 +85,7 @@ if __name__ == "__main__":
         a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
                                 ff_d=ff_d, partitions=args.train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
-                                train_oh=args.train_oh)
+                                train_oh=args.train_oh, deployment_model=args.deployment_model)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()
