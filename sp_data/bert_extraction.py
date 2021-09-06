@@ -1498,8 +1498,8 @@ def extract_and_save_embeddings(model, return_first=False, emb_name="some_mdl", 
 
 if os.path.exists("/scratch/work"):
     hparams.embedding_save_name = "/scratch/work/dumitra1/" + hparams.embedding_save_name
-extract_and_save_embeddings(model, emb_name="sp6_partitioned_data_test_0", test_new_data=True, extract_cdr3=True,
-                            sum_tcrs=False, extract_unlabeled=False,add_long_aa=-1, data_file="sp6_partitioned_data_test_0.bin")
+extract_and_save_embeddings(model, emb_name="test_seqs", test_new_data=True, extract_cdr3=True,
+                            sum_tcrs=False, extract_unlabeled=False,add_long_aa=-1, data_file="test_seqs.bin")
 
 # extract_and_save_embeddings(model, emb_name="vdj50_original_bert_cdr3Only", test_new_data=True, extract_cdr3=True,
 #                             use_only_cdr3=True, use_covid_data="")

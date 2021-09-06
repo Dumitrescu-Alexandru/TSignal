@@ -120,17 +120,20 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
     return total_loss / len(dataset_loader)
 
 
-def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1):
+def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1, dataset_loader=None):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
     model.eval()
-    sp_data = SPCSpredictionData()
-    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets)
+    if dataset_loader is None:
+        sp_data = SPCSpredictionData()
+        sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
+                                    glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets)
 
-    dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=test_batch_size, shuffle=False,
-                                                 num_workers=4, collate_fn=collate_fn)
+        dataset_loader = torch.utils.data.DataLoader(sp_dataset,
+                                                     batch_size=test_batch_size, shuffle=False,
+                                                     num_workers=4, collate_fn=collate_fn)
+
+
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     total_loss = 0
     for ind, (src, tgt, _, _) in tqdm(enumerate(dataset_loader), "Epoch {} validation".format(epoch), total=len(dataset_loader)):
@@ -138,11 +141,12 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         src = src
         tgt = tgt
         predicted_tokens, probs = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt)
-        true_targets = padd_add_eos_tkn(tgt, sp_data.lbl2ind)
+        true_targets = padd_add_eos_tkn(tgt, lbl2ind)
         total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
         for s, t, pt in zip(src, tgt, predicted_tokens):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
             eval_dict[s] = predicted_lbls[:len(t)]
+    print(eval_dict)
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
     return total_loss / len(dataset_loader)
 
@@ -154,11 +158,10 @@ def save_model(model, model_name=""):
     model.input_encoder.update()
 
 
-def load_model(model_path, ntoken, partitions, lbl2ind, lg2ind, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
-               ff_dim=1024 * 4):
+def load_model(model_path, dict_file=None):
     folder = get_data_folder()
     model = torch.load(folder + model_path)
-    model.input_encoder.update()
+    model.input_encoder.update(emb_f_name=dict_file)
     return model
 
 
@@ -279,9 +282,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          format(e, patience, valid_loss, best_valid_loss))
             patience -= 1
     if not deployment_model:
-        model = load_model(run_name + "_best_eval.pth", len(sp_data.lbl2ind.keys()), partitions=[0, 1],
-                           lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
-                           dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()))
+        model = load_model(run_name + "_best_eval.pth")
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"])
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False)
@@ -296,3 +297,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         logging.info("TEST: Total positives and false positives: {}, {}, {}, {}, {}, {}, {}, {}", pos_fp_info)
         logging.info("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
                      "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
+
+def test_seqs_w_pretrained_mdl(model_f_name="", test_file=""):
+    model = load_model(model_f_name, dict_file=test_file)
+    sp_data = SPCSpredictionData()
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file)
+
+    dataset_loader = torch.utils.data.DataLoader(sp_dataset,
+                                                 batch_size=50, shuffle=True,
+                                                 num_workers=4, collate_fn=collate_fn)
+    evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results.bin", epoch=-1, dataset_loader=dataset_loader)

@@ -43,6 +43,7 @@ class InputEmbeddingEncoder(nn.Module):
         self.data_folder = get_data_folder()
         super().__init__()
         seq2emb = {}
+        self.lg2ind = pickle.load(open("sp6_dicts.bin", "rb"))[1]
         seq2lg = {}
         self.use_lg = lg2ind is not None
         if aa2ind is None:
@@ -148,13 +149,20 @@ class InputEmbeddingEncoder(nn.Module):
         return src_mask, tgt_mask, ~padding_mask_src.to(self.device), ~padding_mask_tgt.to(self.device), \
                tensor_inputs
 
-    def update(self, partitions=[0,1,2]):
+    def update(self, partitions=[0,1,2], emb_f_name=None):
         seq2emb = {}
-        for p in partitions:
-            for t in ["test", "train"]:
-                part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
-                seq2emb.update({seq: emb for seq, (emb, _, _, _) in part_dict.items()})
+        if emb_f_name is not None:
+            self.lg2ind = pickle.load(open("sp6_dicts.bin", "rb"))[1]
+            dict_ = pickle.load(open(self.data_folder + emb_f_name, "rb"))
+            seq2emb.update({seq: emb for seq, (emb, _, _, _) in dict_.items()})
+            self.seq2lg = {seq: self.lg2ind[lg] for seq, (_, _, lg, _) in dict_.items()}
+        else:
+            for p in partitions:
+                for t in ["test", "train"]:
+                    part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
+                    seq2emb.update({seq: emb for seq, (emb, _, _, _) in part_dict.items()})
         self.seq2emb = seq2emb
+
 
 
 class TransformerModel(nn.Module):

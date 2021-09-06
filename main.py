@@ -2,7 +2,7 @@ import pickle
 import os
 import datetime
 from sp_data.data_utils import SPbinaryData
-from train_scripts.cv_train_cs_predictors import train_cs_predictors
+from train_scripts.cv_train_cs_predictors import train_cs_predictors, test_seqs_w_pretrained_mdl
 from train_scripts.cv_train_binary_sp_model import train_bin_sp_mdl
 import argparse
 import logging
@@ -52,6 +52,8 @@ def parse_arguments():
     parser.add_argument("--train_oh", default=False, action="store_true")
     parser.add_argument("--train_folds", default=[0,1], nargs="+")
     parser.add_argument("--deployment_model", default=False, action="store_true")
+    parser.add_argument("--test_seqs", default="", type=str)
+    parser.add_argument("--test_mdl", default="", type=str)
 
     return parser.parse_args()
 
@@ -60,7 +62,9 @@ if __name__ == "__main__":
     date_now = str(datetime.datetime.now()).split(".")[0].replace("-", "").replace(":", "").replace(" ", "")
     logging.getLogger('some_logger')
     args = parse_arguments()
-    if args.train_cs_predictor:
+    if args.test_seqs:
+        test_seqs_w_pretrained_mdl(args.test_mdl, args.test_seqs)
+    elif args.train_cs_predictor:
         if not os.path.exists("param_groups_by_id_cs.bin"):
             create_param_set_cs_predictors()
         ff_d = 4096

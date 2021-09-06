@@ -65,15 +65,24 @@ class SPCSpredictionData:
 
 
 class CSPredsDataset(Dataset):
-    def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True, sets=["train", "test"]):
+    def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True, sets=["train", "test"], test_f_name=""):
         self.life_grp, self.seqs, self.lbls, self.glbl_lbl = [], [], [], []
-        for p in partitions:
-            for s in sets:
-                data_dict = pickle.load(open(data_folder + "sp6_partitioned_data_{}_{}.bin".format(s, p), "rb"))
-                self.seqs.extend(list(data_dict.keys()))
-                self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
-                self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
-                self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
+        if partitions is not None:
+            # when using partitions, the sp6 data partition files will be used in train/testing
+            for p in partitions:
+                for s in sets:
+                    data_dict = pickle.load(open(data_folder + "sp6_partitioned_data_{}_{}.bin".format(s, p), "rb"))
+                    self.seqs.extend(list(data_dict.keys()))
+                    self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
+                    self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
+                    self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
+        else:
+            # parameter for a specific test
+            data_dict = pickle.load(open(data_folder + test_f_name, "rb"))
+            self.seqs.extend(list(data_dict.keys()))
+            self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
+            self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
+            self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
 
     def __len__(self):
         return len(self.seqs)
