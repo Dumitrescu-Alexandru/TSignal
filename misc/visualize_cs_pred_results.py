@@ -377,6 +377,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     # order results by the eukaryote mcc
     eukaryote_mcc = []
     for ind, u_p in enumerate(unique_params):
+        print(u_p)
         mccs, all_recalls, all_precisions, avg_epoch= extract_mean_test_results(run=u_p, result_folder=result_folder, only_cs_position=only_cs_position)
         mdl2results[ind] = (mccs, list(np.reshape(np.array(all_recalls),-1)),
                             list(np.reshape(np.array(all_precisions),-1)), avg_epoch)
@@ -572,12 +573,13 @@ def visualize_training_variance(mdl2results, mdl2results_hps=None):
 
 
 if __name__ == "__main__":
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="consistency_results/")
+    # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="consistency_results/")
+    # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
-    visualize_training_variance(mdl2results)#, mdl2results_hps)
+    # visualize_training_variance(mdl2results)#, mdl2results_hps)
     # extract_mean_test_results(run="param_search_0_2048_1e-05")
     # sanity_checks()
-    # visualize_validation(run="w_lg_wo_glbl_lbl_100ep_", folds=[0,1])
+    visualize_validation(run="param_search_patience_60_w_nl_nh_0.0_4096_1e-05_2_8__folds_", folds=[0,1],folder="results_param_search_patience_60/")
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[0,2])
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[1,2])
     # life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin")

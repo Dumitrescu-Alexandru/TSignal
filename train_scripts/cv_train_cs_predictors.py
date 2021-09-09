@@ -1,3 +1,5 @@
+from ignite.handlers.param_scheduler import create_lr_scheduler_with_warmup
+from torch.optim.lr_scheduler import ExponentialLR, StepLR
 from tqdm import tqdm
 import logging
 import sys
@@ -88,10 +90,80 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
         ys = current_ys
     return ys, torch.stack(all_probs).transpose(0, 1)
 
-
-def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None):
+def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=4):
+    ind2lbl = {v: k for k, v in lbl2ind.items()}
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    src = src
+    seq_lens = [len(src_) for src_ in src]
+    with torch.no_grad():
+        memory = model.encode(src)
+    # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
+    ys = []
+    if not ys:
+        for _ in range(len(src)):
+            ys.append([])
     model.eval()
-    tgt_tokens, probs = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
+    all_probs = []
+    current_batch_size = len(src)
+    log_probs = torch.zeros(current_batch_size, beam_width)
+    for i in range(max(seq_lens) + 1):
+        with torch.no_grad():
+            tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
+            # seq len, batch size, emb dimensions
+            # 5,5,3 -> 5,15,3 -> 5,3,15 ->
+            if i == 1:
+                memory = memory.repeat(1, 1, beam_width).reshape(memory.shape[0], current_batch_size * beam_width, -1)
+            out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+            out = out.transpose(0, 1)
+            prob = model.generator(out[:, -1])
+        all_probs.append(prob)
+        beam_probs, next_words = torch.topk(torch.nn.functional.softmax(prob, dim=-1), beam_width, dim=1)
+        if i == 0:
+            log_probs = torch.log(torch.nn.functional.softmax(beam_probs, dim=-1)).reshape(current_batch_size, beam_width)
+        else:
+            # correctly broadcast (e.g. second element prediction for each sequence)
+            # [[s1_pred_1 + s1_pred_1.1, s1_pred_1 + s1_pred_1.2... ] [s1_pred_2 + s1_pred_2.1 s1_pred_2+ s1_pred_2.2 ...], ... ]]
+            log_probs = log_probs.reshape(*log_probs.shape, 1)
+            log_probs = log_probs + torch.log(beam_probs.reshape(current_batch_size, beam_width, beam_width))
+            log_probs = log_probs.reshape(current_batch_size, beam_width * beam_width)
+            if i == max(seq_lens):
+                log_probs, next_word_seq_col_indices = torch.topk(log_probs, 1, dim=1)
+                next_word_col_indices = next_word_seq_col_indices.reshape(-1)
+            else:
+                log_probs, next_word_seq_col_indices = torch.topk(log_probs, beam_width, dim=1)
+                next_word_col_indices = next_word_seq_col_indices.reshape(-1)
+
+        current_ys = []
+        if i == 0:
+            next_word = [nw.item() for nw in next_words.reshape(-1)]
+            for _ in range(len(src) * (beam_width-1)):
+                ys.append([])
+            for bach_ind in range(len(src) * beam_width):
+                current_ys.append(ys[bach_ind])
+                current_ys[-1].append(next_word[bach_ind])
+        elif i == max(seq_lens):
+            for seq_ind in range(len(src)):
+                next_chosen_seq = next_word_col_indices[seq_ind]
+                previous_word_seq = ys[seq_ind * beam_width + next_chosen_seq // beam_width].copy()
+                current_ys.append(previous_word_seq)
+                current_ys[-1].append(next_words[seq_ind * beam_width + next_chosen_seq // beam_width, next_chosen_seq % beam_width].item())
+        else:
+            for seq_ind in range(len(src)):
+                for j in range(beam_width):
+                    next_chosen_seq = next_word_col_indices[seq_ind * beam_width + j]
+                    # choose the prev sequence to which this maximal probability corresponds
+                    previous_word_seq = ys[seq_ind * beam_width + next_chosen_seq // beam_width].copy()
+                    current_ys.append(previous_word_seq)
+                    current_ys[-1].append(next_words[seq_ind * beam_width + next_chosen_seq // beam_width, next_chosen_seq % beam_width].item())
+        ys = current_ys
+    return ys, torch.tensor([0.1])
+
+def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False):
+    model.eval()
+    if use_beams_search:
+        tgt_tokens, probs = beam_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
+    else:
+        tgt_tokens, probs = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
     return tgt_tokens, probs
 
 
@@ -120,7 +192,8 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
     return total_loss / len(dataset_loader)
 
 
-def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1, dataset_loader=None):
+def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1, dataset_loader=None,
+             use_beams_search=False):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
     model.eval()
@@ -140,13 +213,13 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         # print("Number of sequences tested: {}".format(ind * test_batch_size))
         src = src
         tgt = tgt
-        predicted_tokens, probs = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt)
+        predicted_tokens, probs = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search)
         true_targets = padd_add_eos_tkn(tgt, lbl2ind)
-        total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
+        if not use_beams_search:
+            total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
         for s, t, pt in zip(src, tgt, predicted_tokens):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
             eval_dict[s] = predicted_lbls[:len(t)]
-    print(eval_dict)
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
     return total_loss / len(dataset_loader)
 
@@ -178,6 +251,23 @@ def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, 
         "{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
             test_on, ep, *all_precisions))
 
+def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0):
+    def get_schduler_type(op, lr_sched):
+        if lr_sched == "expo":
+            return ExponentialLR(optimizer=op, gamma=0.98)
+        elif lr_sched == "step":
+            return StepLR(optimizer=op, gamma=0.1, step_size=15)
+
+    if lr_scheduler == "none":
+        return None, None
+    elif lr_sched_warmup >= 2:
+        scheduler = get_schduler_type(opt, lr_scheduler)
+        # in lr_sched_warmup epochs, the learning rate will be increased by 10. 1e-5 is the stable lr found. This
+        # lr will increase to 1e-4 after lr_sched_warmup steps
+        warmup_scheduler = ExponentialLR(opt, gamma=10 ** (1/lr_sched_warmup))
+        return warmup_scheduler, scheduler
+    else:
+        return None, get_schduler_type(opt, lr_scheduler)
 
 def euk_importance_avg(cs_mcc):
     return (3 / 4) * cs_mcc[0] + (1 / 4) * np.mean(cs_mcc[1:])
@@ -185,8 +275,7 @@ def euk_importance_avg(cs_mcc):
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
-                        patience=30,
-                        train_oh=False, deployment_model=False):
+                        patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0):
     logging.info("Log from here...")
     test_partition = set() if deployment_model else ({0, 1, 2} - set(partitions))
     partitions = [0,1,2] if deployment_model else partitions
@@ -209,14 +298,13 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_glbl = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
-
-    ind2lbl = {ind: lbl for lbl, ind in sp_data.lbl2ind.items()}
-
+    warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup)
     best_avg_mcc = -1
     best_valid_loss = 5 ** 10
     best_epoch = 0
     e = -1
     while patience != 0:
+        print("\n\nLR:",optimizer.param_groups[0]['lr'],"\n\n")
         model.train()
         e += 1
         losses = 0
@@ -242,6 +330,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
             loss.backward()
             optimizer.step()
+        if scheduler is not None:
+            if e < lr_sched_warmup and lr_sched_warmup > 2:
+                warmup_scheduler.step()
+            else:
+                scheduler.step()
         _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"], epoch=e)
         valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions,
                                          sets=["test"])
@@ -275,7 +368,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             save_model(model, run_name)
             if e == eps - 1:
                 patience = 0
-        elif e > 20 and valid_loss > best_valid_loss and eps == -1:
+        elif e > 10 and valid_loss > best_valid_loss and eps == -1:
             print("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                   format(e, patience, valid_loss, best_valid_loss))
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
@@ -298,7 +391,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         logging.info("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
                      "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
 
-def test_seqs_w_pretrained_mdl(model_f_name="", test_file=""):
+def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True):
+    # model = load_model(model_f_name, dict_file=None)
     model = load_model(model_f_name, dict_file=test_file)
     sp_data = SPCSpredictionData()
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
@@ -307,4 +401,12 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file=""):
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=50, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results.bin", epoch=-1, dataset_loader=dataset_loader)
+    evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results", epoch=-1, dataset_loader=dataset_loader,
+             use_beams_search=True)
+    #
+    # evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results", epoch=-1,
+    #          dataset_loader=None,use_beams_search=False, partitions=[1], sets=['test'])
+    if verbouse:
+        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+            get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False)
+        print(sp_pred_mccs, all_recalls, all_precisions)

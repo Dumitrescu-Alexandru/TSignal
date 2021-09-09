@@ -10,8 +10,10 @@ import logging
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
-    parameters = {"dos":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
-                  "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
+    parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
+                  "run_number":list(range(5))}
+    # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
+    #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
     group_params = list(ParameterGrid(parameters))
@@ -43,7 +45,7 @@ def parse_arguments():
     parser.add_argument("--epochs", default=-1, type=int, help="By default, model uses tolerence. Set this for a fixed"
                                                                "number of epochs training")
     parser.add_argument("--add_lg_info", default=False, action="store_true")
-    parser.add_argument("--dropout", default=0.5, type=float)
+    parser.add_argument("--dropout", default=0, type=float)
     parser.add_argument("--test_freq", default=5, type=int)
     parser.add_argument("--use_glbl_lbls", default=False, action="store_true")
     parser.add_argument("--nlayers", default=3, type=int)
@@ -54,8 +56,44 @@ def parse_arguments():
     parser.add_argument("--deployment_model", default=False, action="store_true")
     parser.add_argument("--test_seqs", default="", type=str)
     parser.add_argument("--test_mdl", default="", type=str)
-
+    parser.add_argument("--lr_scheduler", default="none", type=str)
+    parser.add_argument("--lr_sched_warmup", default=0, type=int)
+    parser.add_argument("--ff_d", default=4096, type=int, help='Expanding dimension')
     return parser.parse_args()
+
+def modify_param_search_args(args):
+    params = pickle.load(open("param_groups_by_id_cs.bin", "rb"))
+    param_set = params[args.param_set_search_number]
+    run_name = args.run_name
+    if 'dos' in param_set:
+        args.dropout = param_set['dos']
+        run_name += "dos_{}_".format(args.dropout)
+    if 'lr' in param_set:
+        args.lr = param_set['lr']
+        run_name += "lr_{}_".format(args.lr)
+    if 'ff_d' in param_set:
+        args.ff_d = param_set['ff_d']
+        run_name += "ffd_{}_".format(args.ff_d)
+    if 'nlayers' in param_set:
+        args.nlayers = param_set['nlayers']
+        run_name += "nlayers_{}_".format(args.nlayers)
+    if 'nhead' in param_set:
+        args.nhead = param_set['nhead']
+        run_name += "nhead_{}_".format(args.nhead)
+    if 'lr_scheduler' in param_set:
+        args.lr_sceduler = param_set['lr_scheduler']
+        run_name += "lrsched_{}_".format(args.lr_sceduler)
+    if 'lr_sched_warmup' in param_set:
+        args.lr_sched_warmup = param_set['lr_sched_warmup']
+        run_name += "wrmplrsched_{}_"
+    if "run_number" in param_set:
+        run_name += "run_no_{}".format(param_set['run_number'])
+    if 'train_folds' in param_set:
+        args.train_folds = param_set['train_folds']
+    # use the train folds in the name of the model regardless
+    run_name += "trFlds_{}_{}".format(args.train_folds[0], args.train_folds[1])
+    args.run_name = run_name
+    return args
 
 
 if __name__ == "__main__":
@@ -67,29 +105,18 @@ if __name__ == "__main__":
     elif args.train_cs_predictor:
         if not os.path.exists("param_groups_by_id_cs.bin"):
             create_param_set_cs_predictors()
-        ff_d = 4096
         train_folds = [0, 1]
         if args.param_set_search_number != -1:
-            params = pickle.load(open("param_groups_by_id_cs.bin" ,"rb"))
-            param_set = params[args.param_set_search_number]
-            run_no = "run_number_{}".format(param_set["run_number"]) if "run_number" in param_set else ""
-            args.run_name = args.run_name + "_{}_{}_{}_{}_{}_{}_folds_{}_{}".format(param_set['dos'], param_set['ff_d'] ,param_set['lr'],
-                                                                           param_set['nlayers'], param_set['nheads'], run_no,
-                                                                         param_set['train_folds'][0], param_set['train_folds'][1])
-            args.dropout = param_set['dos']
-            args.lr = param_set['lr']
-            ff_d = param_set['ff_d']
-            args.nlayers = param_set['nlayers']
-            args.nheads = param_set['nheads']
-            args.train_folds = param_set['train_folds']
+            args = modify_param_search_args(args)
 
         logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
         logging.info("Started training")
         args.train_folds = [int(tf) for tf in args.train_folds]
         a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
-                                ff_d=ff_d, partitions=args.train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
-                                train_oh=args.train_oh, deployment_model=args.deployment_model)
+                                ff_d=args.ff_d, partitions=args.train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
+                                train_oh=args.train_oh, deployment_model=args.deployment_model, lr_scheduler=args.lr_scheduler,
+                                lr_sched_warmup=args.lr_sched_warmup)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()

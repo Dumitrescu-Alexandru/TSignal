@@ -150,6 +150,7 @@ class InputEmbeddingEncoder(nn.Module):
                tensor_inputs
 
     def update(self, partitions=[0,1,2], emb_f_name=None):
+        self.data_folder = get_data_folder()
         seq2emb = {}
         if emb_f_name is not None:
             self.lg2ind = pickle.load(open("sp6_dicts.bin", "rb"))[1]
