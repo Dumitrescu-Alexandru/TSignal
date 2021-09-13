@@ -370,7 +370,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             save_model(model, run_name)
             if e == eps - 1:
                 patience = 0
-        elif e > 10 and valid_loss > best_valid_loss and eps == -1:
+        elif e > 20 and valid_loss > best_valid_loss and eps == -1:
             print("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                   format(e, patience, valid_loss, best_valid_loss))
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".

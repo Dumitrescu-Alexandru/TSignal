@@ -10,8 +10,7 @@ import logging
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
-    parameters = {"lr_sched_warmup":[0], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
-                  "run_number":list(range(5))}
+    parameters = {"run_number":list(range(5))}
     # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
@@ -86,7 +85,7 @@ def modify_param_search_args(args):
         run_name += "lrsched_{}_".format(args.lr_sceduler)
     if 'lr_sched_warmup' in param_set:
         args.lr_sched_warmup = param_set['lr_sched_warmup']
-        run_name += "wrmpLrSched_"
+        run_name += "wrmpLrSched_{}_".format(param_set['lr_sched_warmup'])
     if "run_number" in param_set:
         run_name += "run_no_{}_".format(param_set['run_number'])
     if 'train_folds' in param_set:
