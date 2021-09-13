@@ -10,7 +10,10 @@ import logging
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
-    parameters = {"run_number":list(range(5))}
+    # parameters = {"lr_sched_warmup":[0], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
+    #               "run_number":list(range(5))}
+    parameters = {"lr_sched_warmup":[0], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
+                  "run_number":list(range(5))}
     # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
