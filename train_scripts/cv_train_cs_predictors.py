@@ -90,7 +90,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
         ys = current_ys
     return ys, torch.stack(all_probs).transpose(0, 1)
 
-def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=4):
+def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=2):
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     src = src
@@ -197,6 +197,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
     model.eval()
+    val_or_test = "test" if len(sets) == 2 else "validation"
     if dataset_loader is None:
         sp_data = SPCSpredictionData()
         sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
@@ -209,7 +210,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
 
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     total_loss = 0
-    for ind, (src, tgt, _, _) in tqdm(enumerate(dataset_loader), "Epoch {} validation".format(epoch), total=len(dataset_loader)):
+    for ind, (src, tgt, _, _) in tqdm(enumerate(dataset_loader), "Epoch {} {}".format(epoch, val_or_test), total=len(dataset_loader)):
         # print("Number of sequences tested: {}".format(ind * test_batch_size))
         src = src
         tgt = tgt
@@ -238,18 +239,18 @@ def load_model(model_path, dict_file=None):
     return model
 
 
-def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1):
-    print("{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(test_on, ep, *sp_pred_mccs))
-    print("{}, epoch {} Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1, beam_txt=""):
+    print("{}, epoch {} Mean sp_pred mcc for life groups {}: {}, {}, {}, {}".format(beam_txt, test_on, ep, *sp_pred_mccs))
+    print("{}, epoch {} Mean cs recall {}: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(beam_txt,
         test_on, ep, *all_recalls))
-    print("{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+    print("{}, epoch {} Mean cs precision {}: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(beam_txt,
         test_on, ep, *all_precisions))
-    logging.info("{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(test_on, ep, *sp_pred_mccs))
-    logging.info("{}, epoch {}: Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-        test_on, ep, *all_recalls))
+    logging.info("{}, epoch {}: Mean sp_pred mcc for life groups {}: {}, {}, {}, {}".format(beam_txt, test_on, ep, *sp_pred_mccs))
+    logging.info("{}, epoch {}: Mean cs recall {}: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+        beam_txt,test_on, ep, *all_recalls))
     logging.info(
-        "{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-            test_on, ep, *all_precisions))
+        "{}, epoch {} Mean cs precision {}: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+            beam_txt, test_on, ep, *all_precisions))
 
 def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0):
     def get_schduler_type(op, lr_sched):
@@ -275,9 +276,10 @@ def euk_importance_avg(cs_mcc):
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
-                        patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0):
+                        patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
+                        test_beam=False):
     logging.info("Log from here...")
-    test_partition = set() if deployment_model else ({0, 1, 2} - set(partitions))
+    test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
     partitions = [0,1,2] if deployment_model else partitions
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData()
@@ -374,6 +376,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                          format(e, patience, valid_loss, best_valid_loss))
             patience -= 1
+        break
     if not deployment_model:
         model = load_model(run_name + "_best_eval.pth")
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"])
@@ -382,14 +385,19 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
             np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch)
-        print("TEST: Total positives and false positives: ", total_positives, false_positives)
-        print("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
-              "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
         pos_fp_info = total_positives
         pos_fp_info.extend(false_positives)
-        logging.info("TEST: Total positives and false positives: {}, {}, {}, {}, {}, {}, {}, {}", pos_fp_info)
-        logging.info("TEST: True positive predictions {}, {}, {}, {}, {},{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, "
-                     "{}, {}, {}, {}, {},".format(*np.concatenate(predictions)))
+        if test_beam:
+            model = load_model(run_name + "_best_eval.pth")
+            evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best_beam", partitions=test_partition,
+                     sets=["train", "test"], use_beams_search=True)
+            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+                get_cs_and_sp_pred_results(filename=run_name + "_best_beam.bin".format(e), v=False)
+            all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
+                np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
+            log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch, beam_txt="using_bm_search")
+            pos_fp_info = total_positives
+            pos_fp_info.extend(false_positives)
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True):
     # model = load_model(model_f_name, dict_file=None)
@@ -401,11 +409,10 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True):
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=50, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results", epoch=-1, dataset_loader=dataset_loader,
+    evaluate(model, sp_data.lbl2ind, test_file.replace("_beam_s.bin", "") + "_results", epoch=-1, dataset_loader=dataset_loader,
              use_beams_search=True)
-    #
-    # evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results", epoch=-1,
-    #          dataset_loader=None,use_beams_search=False, partitions=[1], sets=['test'])
+    evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results", epoch=-1,
+             dataset_loader=None,use_beams_search=False, partitions=[1], sets=['test'])
     if verbouse:
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
             get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False)

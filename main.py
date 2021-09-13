@@ -10,7 +10,7 @@ import logging
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
-    parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
+    parameters = {"lr_sched_warmup":[0], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
                   "run_number":list(range(5))}
     # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
@@ -59,6 +59,7 @@ def parse_arguments():
     parser.add_argument("--lr_scheduler", default="none", type=str)
     parser.add_argument("--lr_sched_warmup", default=0, type=int)
     parser.add_argument("--ff_d", default=4096, type=int, help='Expanding dimension')
+    parser.add_argument("--test_beam", default=False, action="store_true")
     return parser.parse_args()
 
 def modify_param_search_args(args):
@@ -85,9 +86,9 @@ def modify_param_search_args(args):
         run_name += "lrsched_{}_".format(args.lr_sceduler)
     if 'lr_sched_warmup' in param_set:
         args.lr_sched_warmup = param_set['lr_sched_warmup']
-        run_name += "wrmplrsched_{}_"
+        run_name += "wrmpLrSched_"
     if "run_number" in param_set:
-        run_name += "run_no_{}".format(param_set['run_number'])
+        run_name += "run_no_{}_".format(param_set['run_number'])
     if 'train_folds' in param_set:
         args.train_folds = param_set['train_folds']
     # use the train folds in the name of the model regardless
@@ -116,7 +117,7 @@ if __name__ == "__main__":
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
                                 ff_d=args.ff_d, partitions=args.train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
                                 train_oh=args.train_oh, deployment_model=args.deployment_model, lr_scheduler=args.lr_scheduler,
-                                lr_sched_warmup=args.lr_sched_warmup)
+                                lr_sched_warmup=args.lr_sched_warmup, test_beam=args.test_beam)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()
