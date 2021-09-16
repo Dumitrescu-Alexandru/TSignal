@@ -14,7 +14,7 @@ def create_param_set_cs_predictors():
     #               "run_number":list(range(5))}
     # parameters = {"lr_sched_warmup":[0], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
     #               "run_number":list(range(5))}
-    parameters = {"weight_decay":[0.0001, 0.001, 0.01, 0.1, 0], "train_folds":[[0,1],[1,2],[0,2]] }
+    parameters = {"wd":[0.0001, 0.001, 0.01, 0.1, 0], "train_folds":[[0,1],[1,2],[0,2]] }
     # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
@@ -85,6 +85,9 @@ def modify_param_search_args(args):
     if 'nhead' in param_set:
         args.nhead = param_set['nhead']
         run_name += "nhead_{}_".format(args.nhead)
+    if 'wd' in param_set:
+        args.wd = param_set['wd']
+        run_name += "wd_{}_".format(args.wd)
     if 'lr_scheduler' in param_set:
         args.lr_sceduler = param_set['lr_scheduler']
         run_name += "lrsched_{}_".format(args.lr_sceduler)
@@ -121,7 +124,7 @@ if __name__ == "__main__":
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
                                 ff_d=args.ff_d, partitions=args.train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
                                 train_oh=args.train_oh, deployment_model=args.deployment_model, lr_scheduler=args.lr_scheduler,
-                                lr_sched_warmup=args.lr_sched_warmup, test_beam=args.test_beam)
+                                lr_sched_warmup=args.lr_sched_warmup, test_beam=args.test_beam, wd=args.wd)
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()

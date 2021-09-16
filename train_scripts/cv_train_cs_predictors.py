@@ -333,7 +333,7 @@ def euk_importance_avg(cs_mcc):
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
-                        test_beam=False):
+                        test_beam=False, wd=0.):
     logging.info("Log from here...")
     test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
     partitions = [0,1,2] if deployment_model else partitions
@@ -355,7 +355,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_glbl = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
     warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup)
     best_avg_mcc = -1
     best_valid_loss = 5 ** 10
