@@ -10,10 +10,11 @@ import logging
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
+    # parameters = { "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
+    #               "run_number":list(range(5))}
     # parameters = {"lr_sched_warmup":[0], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
     #               "run_number":list(range(5))}
-    parameters = {"lr_sched_warmup":[0], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
-                  "run_number":list(range(5))}
+    parameters = {"weight_decay":[0.0001, 0.001, 0.01, 0.1, 0], "train_folds":[[0,1],[1,2],[0,2]] }
     # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
@@ -62,6 +63,7 @@ def parse_arguments():
     parser.add_argument("--lr_sched_warmup", default=0, type=int)
     parser.add_argument("--ff_d", default=4096, type=int, help='Expanding dimension')
     parser.add_argument("--test_beam", default=False, action="store_true")
+    parser.add_argument("--wd", default=0., type=float)
     return parser.parse_args()
 
 def modify_param_search_args(args):

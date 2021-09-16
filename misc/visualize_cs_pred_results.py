@@ -134,6 +134,108 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False):
     return mccs
 
 
+def get_bin(p, bins):
+    for i in range(len(bins)):
+        if bins[i] < p <= bins[i + 1]:
+
+            return i
+
+def get_cs_preds_by_tol(tl, pl):
+    pl = pl.replace("ES", "")
+    correct_by_tol = [0,0,0,0]
+    for tol in range(4):
+        correct_by_tol[tol] = int(tl.rfind("S") - tol <= pl.rfind("S") <= tl.rfind("S") + tol)
+    return correct_by_tol
+
+def plot_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_acc):
+    import matplotlib
+    fig = matplotlib.pyplot.gcf()
+    fig.set_size_inches(12, 8)
+    fig.savefig('test2png.png', dpi=100)
+
+    accs = [acc_to_perc[0] for acc_to_perc in resulted_perc_by_acc]
+    total_counts_per_acc = list(total_counts_per_acc)
+    percs = [acc_to_perc[1] for acc_to_perc in resulted_perc_by_acc]
+    bars_width = accs[0]-accs[1]
+    plt.title(name)
+    plt.bar(accs, accs, width=bars_width, alpha=0.5, linewidth=2, edgecolor="black", color='blue', label='Perfect calibration')
+    plt.bar(accs, percs, width=bars_width, alpha=0.5, color='red', label="Model's calibration",
+            tick_label=["{}\n{}".format(str(round(accs[i],2)), str(total_counts_per_acc[i])) for i in range(len(accs))])
+    plt.xlabel("Prob/No of preds")
+    plt.ylabel("Prob")
+    plt.legend()
+    plt.show()
+
+def get_prob_calibration_and_plot(probabilities_file, life_grp, seqs, true_lbls, pred_lbls, bins=15, plot=True):
+    # initialize bins
+    bin_limmits = np.linspace(0, 1, bins)
+    correct_calibration_accuracies = [(bin_limmits[i] + bin_limmits[i + 1]) / 2 for i in range(bins - 1)]
+
+    # initialize cleavage site and binary sp dictionaries of the form:
+    # binary_sp_dict: {<life_group> : { total : { <accuracy> : count }, correct : { <accuracy> : count} } }
+    # cs_pred: {<life_group> : { <tol> : { total : {<accuracy> : count}, correct: {<accuracy> : count} } } }
+    binary_sp_calibration_by_grp = {}
+    cs_by_lg_and_tol_accs = {}
+    for lg in life_grp:
+        lg = lg.split("|")[0]
+        crct_cal_acc_2_correct_preds = {crct_cal_acc: 0 for crct_cal_acc in correct_calibration_accuracies}
+        crct_cal_acc_2_totals = {crct_cal_acc: 0 for crct_cal_acc in correct_calibration_accuracies}
+        wrap_dict = {'total':crct_cal_acc_2_totals, 'correct':crct_cal_acc_2_correct_preds}
+        binary_sp_calibration_by_grp[lg] = wrap_dict
+        tol_based_cs_accs = {}
+        for tol in range(4):
+            crct_cal_acc_2_correct_preds = {crct_cal_acc: 0 for crct_cal_acc in correct_calibration_accuracies}
+            crct_cal_acc_2_totals = {crct_cal_acc: 0 for crct_cal_acc in correct_calibration_accuracies}
+            wrap_dict = {'total': crct_cal_acc_2_totals, 'correct': crct_cal_acc_2_correct_preds}
+            tol_based_cs_accs[tol] = wrap_dict
+        cs_by_lg_and_tol_accs[lg] = tol_based_cs_accs
+
+    sp2probs = pickle.load(open(probabilities_file, "rb"))
+    for s, tl, pl, lg in zip(seqs, true_lbls, pred_lbls, life_grp):
+        lg = lg.split("|")[0]
+        predicted_sp_prob, all_sp_probs, _ = sp2probs[s]
+        bin = get_bin(predicted_sp_prob, bin_limmits)
+        coresp_acc = correct_calibration_accuracies[bin]
+        if tl[0] == "S":
+            binary_sp_calibration_by_grp[lg]['total'][coresp_acc] += 1
+            if pl[0] == "S":
+                binary_sp_calibration_by_grp[lg]['correct'][coresp_acc]+= 1
+        if tl[0] == pl[0] == "S":
+            correct_preds_by_tol = get_cs_preds_by_tol(tl, pl)
+            for tol in range(4):
+                cs_by_lg_and_tol_accs[lg][tol]['correct'][coresp_acc] += correct_preds_by_tol[tol]
+                cs_by_lg_and_tol_accs[lg][tol]['total'][coresp_acc] += 1
+    binary_ece, cs_ece = [], [[],[],[],[]]
+    for lg_ind, lg in enumerate(['EUKARYA', 'NEGATIVE', 'POSITIVE', 'ARCHAEA']):
+        correct_binary_preds, total_binary_preds = binary_sp_calibration_by_grp[lg]['correct'].values(), \
+                                             binary_sp_calibration_by_grp[lg]['total'].values()
+        results = []
+        current_binary_ece = []
+        for ind, (crct, ttl) in enumerate(zip(correct_binary_preds, total_binary_preds)):
+            actual_acc = crct / ttl if ttl != 0 else 0
+            results.append((correct_calibration_accuracies[ind], actual_acc if ttl != 0 else 0))
+            current_binary_ece.append(np.abs(correct_calibration_accuracies[ind] - actual_acc) * (ttl/sum(total_binary_preds)))
+        binary_ece.append(round(sum(current_binary_ece),3))
+        if plot:
+            print("Binary preds for {} with ECE {}: ".format(lg, sum(current_binary_ece)), results, total_binary_preds)
+            plot_reliability_diagrams(results, "Binary sp pred results for {} with ECE {}".format(lg, round(sum(current_binary_ece),3)), total_binary_preds)
+        for tol in range(4):
+            correct_cs_preds, total_cs_preds = cs_by_lg_and_tol_accs[lg][tol]['correct'].values(), \
+                                               cs_by_lg_and_tol_accs[lg][tol]['total'].values()
+            results = []
+            current_cs_ece = []
+            for ind, (crct, ttl) in enumerate(zip(correct_cs_preds, total_cs_preds)):
+                results.append((correct_calibration_accuracies[ind], crct/ttl if ttl != 0 else 0))
+                actual_acc = crct/ttl if ttl != 0 else 0
+                current_cs_ece.append(np.abs(correct_calibration_accuracies[ind]- actual_acc) *(ttl/sum(total_binary_preds)))
+            cs_ece[lg_ind].append(round(sum(current_cs_ece),3))
+            if plot:
+                plot_reliability_diagrams(results, "CS pred results for tol {} for {} with ECE {}".format(tol,lg, round(sum(current_cs_ece),3)), total_cs_preds)
+                print("Cs preds for {} for tol {}:".format(lg, tol), results)
+
+
+
+
 def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_fold=2, dict_=None):
     seq2preds = pickle.load(open(filename, "rb")) if dict_ is None else dict_
     tested_seqs = set(seq2preds.keys())
@@ -160,8 +262,11 @@ def get_data_folder():
         return "/scratch/project2003818/dumitra1/sp_data/"
 
 
-def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False):
+def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabilities_file=None):
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename=filename)
+    if probabilities_file is not None:
+        get_prob_calibration_and_plot(probabilities_file, life_grp, seqs, true_lbls, pred_lbls)
+        exit(1)
     sp_pred_accs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v)
     all_recalls, all_precisions, total_positives, false_positives, predictions = get_cs_acc(life_grp, seqs, true_lbls,
                                                                                             pred_lbls, v=v)
@@ -397,9 +502,9 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results):
             avg_prec[mdl] = np.array(all_precisions)
     for mdl, no_of_tests in no_of_mdls.items():
         print(mdl)
-        print(avg_mcc[mdl]/no_of_tests)
-        print(avg_recall[mdl]/no_of_tests)
-        print(avg_prec[mdl]/no_of_tests)
+        print(avg_mcc[mdl] / no_of_tests)
+        print(avg_recall[mdl] / no_of_tests)
+        print(avg_prec[mdl] / no_of_tests)
 
 
 def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False):

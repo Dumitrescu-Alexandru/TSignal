@@ -65,6 +65,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     src = src
     seq_lens = [len(src_) for src_ in src]
+    sp_probs = []
+    sp_logits = []
+    all_seq_sp_probs = []
+    all_seq_sp_logits = []
+
     with torch.no_grad():
         memory = model.encode(src)
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
@@ -80,6 +85,19 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
             out = model.decode(ys, memory.to(device), tgt_mask.to(device))
             out = out.transpose(0, 1)
             prob = model.generator(out[:, -1])
+        if i == 0:
+            # extract the sp-presence probabilities
+            sp_probs = [sp_prb.item() for sp_prb in torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
+            all_seq_sp_probs = [[sp_prob.item()] for sp_prob in torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
+            all_seq_sp_logits = [[sp_prob.item()] for sp_prob in prob[:, lbl2ind['S']]]
+        else:
+            # used to update the sequences of probabilities
+            softmax_probs = torch.nn.functional.softmax(prob, dim=-1)
+            next_sp_probs = softmax_probs[:, lbl2ind['S']]
+            next_sp_logits = prob[:, lbl2ind['S']]
+            for seq_prb_ind in range(len(all_seq_sp_probs)):
+                all_seq_sp_probs[seq_prb_ind].append(next_sp_probs[seq_prb_ind].item())
+                all_seq_sp_logits[seq_prb_ind].append(next_sp_logits[seq_prb_ind].item())
         all_probs.append(prob)
         _, next_words = torch.max(prob, dim=1)
         next_word = [nw.item() for nw in next_words]
@@ -88,9 +106,9 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
             current_ys.append(ys[bach_ind])
             current_ys[-1].append(next_word[bach_ind])
         ys = current_ys
-    return ys, torch.stack(all_probs).transpose(0, 1)
+    return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 
-def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=2):
+def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=3):
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     src = src
@@ -103,7 +121,7 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=2):
         for _ in range(len(src)):
             ys.append([])
     model.eval()
-    all_probs = []
+    all_probs, sp_probs, sp_logits = [], [], []
     current_batch_size = len(src)
     log_probs = torch.zeros(current_batch_size, beam_width)
     for i in range(max(seq_lens) + 1):
@@ -116,10 +134,15 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=2):
             out = model.decode(ys, memory.to(device), tgt_mask.to(device))
             out = out.transpose(0, 1)
             prob = model.generator(out[:, -1])
-        all_probs.append(prob)
+        softmax_probs = torch.nn.functional.softmax(prob, dim=-1)
         beam_probs, next_words = torch.topk(torch.nn.functional.softmax(prob, dim=-1), beam_width, dim=1)
         if i == 0:
-            log_probs = torch.log(torch.nn.functional.softmax(beam_probs, dim=-1)).reshape(current_batch_size, beam_width)
+            # will be used to determine cs prediction probabilities
+            # all_probs = beam_probs.reshape(-1)
+            # # will be used to visualize and calibrate probabilities of sp-presence predictions
+            # sp_probs = [softmax_probs[bi, lbl2ind['S']].item() for bi in range(current_batch_size)]
+            # sp_logits = [[prob[bi, bwi].item() for bwi in range(beam_width)] for bi in range(current_batch_size)]
+            log_probs = torch.log(beam_probs).reshape(current_batch_size, beam_width)
         else:
             # correctly broadcast (e.g. second element prediction for each sequence)
             # [[s1_pred_1 + s1_pred_1.1, s1_pred_1 + s1_pred_1.2... ] [s1_pred_2 + s1_pred_2.1 s1_pred_2+ s1_pred_2.2 ...], ... ]]
@@ -132,6 +155,27 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=2):
             else:
                 log_probs, next_word_seq_col_indices = torch.topk(log_probs, beam_width, dim=1)
                 next_word_col_indices = next_word_seq_col_indices.reshape(-1)
+                # current_probs = []
+                # if 0 < i < max(seq_lens):
+                #     for seq_ind in range(len(src)):
+                #         for j in range(beam_width):
+                #             next_prob_chosen = next_word_col_indices[seq_ind * beam_width + j]
+                #             # choose the prev sequence to which this maximal probability corresponds
+                #             previous_prob_seq = all_probs[seq_ind * beam_width + next_prob_chosen // beam_width]
+                #             chosen_seq_probs = torch.cat([previous_prob_seq.reshape(-1),
+                #                                           beam_probs.reshape(-1, beam_width*beam_width)
+                #                                           [seq_ind, next_prob_chosen].reshape(-1) ] )
+                #             current_probs.append(chosen_seq_probs)
+                #     all_probs = torch.vstack(current_probs)
+                # elif i == max(seq_lens):
+                #     for seq_ind in range(len(src)):
+                #         next_prob_chosen = next_word_col_indices[seq_ind]
+                #         previous_prob_seq = all_probs[seq_ind * beam_width + next_prob_chosen // beam_width]
+                #         chosen_seq_probs = torch.cat([previous_prob_seq.reshape(-1),
+                #                                       beam_probs[seq_ind, next_prob_chosen].reshape(-1)])
+                #         current_probs.append(chosen_seq_probs)
+                #     all_probs = torch.vstack(current_probs).reshape(-1)
+
 
         current_ys = []
         if i == 0:
@@ -156,15 +200,17 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=2):
                     current_ys.append(previous_word_seq)
                     current_ys[-1].append(next_words[seq_ind * beam_width + next_chosen_seq // beam_width, next_chosen_seq % beam_width].item())
         ys = current_ys
+
     return ys, torch.tensor([0.1])
 
 def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False):
     model.eval()
     if use_beams_search:
-        tgt_tokens, probs = beam_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
+        tgt_tokens, probs  = beam_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
+        sp_probs, all_sp_probs, all_seq_sp_logits = None, None, None
     else:
-        tgt_tokens, probs = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
-    return tgt_tokens, probs
+        tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
+    return tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits
 
 
 def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"]):
@@ -196,6 +242,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
              use_beams_search=False):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
+    seqs2probs = {}
     model.eval()
     val_or_test = "test" if len(sets) == 2 else "validation"
     if dataset_loader is None:
@@ -214,14 +261,23 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         # print("Number of sequences tested: {}".format(ind * test_batch_size))
         src = src
         tgt = tgt
-        predicted_tokens, probs = translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search)
+        predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = \
+            translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search)
         true_targets = padd_add_eos_tkn(tgt, lbl2ind)
         if not use_beams_search:
             total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
         for s, t, pt in zip(src, tgt, predicted_tokens):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
             eval_dict[s] = predicted_lbls[:len(t)]
+        if sp_probs is not None:
+            for s, sp_prob, all_sp_probs, all_sp_logits in zip(src, sp_probs, all_sp_probs, all_seq_sp_logits):
+                seqs2probs[s] = (sp_prob, all_sp_probs, all_sp_logits)
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
+    if sp_probs is not None and len(sets) > 1:
+        # retrieve the dictionary of calibration only for the test set (not for validation) - for now it doesn't
+        # make sense to do prob calibration since like 98% of predictions have >0.99 and are correct. See with weight decay
+        pickle.dump(seqs2probs, open(run_name + "_sp_probs.bin", "wb"))
+
     return total_loss / len(dataset_loader)
 
 
@@ -408,11 +464,26 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True):
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=50, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    evaluate(model, sp_data.lbl2ind, test_file.replace("_beam_s.bin", "") + "_results", epoch=-1, dataset_loader=dataset_loader,
-             use_beams_search=True)
+    sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+        get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False,
+                                   probabilities_file=test_file.replace(".bin", "") + "_results_sp_probs.bin")
     evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results", epoch=-1,
-             dataset_loader=None,use_beams_search=False, partitions=[1], sets=['test'])
+             dataset_loader=dataset_loader,use_beams_search=False, partitions=[1], sets=['test'])
+    exit(1)
     if verbouse:
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
             get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False)
         print(sp_pred_mccs, all_recalls, all_precisions)
+
+
+
+
+    evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results_beam", epoch=-1, dataset_loader=dataset_loader,
+             use_beams_search=True)
+    if verbouse:
+        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+            get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results_beam.bin", v=False)
+        print(sp_pred_mccs, all_recalls, all_precisions)
+
+
+
