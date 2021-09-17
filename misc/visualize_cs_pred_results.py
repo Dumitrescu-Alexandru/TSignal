@@ -442,7 +442,10 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
         with open(result_folder + run + "_{}_{}.log".format(tr_folds[0], tr_folds[1]), "rt") as f:
             lines = f.readlines()
-            epochs.append(int(lines[-2].split(" ")[2]))
+            try:
+                epochs.append(int(lines[-2].split(" ")[2]))
+            except:
+                epochs.append(int(lines[-2].split(":")[-2].split(" ")[-1]))
     avg_epoch = np.mean(epochs)
     print("Results found on epochs: {}, {}, {}".format(*epochs))
 

@@ -295,25 +295,25 @@ def load_model(model_path, dict_file=None):
     return model
 
 
-def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1, beam_txt=""):
-    print("{}, epoch {} Mean sp_pred mcc for life groups {}: {}, {}, {}, {}".format(beam_txt, test_on, ep, *sp_pred_mccs))
-    print("{}, epoch {} Mean cs recall {}: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(beam_txt,
+def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1, beam_txt="Greedy"):
+    print("{}_{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on, ep, *sp_pred_mccs))
+    print("{}_{}, epoch {} Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(beam_txt,
         test_on, ep, *all_recalls))
-    print("{}, epoch {} Mean cs precision {}: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(beam_txt,
+    print("{}_{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(beam_txt,
         test_on, ep, *all_precisions))
-    logging.info("{}, epoch {}: Mean sp_pred mcc for life groups {}: {}, {}, {}, {}".format(beam_txt, test_on, ep, *sp_pred_mccs))
-    logging.info("{}, epoch {}: Mean cs recall {}: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+    logging.info("{}_{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on, ep, *sp_pred_mccs))
+    logging.info("{}_{}, epoch {}: Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         beam_txt,test_on, ep, *all_recalls))
     logging.info(
-        "{}, epoch {} Mean cs precision {}: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+        "{}_{}, epoch {}: Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
             beam_txt, test_on, ep, *all_precisions))
 
 def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0):
     def get_schduler_type(op, lr_sched):
         if lr_sched == "expo":
-            return ExponentialLR(optimizer=op, gamma=0.98)
+            return ExponentialLR(optimizer=op, gamma=0.96)
         elif lr_sched == "step":
-            return StepLR(optimizer=op, gamma=0.1, step_size=15)
+            return StepLR(optimizer=op, gamma=0.1, step_size=10)
 
     if lr_scheduler == "none":
         return None, None
