@@ -727,7 +727,7 @@ def visualize_training_variance(mdl2results, mdl2results_hps=None):
 
 
 if __name__ == "__main__":
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="lr_sched_search/")
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # visualize_training_variance(mdl2results)#, mdl2results_hps)
