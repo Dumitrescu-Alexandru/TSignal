@@ -293,15 +293,23 @@ def get_data_folder():
         return "/scratch/project2003818/dumitra1/sp_data/"
 
 
-def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabilities_file=None):
+def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabilities_file=None,return_everything=False):
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename=filename)
     if probabilities_file is not None:
         get_prob_calibration_and_plot(probabilities_file, life_grp, seqs, true_lbls, pred_lbls)
-        exit(1)
-    sp_pred_accs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v)
+    sp_pred_mccs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v)
     all_recalls, all_precisions, total_positives, false_positives, predictions = get_cs_acc(life_grp, seqs, true_lbls,
                                                                                             pred_lbls, v=v)
-    return sp_pred_accs, all_recalls, all_precisions, total_positives, false_positives, predictions
+    if return_everything:
+        sp_pred_mccs,sp_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v, return_mcc2=True, sp_type="SP")
+        lipo_pred_mccs,lipo_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v, return_mcc2=True, sp_type="LIPO")
+        tat_pred_mccs,tat_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v, return_mcc2=True, sp_type="TAT")
+
+        all_recalls_lipo, all_precisions_lipo, _, _, _ = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO")
+        all_recalls_tat, all_precisions_tat, _, _, _ = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT")
+        return sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs,lipo_pred_mccs2, tat_pred_mccs,tat_pred_mccs2, \
+               all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat
+    return sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions
 
 
 def get_summary_sp_acc(sp_pred_accs):

@@ -14,7 +14,8 @@ def create_param_set_cs_predictors():
     #               "run_number":list(range(5))}
     # parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
     #               "run_number":list(range(5))}
-    parameters = {"use_glbl_lbls:":[1], "glbl_lbl_weight":[1, 0.1], "glbl_lbl_version":[1,2], "run_number":list(range(5))}
+    parameters = {"use_glbl_lbls:":[1], "glbl_lbl_weight":[1, 0.1], "glbl_lbl_version":[1,2],
+                  "run_number":list(range(3)), "train_folds":[[0,1],[0,2],[1,2]]}
     # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
 
     # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
@@ -23,12 +24,14 @@ def create_param_set_cs_predictors():
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
     group_params = list(ParameterGrid(parameters))
     # add 5 without-glbl label runs. See if glbl label actually helps the TAT/LIPO metrics
-    for r_n in range(5):
-        group_params.append({'run_number':r_n, 'use_glbl_lbls':0, 'glbl_lbl_weight':1, 'glbl_lbl_version':1})
+    for r_n in range(3):
+        for tr_f in [[0,1],[0,2],[1,2]]:
+            group_params.append({'run_number':r_n, 'use_glbl_lbls':0, 'glbl_lbl_weight':1, 'glbl_lbl_version':1, 'train_folds':tr_f})
     grpid_2_params = {}
     for i in range(len(group_params)):
         grpid_2_params[i] = group_params[i]
     pickle.dump(grpid_2_params, open("param_groups_by_id_cs.bin", "wb"))
+    exit(1)
 
 def create_parameter_set():
     from sklearn.model_selection import ParameterGrid

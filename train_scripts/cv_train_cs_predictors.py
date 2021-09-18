@@ -465,26 +465,49 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True):
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=50, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+    # sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+    #     get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False,
+    #                                probabilities_file=test_file.replace(".bin", "") + "_results_sp_probs.bin")
+    # evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results", epoch=-1,
+    #          dataset_loader=dataset_loader,use_beams_search=False, partitions=[1], sets=['test'])
+    # exit(1)
+    # if verbouse:
+    #     sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+    #         get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=True, return_everything=False)
+
+    # evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results_beam", epoch=-1, dataset_loader=dataset_loader,
+    #          use_beams_search=True)
+    # if verbouse:
+    #     sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+    #         get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results_beam.bin", v=False, return_everything=True)
+    #     print(sp_pred_mccs, all_recalls, all_precisions)
+
+    sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
+    all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat = \
         get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False,
-                                   probabilities_file=test_file.replace(".bin", "") + "_results_sp_probs.bin")
-    evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results", epoch=-1,
-             dataset_loader=dataset_loader,use_beams_search=False, partitions=[1], sets=['test'])
-    exit(1)
-    if verbouse:
-        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
-            get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False)
-        print(sp_pred_mccs, all_recalls, all_precisions)
+                                   return_everything=True)
+    beam_sp_pred_mccs, beam_sp_pred_mccs2, beam_lipo_pred_mccs, beam_lipo_pred_mccs2, beam_tat_pred_mccs, beam_tat_pred_mccs2, \
+    beam_all_recalls_lipo, beam_all_precisions_lipo, beam_all_recalls_tat, beam_all_precisions_tat = \
+        get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results_beam.bin", v=False,
+                                   return_everything=True)
+    print(sp_pred_mccs2, beam_sp_pred_mccs2)
+    print("MCC1/MCC2 SEC/SPII")
+    print(lipo_pred_mccs, lipo_pred_mccs2)
+    print(beam_lipo_pred_mccs, beam_lipo_pred_mccs2)
 
 
+    print("Recalls SEC/SPII")
+    print(all_recalls_lipo)
+    print(beam_all_recalls_lipo)
 
 
-    evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results_beam", epoch=-1, dataset_loader=dataset_loader,
-             use_beams_search=True)
-    if verbouse:
-        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
-            get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results_beam.bin", v=False)
-        print(sp_pred_mccs, all_recalls, all_precisions)
+    print(sp_pred_mccs2, beam_sp_pred_mccs2)
+    print("MCC1/MCC2 TAT/SPI")
+    print(tat_pred_mccs, tat_pred_mccs2)
+    print(beam_tat_pred_mccs,beam_tat_pred_mccs2)
 
 
+    print("Recalls TAT/SPI")
+    print(all_recalls_tat)
+    print(beam_all_recalls_tat)
 
