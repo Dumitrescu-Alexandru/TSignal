@@ -31,7 +31,6 @@ def create_param_set_cs_predictors():
     for i in range(len(group_params)):
         grpid_2_params[i] = group_params[i]
     pickle.dump(grpid_2_params, open("param_groups_by_id_cs.bin", "wb"))
-    exit(1)
 
 def create_parameter_set():
     from sklearn.model_selection import ParameterGrid
@@ -59,7 +58,7 @@ def parse_arguments():
     parser.add_argument("--dropout", default=0, type=float)
     parser.add_argument("--test_freq", default=5, type=int)
     parser.add_argument("--use_glbl_lbls", default=False, action="store_true")
-    parser.add_argument("--nlayers", default=3, type=int)
+    parser.add_argument("--nlayers", default=4, type=int)
     parser.add_argument("--nheads", default=8, type=int)
     parser.add_argument("--patience", default=30, type=int)
     parser.add_argument("--train_oh", default=False, action="store_true")
