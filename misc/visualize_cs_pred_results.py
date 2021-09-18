@@ -7,15 +7,10 @@ from Bio import SeqIO
 import numpy as np
 
 
-def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False):
-    def is_cs(predicted_cs_ind, true_lbl_seq):
-        if true_lbl_seq[predicted_cs_ind] == "S" and true_lbl_seq[predicted_cs_ind + 1] != "S":
-            return True
-        return False
-
-    def get_acc_for_tolerence(ind, t_lbl):
+def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP"):
+    def get_acc_for_tolerence(ind, t_lbl, sp_letter):
         true_cs = 0
-        while t_lbl[true_cs] == "S" and true_cs < len(t_lbl):
+        while t_lbl[true_cs] == sp_letter and true_cs < len(t_lbl):
             true_cs += 1
         if np.abs(true_cs - ind) == 0:
             return np.array([1, 1, 1, 1, 1, 0, 0, 0, 0, 0])
@@ -32,7 +27,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             # if ind==0, SP was not even predicted (so there is no CS prediction) and this affects precision metric
             # tp/(tp+fp). It means this isnt a tp or a fp, its a fn
             return np.array([0, 0, 0, 0, 1, 0, 0, 0, 0, 0])
-
+    sptype2letter = {'TAT':'T', 'LIPO':'L', 'PILIN':'P', 'TATLIPO':'T', 'SP':'S'}
     sp_types = ["S", "T", "L", "P"]
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
     # order of elemnts in below list:
@@ -48,21 +43,22 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     predictions = [np.array(p) for p in predictions]
     count, count2 = 0, 0
     count_tol_fn, count_complete_fn, count_otherSPpred = 0, 0, 0
+    sp_letter = sptype2letter[sp_type]
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
-        life_grp, sp_info = l.split("|")
+        lg, sp_info = l.split("|")
         ind = 0
         predicted_sp = p[0]
         is_sp = predicted_sp in sp_types
-        if sp_info == "SP":
+        if sp_info == sp_type:
 
-            while (p[ind] == "S" or (p[ind] == predicted_sp and is_sp and only_cs_position)) and ind < len(p) - 1:
+            while (p[ind] == sp_letter or (p[ind] == predicted_sp and is_sp and only_cs_position)) and ind < len(p) - 1:
                 # when only_cs_position=True, the cleavage site positions will be taken into account irrespective of
                 # whether the predicted SP is the correct kind
                 ind += 1
-            predictions[grp2_ind[life_grp]] += get_acc_for_tolerence(ind, t)
+            predictions[grp2_ind[lg]] += get_acc_for_tolerence(ind, t, sp_letter)
 
-        elif sp_info != "SP" and p[ind] == "S":
-            predictions[grp2_ind[life_grp]] += np.array([0, 0, 0, 0, 0, 1, 0, 0, 0, 0])
+        elif sp_info != "SP" and p[ind] == sp_letter:
+            predictions[grp2_ind[lg]] += np.array([0, 0, 0, 0, 0, 1, 0, 0, 0, 0])
     if v:
         print(" count_tol_fn, count_complete_fn, count_otherSPpred", count_tol_fn, count_complete_fn, count_otherSPpred)
     all_recalls = []
@@ -70,25 +66,27 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     total_positives = []
     false_positives = []
     for life_grp, ind in grp2_ind.items():
-        current_preds = predictions[grp2_ind[life_grp]]
-        if v:
-            print("Recall {}: {}".format(life_grp, [current_preds[i] / current_preds[4] for i in range(4)]))
-            print("Prec {}: {}".format(life_grp,
-                                       [current_preds[i] / (current_preds[i] + current_preds[5]) for i in range(4)]))
-        all_recalls.append([current_preds[i] / current_preds[4] for i in range(4)])
-        all_precisions.append([])
-        for i in range(4):
-            if current_preds[5] + current_preds[i] == 0:
-                all_precisions[-1].append(0.)
-            else:
-                all_precisions[-1].append(
-                    current_preds[i] / (current_preds[-1] + current_preds[i] + current_preds[i + 6]))
-        total_positives.append(current_preds[4])
-        false_positives.append(current_preds[5])
+        if sp_type == "SP" or life_grp != "EUKARYA":
+            # eukaryotes do not have SEC/SPI or SEC/SPII
+            current_preds = predictions[grp2_ind[life_grp]]
+            if v:
+                print("Recall {}: {}".format(life_grp, [current_preds[i] / current_preds[4] for i in range(4)]))
+                print("Prec {}: {}".format(life_grp,
+                                           [current_preds[i] / (current_preds[i] + current_preds[5]) for i in range(4)]))
+            all_recalls.append([current_preds[i] / current_preds[4] for i in range(4)])
+            all_precisions.append([])
+            for i in range(4):
+                if current_preds[5] + current_preds[i] == 0:
+                    all_precisions[-1].append(0.)
+                else:
+                    all_precisions[-1].append(
+                        current_preds[i] / (current_preds[-1] + current_preds[i] + current_preds[i + 6]))
+            total_positives.append(current_preds[4])
+            false_positives.append(current_preds[5])
     return all_recalls, all_precisions, total_positives, false_positives, predictions
 
 
-def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False):
+def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="SP"):
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
     # order of elemnts in below list:
     # (eukaria_tp, eukaria_tn, eukaria_fp, eukaria_fn)
@@ -98,39 +96,72 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False):
     # Matthews correlation coefficient (MCC) both true and false positive and negative predictions are counted at
     # the sequence level
     grp2_ind = {"EUKARYA": 0, "NEGATIVE": 1, "POSITIVE": 2, "ARCHAEA": 3}
-    predictions = [[[], []], [[], []], [[], []], [[], []]]
+    lg2sp_letter = {'TAT':'T', 'LIPO':'L', 'PILIN':'P', 'TATLIPO':'T', 'SP':'S'}
+    sp_type_letter = lg2sp_letter[sp_type]
+    predictions = [ [[], []], [[], []], [[], []], [[], []]]
+    predictions_mcc2 = [ [[], []], [[],[]], [[],[]], [[],[]] ]
+    zv = 0
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
-        life_grp, sp_info = l.split("|")
-        ind = 0
-        life_grp, sp_info = l.split("|")
-        if sp_info == "SP" or sp_info == "NO_SP":
+        zv +=1
+        lg, sp_info = l.split("|")
+        if sp_info == sp_type or sp_info == "NO_SP":
             p = p.replace("ES", "J")
             len_ = min(len(p), len(t))
             t, p = t[:len_], p[:len_]
             for ind in range(len(t)):
-                if t[ind] == "S" and p[ind] == "S":
-                    predictions[grp2_ind[life_grp]][1].append(1)
-                    predictions[grp2_ind[life_grp]][0].append(1)
-                elif t[ind] == "S" and p[ind] != "S":
-                    predictions[grp2_ind[life_grp]][1].append(1)
-                    predictions[grp2_ind[life_grp]][0].append(-1)
-                elif t[ind] != "S" and p[ind] == "S":
-                    predictions[grp2_ind[life_grp]][1].append(-1)
-                    predictions[grp2_ind[life_grp]][0].append(1)
-                elif t[ind] != "S" and p[ind] != "S":
-                    predictions[grp2_ind[life_grp]][1].append(-1)
-                    predictions[grp2_ind[life_grp]][0].append(-1)
-    mccs = []
+                if t[ind] == sp_type_letter and p[ind] == sp_type_letter:
+                    predictions[grp2_ind[lg]][1].append(1)
+                    predictions[grp2_ind[lg]][0].append(1)
+                elif t[ind] == sp_type_letter and p[ind] != sp_type_letter:
+                    predictions[grp2_ind[lg]][1].append(1)
+                    predictions[grp2_ind[lg]][0].append(-1)
+                elif t[ind] != sp_type_letter and p[ind] == sp_type_letter:
+                    predictions[grp2_ind[lg]][1].append(-1)
+                    predictions[grp2_ind[lg]][0].append(1)
+                elif t[ind] != sp_type_letter and p[ind] != sp_type_letter:
+                    predictions[grp2_ind[lg]][1].append(-1)
+                    predictions[grp2_ind[lg]][0].append(-1)
+        if return_mcc2:
+            p = p.replace("ES", "J")
+            len_ = min(len(p), len(t))
+            t, p = t[:len_], p[:len_]
+            for ind in range(len(t)):
+                if t[ind] == sp_type_letter and p[ind] == sp_type_letter:
+                    predictions_mcc2[grp2_ind[lg]][1].append(1)
+                    predictions_mcc2[grp2_ind[lg]][0].append(1)
+                elif t[ind] == sp_type_letter and p[ind] != sp_type_letter:
+                    predictions_mcc2[grp2_ind[lg]][1].append(1)
+                    predictions_mcc2[grp2_ind[lg]][0].append(-1)
+                elif t[ind] != sp_type_letter and p[ind] == sp_type_letter:
+                    predictions_mcc2[grp2_ind[lg]][1].append(-1)
+                    predictions_mcc2[grp2_ind[lg]][0].append(1)
+                elif t[ind] != sp_type_letter and p[ind] != sp_type_letter:
+                    predictions_mcc2[grp2_ind[lg]][1].append(-1)
+                    predictions_mcc2[grp2_ind[lg]][0].append(-1)
+    mccs, mccs2 = [], []
     for grp, id in grp2_ind.items():
-        if sum(predictions[grp2_ind[grp]][0]) == -len(predictions[grp2_ind[grp]][0]) or \
-                sum(predictions[grp2_ind[grp]][0]) == len(predictions[grp2_ind[grp]][0]):
-            mccs.append(-1)
-        else:
-            mccs.append(compute_mcc(predictions[grp2_ind[grp]][0]
-                                    , predictions[grp2_ind[grp]][1]))
-        if v:
-            print("{}: {}".format(grp, mccs[-1]))
+        if sp_type == "SP" or grp != "EUKARYA":
+            if sum(predictions[grp2_ind[grp]][0]) == -len(predictions[grp2_ind[grp]][0]) or \
+                    sum(predictions[grp2_ind[grp]][0]) == len(predictions[grp2_ind[grp]][0]):
+                mccs.append(-1)
+            else:
+                mccs.append(compute_mcc(predictions[grp2_ind[grp]][0]
+                                        , predictions[grp2_ind[grp]][1]))
+            if v:
+                print("{}: {}".format(grp, mccs[-1]))
+    if return_mcc2:
+        for grp, id in grp2_ind.items():
+            if sp_type == "SP" or grp != "EUKARYA":
 
+                if sum(predictions_mcc2[grp2_ind[grp]][0]) == -len(predictions_mcc2[grp2_ind[grp]][0]) or \
+                        sum(predictions_mcc2[grp2_ind[grp]][0]) == len(predictions_mcc2[grp2_ind[grp]][0]):
+                    mccs2.append(-1)
+                else:
+                    mccs2.append(compute_mcc(predictions_mcc2[grp2_ind[grp]][0]
+                                            , predictions_mcc2[grp2_ind[grp]][1]))
+                if v:
+                    print("{}: {}".format(grp, mccs2[-1]))
+        return mccs, mccs2
     return mccs
 
 
@@ -445,7 +476,7 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
             try:
                 epochs.append(int(lines[-2].split(" ")[2]))
             except:
-                epochs.append(int(lines[-2].split(":")[-2].split(" ")[-1]))
+                epochs.append(int(lines[-2].split(":")[-3].split(" ")[-1]))
     avg_epoch = np.mean(epochs)
     print("Results found on epochs: {}, {}, {}".format(*epochs))
 
@@ -454,14 +485,22 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
         full_dict_results.update(res_dict)
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin",
                                                                                    dict_=full_dict_results)
-    mccs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False)
+    mccs, mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP")
+    # LIPO is SEC/SPII
+    mccs_lipo, mccs2_lipo = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="LIPO")
+    # TAT is TAT/SPI
+    mccs_tat, mccs2_tat = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="TAT")
     if "param_search_w_nl_nh_0.0_4096_1e-05_4_4" in run:
         v = False
     else:
         v = False
     all_recalls, all_precisions, _, _, _ = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position)
-    return mccs, all_recalls, all_precisions, avg_epoch
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="SP")
+    all_recalls_lipo, all_precisions_lipo, _, _, _ = \
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="LIPO")
+    all_recalls_tat, all_precisions_tat, _, _, _ = \
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TAT")
+    return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo,all_recalls_tat, all_precisions_tat, avg_epoch
 
 
 def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""):
@@ -491,7 +530,8 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
 def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results):
     avg_mcc, avg_prec, avg_recall, no_of_mdls = {}, {}, {}, {}
     for ind, results in mdl2results.items():
-        mccs, all_recalls, all_precisions, _ = results
+        mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions,\
+            all_recalls_lipo, all_precisions_lipo,all_recalls_tat, all_precisions_tat, _ = results
         mdl = mdlind2mdlparams[ind].split("run_no")[0]
         if mdl in no_of_mdls:
             no_of_mdls[mdl] += 1
@@ -521,32 +561,74 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     # order results by the eukaryote mcc
     eukaryote_mcc = []
     for ind, u_p in enumerate(unique_params):
-        print(u_p)
-        mccs, all_recalls, all_precisions, avg_epoch = extract_mean_test_results(run=u_p, result_folder=result_folder,
-                                                                                 only_cs_position=only_cs_position)
-        mdl2results[ind] = (mccs, list(np.reshape(np.array(all_recalls), -1)),
-                            list(np.reshape(np.array(all_precisions), -1)), avg_epoch)
+        mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, \
+               all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo,\
+        all_recalls_tat, all_precisions_tat,avg_epoch = extract_mean_test_results(run=u_p, result_folder=result_folder,
+                                                                                    only_cs_position=only_cs_position)
+        all_recalls_lipo, all_precisions_lipo, \
+        all_recalls_tat, all_precisions_tat, = list(np.reshape(np.array(all_recalls_lipo), -1)), list(np.reshape(np.array(all_precisions_lipo), -1)), \
+                                               list(np.reshape(np.array(all_recalls_tat), -1)), list(np.reshape(np.array(all_precisions_tat), -1))
+        mdl2results[ind] = (mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, list(np.reshape(np.array(all_recalls), -1)),
+                            list(np.reshape(np.array(all_precisions), -1)),all_recalls_lipo, all_precisions_lipo,
+                            all_recalls_tat, all_precisions_tat, avg_epoch)
         mdlind2mdlparams[ind] = u_p
         eukaryote_mcc.append(get_best_corresponding_eval_mcc(result_folder, u_p))
     get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results)
     best_to_worst_mdls = np.argsort(eukaryote_mcc)[::-1]
-    print("\n\nMCC TABLE\n\n")
+    print("\n\nMCC SEC/SPI TABLE\n\n")
     for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&", " & ".join([str(round(mcc, 3))
-                                                                                     for mcc in
-                                                                                     mdl2results[mdl_ind][0]]), "&",
+        mdl_params = " & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:])
+        print(mdl_params, "&", " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][0]]), "&", " & ".join([str(round(mcc,3)) for mcc in mdl2results[mdl_ind][1]]),
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nRecall table \n\n")
+    print("\n\nRecall table SEC/SPI\n\n")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
-              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][1]]), "&",
+              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][6]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nPrec table \n\n")
+    print("\n\nPrec table SEC/SPI\n\n")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
-              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][2]]), "&",
+              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][7]]), "&",
+              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+    print("\n\nRecall table SEC/SPII \n\n")
+    for mdl_ind in best_to_worst_mdls:
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
+              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][8]]), "&",
+              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+    print("\n\nPrec table SEC/SPII \n\n")
+    for mdl_ind in best_to_worst_mdls:
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
+              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][9]]), "&",
+              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+    print("\n\nRecall table TAT/SPI \n\n")
+    for mdl_ind in best_to_worst_mdls:
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
+              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][10]]), "&",
+              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+    print("\n\nPrec table TAT/SPI \n\n")
+    for mdl_ind in best_to_worst_mdls:
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
+              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][11]]), "&",
+              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+    print("\n\nMCC SEC/SPII TABLE\n\n")
+    for mdl_ind in best_to_worst_mdls:
+        mdl_params = " & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:])
+        print(mdl_params, "&", " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][2]]), "&",
+              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][3]]),
+              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+    print("\n\nMCC TAT/SPI TABLE\n\n")
+    for mdl_ind in best_to_worst_mdls:
+        mdl_params = " & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:])
+        print(mdl_params, "&", " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][4]]), "&",
+              " & ".join([str(round(mcc,3)) for mcc in mdl2results[mdl_ind][5]]),
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     return mdl2results

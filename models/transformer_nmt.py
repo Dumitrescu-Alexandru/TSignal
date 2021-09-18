@@ -36,12 +36,14 @@ class TokenEmbedding(nn.Module):
 
 
 class InputEmbeddingEncoder(nn.Module):
-    def __init__(self, partitions=[0, 1, 2], data_folder="sp_data/", lg2ind=None, use_glbl_lbls=False, aa2ind=None):
+    def __init__(self, partitions=[0, 1, 2], data_folder="sp_data/", lg2ind=None, use_glbl_lbls=False, aa2ind=None,
+                 glbl_lbl_version=1):
         # only create dictionaries from sequences to embeddings (as sequence embeddings are already computed by a bert
         # model
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.data_folder = get_data_folder()
         super().__init__()
+        self.glbl_lbl_version = glbl_lbl_version
         seq2emb = {}
         self.lg2ind = pickle.load(open("sp6_dicts.bin", "rb"))[1]
         seq2lg = {}
@@ -87,7 +89,7 @@ class InputEmbeddingEncoder(nn.Module):
         bos = self.eos_bos_cls_embs(torch.tensor(0, device=self.device)).reshape(1, -1)
         eos = self.eos_bos_cls_embs(torch.tensor(1, device=self.device)).reshape(1, -1)
         input_tensor = [bos]
-        if self.use_glbl_lbls:
+        if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             cls_emb = self.eos_bos_cls_embs(torch.tensor(2, device=self.device)).reshape(1,-1)
             input_tensor.append(cls_emb)
         if self.use_lg:
@@ -102,7 +104,7 @@ class InputEmbeddingEncoder(nn.Module):
         tensor_inputs=[]
         for s in seqs:
             current_s = [self.aa2ind['BS']]
-            if self.use_glbl_lbls:
+            if self.use_glbl_lbls and self.glbl_lbl_version == 1:
                 current_s.append(self.aa2ind['CLS'])
             if self.use_lg:
                 current_s.append(self.aa2ind['LG'])
@@ -136,7 +138,7 @@ class InputEmbeddingEncoder(nn.Module):
         additional_inp_tkns = 1
         if self.use_lg:
             additional_inp_tkns +=1
-        if self.use_glbl_lbls:
+        if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             additional_inp_tkns +=1
         output_lens = [ti.shape[0] - additional_inp_tkns for ti in tensor_inputs]
         max_len = max(input_lens)
@@ -170,7 +172,7 @@ class TransformerModel(nn.Module):
 
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5,
                  data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
-                 no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False):
+                 no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1):
         super().__init__()
         self.model_type = 'Transformer'
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -184,14 +186,15 @@ class TransformerModel(nn.Module):
         # input_encoder is just a dictionary with {sequence:embedding} with embeddings from bert LM
         aa2ind = None if not train_oh else aa2ind
         self.input_encoder = InputEmbeddingEncoder(partitions=[0, 1, 2], data_folder=data_folder, lg2ind=lg2ind, 
-                                                   use_glbl_lbls=use_glbl_lbls, aa2ind=aa2ind)
+                                                   use_glbl_lbls=use_glbl_lbls, aa2ind=aa2ind, glbl_lbl_version=glbl_lbl_version)
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
         self.label_encoder = TokenEmbedding(ntoken, d_hid, lbl2ind=lbl2ind)
         self.d_model = d_model
         self.generator = nn.Linear(d_model, ntoken).to(self.device)
         self.use_glbl_lbls = use_glbl_lbls
-        if use_glbl_lbls:
-            self.glbl_generator = nn.Linear(d_model, no_glbl_lbls).to(self.device)
+        self.glbl_lbl_version = glbl_lbl_version
+        self.glbl_generator = nn.Linear(d_model, no_glbl_lbls).to(self.device)
+
 
     def encode(self, src):
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
@@ -225,7 +228,7 @@ class TransformerModel(nn.Module):
         Returns:
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
-        if self.use_glbl_lbls:
+        if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             return self.forward_glb_lbls(src, tgt)
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
@@ -235,6 +238,8 @@ class TransformerModel(nn.Module):
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
         outs = self.transformer(padded_src, padded_tgt, src_mask, tgt_mask, None, padding_mask_src, padding_mask_tgt,
                                 padding_mask_src)
+        if self.glbl_lbl_version == 2:
+            return self.generator(outs), self.glbl_generator(torch.mean(outs.transpose(0,1), dim=1))
         return self.generator(outs)
 
         # * math.sqrt(self.d_model)

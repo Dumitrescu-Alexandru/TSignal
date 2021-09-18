@@ -12,14 +12,19 @@ def create_param_set_cs_predictors():
     from sklearn.model_selection import ParameterGrid
     # parameters = { "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
     #               "run_number":list(range(5))}
-    parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
-                  "run_number":list(range(5))}
+    # parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
+    #               "run_number":list(range(5))}
+    parameters = {"use_glbl_lbls:":[1], "glbl_lbl_weight":[1, 0.1], "glbl_lbl_version":[1,2], "run_number":list(range(5))}
     # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
+
     # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
     group_params = list(ParameterGrid(parameters))
+    # add 5 without-glbl label runs. See if glbl label actually helps the TAT/LIPO metrics
+    for r_n in range(5):
+        group_params.append({'run_number':r_n, 'use_glbl_lbls':0, 'glbl_lbl_weight':1, 'glbl_lbl_version':1})
     grpid_2_params = {}
     for i in range(len(group_params)):
         grpid_2_params[i] = group_params[i]
@@ -64,12 +69,24 @@ def parse_arguments():
     parser.add_argument("--ff_d", default=4096, type=int, help='Expanding dimension')
     parser.add_argument("--test_beam", default=False, action="store_true")
     parser.add_argument("--wd", default=0., type=float)
+    parser.add_argument("--glbl_lbl_weight", default=1., type=float)
+    parser.add_argument("--glbl_lbl_version", default=1, type=float)
     return parser.parse_args()
 
 def modify_param_search_args(args):
     params = pickle.load(open("param_groups_by_id_cs.bin", "rb"))
     param_set = params[args.param_set_search_number]
     run_name = args.run_name
+    # "use_glbl_lbls:":[1], "glbl_lbl_weight":[1, 0.1], "glbl_lbl_version":[1,2]}
+    if 'use_glbl_lbls' in param_set:
+        args.use_glbl_lbls = param_set['use_glbl_lbls']
+        version = param_set['glbl_lbl_version'] if 'glbl_lbl_version' in param_set else args.glbl_lbl_version
+        if param_set['use_glbl_lbls']:
+            run_name += "use_glbl_lbls_version_{}_".format(version)
+        args.glbl_lbl_version = version
+    if 'glbl_lbl_weight' in param_set:
+        args.glbl_lbl_weight = param_set['glbl_lbl_weight']
+        run_name += "weight_{}_".format(param_set['glbl_lbl_weight'])
     if 'dos' in param_set:
         args.dropout = param_set['dos']
         run_name += "dos_{}_".format(args.dropout)
@@ -124,7 +141,9 @@ if __name__ == "__main__":
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
                                 ff_d=args.ff_d, partitions=args.train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
                                 train_oh=args.train_oh, deployment_model=args.deployment_model, lr_scheduler=args.lr_scheduler,
-                                lr_sched_warmup=args.lr_sched_warmup, test_beam=args.test_beam, wd=args.wd)
+                                lr_sched_warmup=args.lr_sched_warmup, test_beam=args.test_beam, wd=args.wd,
+                                glbl_lbl_weight=args.glbl_lbl_weight,glbl_lbl_version=args.glbl_lbl_version)
+
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()

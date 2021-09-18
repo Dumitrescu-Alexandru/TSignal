@@ -21,11 +21,11 @@ from models.transformer_nmt import TransformerModel
 
 
 def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
-               ff_dim=1024 * 4, nlayers=3, nheads=8,
-               aa2ind={}, train_oh=False):
+               ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
-                             no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh)
+                             no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
+                             glbl_lbl_version=glbl_lbl_version)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -333,7 +333,7 @@ def euk_importance_avg(cs_mcc):
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
-                        test_beam=False, wd=0.):
+                        test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1):
     logging.info("Log from here...")
     test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
     partitions = [0,1,2] if deployment_model else partitions
@@ -351,7 +351,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     aa2ind = sp_data.aa2ind if train_oh else None
     model = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
-                       ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind)
+                       ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
+                       glbl_lbl_version=glbl_lbl_version)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_glbl = torch.nn.CrossEntropyLoss()
@@ -378,7 +379,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
                 loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
                 losses_glbl += loss_glbl.item()
-                loss += loss_glbl
+                loss += loss_glbl * glbl_lbl_weight
             else:
                 logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()
