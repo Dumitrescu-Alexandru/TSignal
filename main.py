@@ -14,7 +14,9 @@ def create_param_set_cs_predictors():
     #               "run_number":list(range(5))}
     # parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
     #               "run_number":list(range(5))}
-    parameters = {'run_number':list(range(10))}
+    parameters = {'run_number':list(range(5)), "train_folds":[[0,1],[1,2],[0,2]],
+                  'run_name':["glbl_lbl_search_"], 'use_glbl_lbls':[1], 'glbl_lbl_weight':[0.1, 1],
+                  'glbl_lbl_version':[1,2]}
     # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
 
     # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
@@ -27,8 +29,12 @@ def create_param_set_cs_predictors():
     grpid_2_params = {}
     for i in range(len(group_params)):
         grpid_2_params[i] = group_params[i]
+    start_id = len(group_params)
+    for i in range(5):
+        param = {'run_number':i, 'test_beam':True, 'run_name':"test_beam_search"}
+        grpid_2_params[start_id] = param
+        start_id +=1
     pickle.dump(grpid_2_params, open("param_groups_by_id_cs.bin", "wb"))
-    exit(1)
 
 def create_parameter_set():
     from sklearn.model_selection import ParameterGrid
@@ -77,7 +83,10 @@ def modify_param_search_args(args):
     params = pickle.load(open("param_groups_by_id_cs.bin", "rb"))
     param_set = params[args.param_set_search_number]
     run_name = args.run_name
-    # "use_glbl_lbls:":[1], "glbl_lbl_weight":[1, 0.1], "glbl_lbl_version":[1,2]}
+    if 'run_name' in param_set:
+        run_name = param_set['run_name']
+    if "test_beam" in param_set:
+        args.test_beam = param_set["test_beam"]
     if 'use_glbl_lbls' in param_set:
         args.use_glbl_lbls = param_set['use_glbl_lbls']
         version = param_set['glbl_lbl_version'] if 'glbl_lbl_version' in param_set else args.glbl_lbl_version
@@ -120,6 +129,15 @@ def modify_param_search_args(args):
     args.run_name = run_name
     return args
 
+def sanity_check(file, args2):
+    params = pickle.load(open(file, "rb"))
+    param_names = []
+    for k,v in params.items():
+        args2.param_set_search_number = k
+        args2 = modify_param_search_args(args2)
+        param_names.append(args2.run_name)
+    if len(param_names) != len(set(param_names)):
+        print("WARNING: THE NUMBER OF UNIQUE MODEL NAMES IS NOT EQUAL TO THE NUMBER OF PARAMETERS! EXITING...")
 
 if __name__ == "__main__":
     date_now = str(datetime.datetime.now()).split(".")[0].replace("-", "").replace(":", "").replace(" ", "")
@@ -128,9 +146,10 @@ if __name__ == "__main__":
     if args.test_seqs:
         test_seqs_w_pretrained_mdl(args.test_mdl, args.test_seqs)
     elif args.train_cs_predictor:
+        args2 = parse_arguments()
         if not os.path.exists("param_groups_by_id_cs.bin"):
             create_param_set_cs_predictors()
-        train_folds = [0, 1]
+        sanity_check("param_groups_by_id_cs.bin", args2)
         if args.param_set_search_number != -1:
             args = modify_param_search_args(args)
 

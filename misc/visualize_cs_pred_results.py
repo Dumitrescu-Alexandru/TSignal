@@ -535,30 +535,180 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
     return np.mean(all_best_mccs)
 
 
-def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results):
-    avg_mcc, avg_prec, avg_recall, no_of_mdls = {}, {}, {}, {}
+def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type="prec-rec"):
+    avg_mcc, avg_mcc2, avg_mcc_lipo, avg_mcc2_lipo, avg_mccs_tat, avg_mccs2_tat, avg_prec, avg_recall, avg_prec_lipo,\
+    avg_recall_lipo, avg_prec_tat, avg_recall_tat, no_of_mdls = {}, {}, {}, {},{}, {}, {}, {},{}, {}, {}, {},{}
     for ind, results in mdl2results.items():
         mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions,\
             all_recalls_lipo, all_precisions_lipo,all_recalls_tat, all_precisions_tat, _ = results
         mdl = mdlind2mdlparams[ind].split("run_no")[0]
         if mdl in no_of_mdls:
             no_of_mdls[mdl] += 1
-            avg_mcc[mdl] += np.array(mccs)
-            avg_recall[mdl] += np.array(all_recalls)
-            avg_prec[mdl] += np.array(all_precisions)
+            avg_mcc[mdl].append(np.array(mccs))
+            avg_recall[mdl].append(np.array(all_recalls))
+            avg_prec[mdl].append(np.array(all_precisions))
+            avg_mcc2[mdl].append(np.array(mccs2))
+            avg_mcc_lipo[mdl].append(np.array(mccs_lipo))
+            avg_mcc2_lipo[mdl].append(np.array(mccs2_lipo))
+            avg_mccs_tat[mdl].append(np.array(avg_mccs_tat))
+            avg_mccs2_tat[mdl].append(np.array(avg_mccs2_tat))
+            avg_recall_lipo[mdl].append(np.array(all_recalls_lipo))
+            avg_prec_lipo[mdl].append(np.array(all_precisions_lipo))
+            avg_recall_tat[mdl].append(np.array(all_recalls_tat))
+            avg_prec_tat[mdl].append(np.array(all_precisions_tat))
         else:
             no_of_mdls[mdl] = 1
-            avg_mcc[mdl] = np.array(mccs)
-            avg_recall[mdl] = np.array(all_recalls)
-            avg_prec[mdl] = np.array(all_precisions)
-    for mdl, no_of_tests in no_of_mdls.items():
-        print(mdl)
-        print(avg_mcc[mdl] / no_of_tests)
-        print(avg_recall[mdl] / no_of_tests)
-        print(avg_prec[mdl] / no_of_tests)
+            avg_mcc[mdl] = [np.array(mccs)]
+            avg_recall[mdl] = [np.array(all_recalls)]
+            avg_prec[mdl] = [np.array(all_precisions)]
+            avg_mcc2[mdl]= [np.array(mccs2)]
+            avg_mcc_lipo[mdl] = [np.array(mccs_lipo)]
+            avg_mcc2_lipo[mdl] = [np.array(mccs2_lipo)]
+            avg_mccs_tat[mdl] = [np.array(avg_mccs_tat)]
+            avg_mccs2_tat[mdl]= [np.array(avg_mccs2_tat)]
+            print(all_recalls_tat, all_recalls_lipo, all_recalls)
+            avg_recall_lipo[mdl] = [np.array(all_recalls_lipo)]
+            avg_prec_lipo[mdl] = [np.array(all_precisions_lipo)]
+            avg_prec_tat[mdl] = [np.array(all_precisions_tat)]
+            avg_recall_tat[mdl] = [np.array(all_recalls_tat)]
+    fig, axs =  plt.subplots(2, 3, figsize=(12, 8)) if plot_type == "mcc" else plt.subplots(2, 4, figsize=(12, 8))
+    plt.subplots_adjust(right=0.7)
+    colors = ['red', 'green', 'orange', 'blue', 'brown', 'black']
+
+    models = list(avg_mcc.keys())
+    mdl2colors = {models[i]:colors[i] for i in range(len(models))}
 
 
-def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False):
+    # TODO: Configure this for model names (usually full names are quite long and ugly)
+    mdl2mdlnames = {}
+    for mdl in models:
+        if "lr_sched_searchlrsched_step_wrmpLrSched_0_" in mdl:
+            mdl2mdlnames[mdl] = "step, 0 wrmp"
+
+        if "lr_sched_searchlrsched_expo_wrmpLrSched_10_" in mdl:
+            mdl2mdlnames[mdl] = "expo, 10 wrmp"
+
+        if "lr_sched_searchlrsched_expo_wrmpLrSched_0_" in mdl:
+            mdl2mdlnames[mdl] = "expo, 0 wrmp"
+
+        if "lr_sched_searchlrsched_step_wrmpLrSched_10_" in mdl:
+            mdl2mdlnames[mdl] = "step, 10 wrmp"
+    plot_lgs = ['NEGATIVE', 'POSITIVE', 'ARCHAEA'] if plot_type == "mcc" else ['EUKARYA', 'NEGATIVE', 'POSITIVE', 'ARCHAEA']
+    for lg_ind, lg in enumerate(plot_lgs):
+        if plot_type == "mcc":
+            axs[0, 0].set_ylabel("MCC")
+            axs[1, 0].set_ylabel("MCC2")
+        else:
+            axs[0, 0].set_ylabel("Recall")
+            axs[1, 0].set_ylabel("Precision")
+        for mdl in avg_mccs_tat.keys():
+            x = np.linspace(0, 1, 1000)
+            if plot_type == "mcc":
+                kde = stats.gaussian_kde([avg_mcc[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl]) ])
+            else:
+                kde = stats.gaussian_kde([avg_recall[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl]) ])
+
+            if lg_ind == 0:
+                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="{}".format(mdl2mdlnames[mdl]))
+            else:
+                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            axs[0, lg_ind].set_title(lg +" SEC/SPI")
+        for mdl in avg_mccs_tat.keys():
+            x = np.linspace(0, 1, 1000)
+            if plot_type == "mcc":
+                kde = stats.gaussian_kde([avg_mcc2[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl]) ])
+            else:
+                kde = stats.gaussian_kde([avg_prec[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl])])
+            axs[1, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            if lg_ind == len(plot_lgs) -1:
+                axs[1, lg_ind].plot(x, kde(x), color=mdl2colors[
+                    mdl], label="{}".format(mdl2mdlnames[mdl]))
+
+    plot_lgs = ['NEGATIVE', 'POSITIVE', 'ARCHAEA']
+    plt.legend(loc=(1.04, 1))
+    plt.show()
+
+    fig, axs =  plt.subplots(2, 3, figsize=(12, 8))
+    plt.subplots_adjust(right=0.7)
+    for lg_ind, lg in enumerate(['NEGATIVE', 'POSITIVE', 'ARCHAEA']):
+        if plot_type == "mcc":
+            axs[0, 0].set_ylabel("MCC")
+            axs[1, 0].set_ylabel("MCC2")
+        else:
+            axs[0, 0].set_ylabel("Recall")
+            axs[1, 0].set_ylabel("Precision")
+        for mdl in avg_mccs_tat.keys():
+            x = np.linspace(0, 1, 1000)
+            if plot_type == "mcc":
+                kde = stats.gaussian_kde([avg_mcc_lipo[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
+            else:
+                kde = stats.gaussian_kde([avg_recall_lipo[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl])])
+            if lg_ind == 0:
+                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="{}".format(mdl2mdlnames[mdl]))
+            else:
+                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            axs[0, lg_ind].set_title(lg +" SEC/SPII")
+        for mdl in avg_mccs_tat.keys():
+            x = np.linspace(0, 1, 1000)
+            if plot_type == "mcc":
+                kde = stats.gaussian_kde([avg_mcc2_lipo[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
+            else:
+                kde = stats.gaussian_kde([avg_prec_lipo[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl])])
+            axs[1, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            if lg_ind == 2:
+                axs[1, lg_ind].plot(x, kde(x), color=mdl2colors[
+                    mdl], label="{}".format(mdl2mdlnames[mdl]))
+
+    plt.legend(loc=(1.04, 1))
+    plt.show()
+
+    fig, axs = plt.subplots(2, 3, figsize=(12, 8))
+    plt.subplots_adjust(right=0.7)
+    for lg_ind, lg in enumerate(['NEGATIVE', 'POSITIVE', 'ARCHAEA']):
+        if plot_type == "mcc":
+            axs[0, 0].set_ylabel("MCC")
+            axs[1, 0].set_ylabel("MCC2")
+        else:
+            axs[0, 0].set_ylabel("Recall")
+            axs[1, 0].set_ylabel("Precision")
+        for mdl in avg_mccs_tat.keys():
+            x = np.linspace(0, 1, 1000)
+            if plot_type == "mcc":
+                kde = stats.gaussian_kde([avg_mccs_tat[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
+            else:
+                kde = stats.gaussian_kde([avg_recall_tat[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl])])
+            if lg_ind == 0:
+                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="{}".format(mdl2mdlnames[mdl]))
+            else:
+                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            axs[0, lg_ind].set_title(lg +" TAT/SPI")
+        for mdl in avg_mccs_tat.keys():
+            x = np.linspace(0, 1, 1000)
+            if plot_type == "mcc":
+                kde = stats.gaussian_kde([avg_mccs2_tat[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
+            else:
+                kde = stats.gaussian_kde([avg_prec_tat[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl])])
+            axs[1, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            if lg_ind == 2:
+                axs[1, lg_ind].plot(x, kde(x), color=mdl2colors[
+                    mdl], label="{}".format(mdl2mdlnames[mdl]))
+
+    plt.legend(loc=(1.04, 1))
+    plt.show()
+    if plot_type == "mcc":
+        fig, axs =  plt.subplots(1, 1, figsize=(4, 8))
+        plt.subplots_adjust(right=0.7)
+        for lg_ind, lg in enumerate(['EUKARYOTE']):
+            axs[0, 0].set_ylabel("MCC")
+            for mdl in avg_mccs_tat.keys():
+                x = np.linspace(0, 1, 1000)
+                kde = stats.gaussian_kde([avg_mcc[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl]) ])
+                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl], label="{}".format(mdl2mdlnames[mdl]))
+                axs[0, lg_ind].set_title(lg +" SEC/SPI")
+        plt.legend(loc=(1.04, 1))
+        plt.show()
+
+def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False, compare_mdl_plots=False):
     files = os.listdir(result_folder)
     unique_params = set()
     for f in files:
@@ -581,7 +731,8 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
                             all_recalls_tat, all_precisions_tat, avg_epoch)
         mdlind2mdlparams[ind] = u_p
         eukaryote_mcc.append(get_best_corresponding_eval_mcc(result_folder, u_p))
-    get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results)
+    if compare_mdl_plots:
+        get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results)
     best_to_worst_mdls = np.argsort(eukaryote_mcc)[::-1]
     print("\n\nMCC SEC/SPI TABLE\n\n")
     for mdl_ind in best_to_worst_mdls:
@@ -817,7 +968,7 @@ def visualize_training_variance(mdl2results, mdl2results_hps=None):
 
 
 if __name__ == "__main__":
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="lr_sched_search/", compare_mdl_plots=True)
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # visualize_training_variance(mdl2results)#, mdl2results_hps)
