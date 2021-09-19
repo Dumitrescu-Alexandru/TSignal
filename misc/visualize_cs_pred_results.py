@@ -581,18 +581,31 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
 
     # TODO: Configure this for model names (usually full names are quite long and ugly)
     mdl2mdlnames = {}
+    # for mdl in models:
+    #     if "lr_sched_searchlrsched_step_wrmpLrSched_0_" in mdl:
+    #         mdl2mdlnames[mdl] = "step, 0 wrmp"
+    #
+    #     if "lr_sched_searchlrsched_expo_wrmpLrSched_10_" in mdl:
+    #         mdl2mdlnames[mdl] = "expo, 10 wrmp"
+    #
+    #     if "lr_sched_searchlrsched_expo_wrmpLrSched_0_" in mdl:
+    #         mdl2mdlnames[mdl] = "expo, 0 wrmp"
+    #
+    #     if "lr_sched_searchlrsched_step_wrmpLrSched_10_" in mdl:
+    #         mdl2mdlnames[mdl] = "step, 10 wrmp"
+    # FOR GLBL LBL
     for mdl in models:
-        if "lr_sched_searchlrsched_step_wrmpLrSched_0_" in mdl:
-            mdl2mdlnames[mdl] = "step, 0 wrmp"
+        if "glbl_lbl_search_use_glbl_lbls_version_1_weight_1_" in mdl:
+            mdl2mdlnames[mdl] = "version 1 weight 1"
+        if "glbl_lbl_search_use_glbl_lbls_version_2_weight_1_" in mdl:
+            mdl2mdlnames[mdl] = "version 2 weight 1"
+        if "glbl_lbl_search_use_glbl_lbls_version_2_weight_0.1_" in mdl:
+            mdl2mdlnames[mdl] = "version 2 weight 0.1"
+        if "glbl_lbl_search_use_glbl_lbls_version_1_weight_0.1_" in mdl:
+            mdl2mdlnames[mdl] = "version 1 weight 0.1"
+        if "test_beam_searchrun_" in mdl:
+            mdl2mdlnames[mdl] = "no glbl labels"
 
-        if "lr_sched_searchlrsched_expo_wrmpLrSched_10_" in mdl:
-            mdl2mdlnames[mdl] = "expo, 10 wrmp"
-
-        if "lr_sched_searchlrsched_expo_wrmpLrSched_0_" in mdl:
-            mdl2mdlnames[mdl] = "expo, 0 wrmp"
-
-        if "lr_sched_searchlrsched_step_wrmpLrSched_10_" in mdl:
-            mdl2mdlnames[mdl] = "step, 10 wrmp"
     plot_lgs = ['NEGATIVE', 'POSITIVE', 'ARCHAEA'] if plot_type == "mcc" else ['EUKARYA', 'NEGATIVE', 'POSITIVE', 'ARCHAEA']
     for lg_ind, lg in enumerate(plot_lgs):
         if plot_type == "mcc":
@@ -968,7 +981,7 @@ def visualize_training_variance(mdl2results, mdl2results_hps=None):
 
 
 if __name__ == "__main__":
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="lr_sched_search/", compare_mdl_plots=True)
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="glbl_label_tests/", compare_mdl_plots=True)
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # visualize_training_variance(mdl2results)#, mdl2results_hps)

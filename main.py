@@ -14,26 +14,29 @@ def create_param_set_cs_predictors():
     #               "run_number":list(range(5))}
     # parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
     #               "run_number":list(range(5))}
-    parameters = {'run_number':list(range(5)), "train_folds":[[0,1],[1,2],[0,2]],
-                  'run_name':["glbl_lbl_search_"], 'use_glbl_lbls':[1], 'glbl_lbl_weight':[0.1, 1],
-                  'glbl_lbl_version':[1,2]}
+    # parameters = {'run_number':list(range(5)), "train_folds":[[0,1],[1,2],[0,2]],
+    #               'run_name':["glbl_lbl_search_"], 'use_glbl_lbls':[1], 'glbl_lbl_weight':[0.1, 1],
+    #               'glbl_lbl_version':[1,2]}
     # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
 
     # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
-    group_params = list(ParameterGrid(parameters))
+    # group_params = list(ParameterGrid(parameters))
     # add 5 without-glbl label runs. See if glbl label actually helps the TAT/LIPO metrics
 
     grpid_2_params = {}
-    for i in range(len(group_params)):
-        grpid_2_params[i] = group_params[i]
-    start_id = len(group_params)
+    # for i in range(len(group_params)):
+    #     grpid_2_params[i] = group_params[i]
+    # start_id = len(group_params)
+    group_params = []
+    start_id = 0
     for i in range(5):
-        param = {'run_number':i, 'test_beam':True, 'run_name':"test_beam_search"}
-        grpid_2_params[start_id] = param
-        start_id +=1
+        for tf in [[0,1],[1,2],[0,2]]:
+            param = {'run_number':i, 'test_beam':True, 'run_name':"test_beam_search", 'train_folds':tf}
+            grpid_2_params[start_id] = param
+            start_id +=1
     pickle.dump(grpid_2_params, open("param_groups_by_id_cs.bin", "wb"))
 
 def create_parameter_set():
