@@ -311,9 +311,9 @@ def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, 
 def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0):
     def get_schduler_type(op, lr_sched):
         if lr_sched == "expo":
-            return ExponentialLR(optimizer=op, gamma=0.96)
+            return ExponentialLR(optimizer=op, gamma=0.98)
         elif lr_sched == "step":
-            return StepLR(optimizer=op, gamma=0.1, step_size=10)
+            return StepLR(optimizer=op, gamma=0.1, step_size=20)
 
     if lr_scheduler == "none":
         return None, None

@@ -19,24 +19,19 @@ def create_param_set_cs_predictors():
     #               'glbl_lbl_version':[1,2]}
     # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
 
-    # parameters = {"lr_sched":[0.],"nlayers": [2,3,4,5], "ff_d": [2048,4096], "nheads":[4,8,16],
-    #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]]}
+    parameters = {"nlayers": [2,3,4],"nheads":[8,16],
+                  "lr": [0.00001], 'use_glbl_lbls':[0,1], 'glbl_label_version':[2],
+                  'lr_scheduler':['none', 'step', 'expo'], "train_folds": [[0,1],[0,2],[1,2]], 'patience':[30, 60],
+                  'glbl_lbl_weight':[0.1]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
-    # group_params = list(ParameterGrid(parameters))
+    group_params = list(ParameterGrid(parameters))
     # add 5 without-glbl label runs. See if glbl label actually helps the TAT/LIPO metrics
-
     grpid_2_params = {}
-    # for i in range(len(group_params)):
-    #     grpid_2_params[i] = group_params[i]
+    for i in range(len(group_params)):
+        grpid_2_params[i] = group_params[i]
     # start_id = len(group_params)
-    group_params = []
-    start_id = 0
-    for i in range(5):
-        for tf in [[0,1],[1,2],[0,2]]:
-            param = {'run_number':i, 'test_beam':True, 'run_name':"test_beam_search", 'train_folds':tf}
-            grpid_2_params[start_id] = param
-            start_id +=1
+
     pickle.dump(grpid_2_params, open("param_groups_by_id_cs.bin", "wb"))
 
 def create_parameter_set():
@@ -65,7 +60,7 @@ def parse_arguments():
     parser.add_argument("--dropout", default=0, type=float)
     parser.add_argument("--test_freq", default=5, type=int)
     parser.add_argument("--use_glbl_lbls", default=False, action="store_true")
-    parser.add_argument("--nlayers", default=4, type=int)
+    parser.add_argument("--nlayers", default=3, type=int)
     parser.add_argument("--nheads", default=8, type=int)
     parser.add_argument("--patience", default=30, type=int)
     parser.add_argument("--train_oh", default=False, action="store_true")
@@ -88,17 +83,22 @@ def modify_param_search_args(args):
     run_name = args.run_name
     if 'run_name' in param_set:
         run_name = param_set['run_name']
+    run_name += "_"
+    if 'patience' in param_set:
+        run_name += "patience_{}".format(param_set['patience'])
     if "test_beam" in param_set:
         args.test_beam = param_set["test_beam"]
     if 'use_glbl_lbls' in param_set:
         args.use_glbl_lbls = param_set['use_glbl_lbls']
+    if args.use_glbl_lbls:
+        run_name += "use_glbl_lbls_"
         version = param_set['glbl_lbl_version'] if 'glbl_lbl_version' in param_set else args.glbl_lbl_version
         if param_set['use_glbl_lbls']:
             run_name += "use_glbl_lbls_version_{}_".format(version)
         args.glbl_lbl_version = version
-    if 'glbl_lbl_weight' in param_set:
-        args.glbl_lbl_weight = param_set['glbl_lbl_weight']
-        run_name += "weight_{}_".format(param_set['glbl_lbl_weight'])
+        if 'glbl_lbl_weight' in param_set:
+            args.glbl_lbl_weight = param_set['glbl_lbl_weight']
+            run_name += "weight_{}_".format(param_set['glbl_lbl_weight'])
     if 'dos' in param_set:
         args.dropout = param_set['dos']
         run_name += "dos_{}_".format(args.dropout)
@@ -111,8 +111,8 @@ def modify_param_search_args(args):
     if 'nlayers' in param_set:
         args.nlayers = param_set['nlayers']
         run_name += "nlayers_{}_".format(args.nlayers)
-    if 'nhead' in param_set:
-        args.nhead = param_set['nhead']
+    if 'nheads' in param_set:
+        args.nhead = param_set['nheads']
         run_name += "nhead_{}_".format(args.nhead)
     if 'wd' in param_set:
         args.wd = param_set['wd']
@@ -139,8 +139,10 @@ def sanity_check(file, args2):
         args2.param_set_search_number = k
         args2 = modify_param_search_args(args2)
         param_names.append(args2.run_name)
+        args2 = parse_arguments()
     if len(param_names) != len(set(param_names)):
         print("WARNING: THE NUMBER OF UNIQUE MODEL NAMES IS NOT EQUAL TO THE NUMBER OF PARAMETERS! EXITING...")
+        exit(1)
 
 if __name__ == "__main__":
     date_now = str(datetime.datetime.now()).split(".")[0].replace("-", "").replace(":", "").replace(" ", "")

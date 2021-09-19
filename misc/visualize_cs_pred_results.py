@@ -197,7 +197,7 @@ def plot_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_acc):
     plt.legend()
     plt.show()
 
-def get_prob_calibration_and_plot(probabilities_file, life_grp, seqs, true_lbls, pred_lbls, bins=15, plot=True):
+def get_prob_calibration_and_plot(probabilities_file="", life_grp=None, seqs=None, true_lbls=None, pred_lbls=None, bins=15, plot=True, sp2probs=None):
     # initialize bins
     bin_limmits = np.linspace(0, 1, bins)
     correct_calibration_accuracies = [(bin_limmits[i] + bin_limmits[i + 1]) / 2 for i in range(bins - 1)]
@@ -221,7 +221,7 @@ def get_prob_calibration_and_plot(probabilities_file, life_grp, seqs, true_lbls,
             tol_based_cs_accs[tol] = wrap_dict
         cs_by_lg_and_tol_accs[lg] = tol_based_cs_accs
 
-    sp2probs = pickle.load(open(probabilities_file, "rb"))
+    sp2probs = pickle.load(open(probabilities_file, "rb")) if sp2probs is None else sp2probs
     for s, tl, pl, lg in zip(seqs, true_lbls, pred_lbls, life_grp):
         lg = lg.split("|")[0]
         predicted_sp_prob, all_sp_probs, _ = sp2probs[s]
@@ -535,7 +535,7 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
     return np.mean(all_best_mccs)
 
 
-def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type="prec-rec"):
+def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type="prec-rec", tol=1):
     avg_mcc, avg_mcc2, avg_mcc_lipo, avg_mcc2_lipo, avg_mccs_tat, avg_mccs2_tat, avg_prec, avg_recall, avg_prec_lipo,\
     avg_recall_lipo, avg_prec_tat, avg_recall_tat, no_of_mdls = {}, {}, {}, {},{}, {}, {}, {},{}, {}, {}, {},{}
     for ind, results in mdl2results.items():
@@ -566,7 +566,6 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
             avg_mcc2_lipo[mdl] = [np.array(mccs2_lipo)]
             avg_mccs_tat[mdl] = [np.array(avg_mccs_tat)]
             avg_mccs2_tat[mdl]= [np.array(avg_mccs2_tat)]
-            print(all_recalls_tat, all_recalls_lipo, all_recalls)
             avg_recall_lipo[mdl] = [np.array(all_recalls_lipo)]
             avg_prec_lipo[mdl] = [np.array(all_precisions_lipo)]
             avg_prec_tat[mdl] = [np.array(all_precisions_tat)]
@@ -578,34 +577,41 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
     models = list(avg_mcc.keys())
     mdl2colors = {models[i]:colors[i] for i in range(len(models))}
 
-
+    print(set(models))
     # TODO: Configure this for model names (usually full names are quite long and ugly)
     mdl2mdlnames = {}
     # for mdl in models:
-    #     if "lr_sched_searchlrsched_step_wrmpLrSched_0_" in mdl:
-    #         mdl2mdlnames[mdl] = "step, 0 wrmp"
-    #
-    #     if "lr_sched_searchlrsched_expo_wrmpLrSched_10_" in mdl:
-    #         mdl2mdlnames[mdl] = "expo, 10 wrmp"
-    #
-    #     if "lr_sched_searchlrsched_expo_wrmpLrSched_0_" in mdl:
-    #         mdl2mdlnames[mdl] = "expo, 0 wrmp"
-    #
-    #     if "lr_sched_searchlrsched_step_wrmpLrSched_10_" in mdl:
-    #         mdl2mdlnames[mdl] = "step, 10 wrmp"
-    # FOR GLBL LBL
+    #     if "best_beam_test_beam_search" not in mdl:
+    #         mdl2mdlnames[mdl] = "greedy search"
+    #     if "best_beam_test_beam_search" in mdl:
+    #         mdl2mdlnames[mdl] = "beam search"
     for mdl in models:
-        if "glbl_lbl_search_use_glbl_lbls_version_1_weight_1_" in mdl:
-            mdl2mdlnames[mdl] = "version 1 weight 1"
-        if "glbl_lbl_search_use_glbl_lbls_version_2_weight_1_" in mdl:
-            mdl2mdlnames[mdl] = "version 2 weight 1"
-        if "glbl_lbl_search_use_glbl_lbls_version_2_weight_0.1_" in mdl:
-            mdl2mdlnames[mdl] = "version 2 weight 0.1"
-        if "glbl_lbl_search_use_glbl_lbls_version_1_weight_0.1_" in mdl:
-            mdl2mdlnames[mdl] = "version 1 weight 0.1"
-        if "test_beam_searchrun_" in mdl:
-            mdl2mdlnames[mdl] = "no glbl labels"
+        if "lr_sched_searchlrsched_step_wrmpLrSched_0_" in mdl:
+            mdl2mdlnames[mdl] = "step, 0 wrmp"
 
+        if "lr_sched_searchlrsched_expo_wrmpLrSched_10_" in mdl:
+            mdl2mdlnames[mdl] = "expo, 10 wrmp"
+
+        if "lr_sched_searchlrsched_expo_wrmpLrSched_0_" in mdl:
+            mdl2mdlnames[mdl] = "expo, 0 wrmp"
+
+        if "lr_sched_searchlrsched_step_wrmpLrSched_10_" in mdl:
+            mdl2mdlnames[mdl] = "step, 10 wrmp"
+
+        if "test_beam_search" in mdl:
+            mdl2mdlnames[mdl] = "no sched"
+    # FOR GLBL LBL
+    # for mdl in models:
+    #     if "glbl_lbl_search_use_glbl_lbls_version_1_weight_1_" in mdl:
+    #         mdl2mdlnames[mdl] = "version 1 weight 1"
+    #     if "glbl_lbl_search_use_glbl_lbls_version_2_weight_1_" in mdl:
+    #         mdl2mdlnames[mdl] = "version 2 weight 1"
+    #     if "glbl_lbl_search_use_glbl_lbls_version_2_weight_0.1_" in mdl:
+    #         mdl2mdlnames[mdl] = "version 2 weight 0.1"
+    #     if "glbl_lbl_search_use_glbl_lbls_version_1_weight_0.1_" in mdl:
+    #         mdl2mdlnames[mdl] = "version 1 weight 0.1"
+    #     if "test_beam_search" in mdl:
+    #         mdl2mdlnames[mdl] = "no glbl labels"
     plot_lgs = ['NEGATIVE', 'POSITIVE', 'ARCHAEA'] if plot_type == "mcc" else ['EUKARYA', 'NEGATIVE', 'POSITIVE', 'ARCHAEA']
     for lg_ind, lg in enumerate(plot_lgs):
         if plot_type == "mcc":
@@ -619,7 +625,7 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
             if plot_type == "mcc":
                 kde = stats.gaussian_kde([avg_mcc[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl]) ])
             else:
-                kde = stats.gaussian_kde([avg_recall[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl]) ])
+                kde = stats.gaussian_kde([avg_recall[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl]) ])
 
             if lg_ind == 0:
                 axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="{}".format(mdl2mdlnames[mdl]))
@@ -631,7 +637,7 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
             if plot_type == "mcc":
                 kde = stats.gaussian_kde([avg_mcc2[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl]) ])
             else:
-                kde = stats.gaussian_kde([avg_prec[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl])])
+                kde = stats.gaussian_kde([avg_prec[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
             axs[1, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
             if lg_ind == len(plot_lgs) -1:
                 axs[1, lg_ind].plot(x, kde(x), color=mdl2colors[
@@ -655,7 +661,7 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
             if plot_type == "mcc":
                 kde = stats.gaussian_kde([avg_mcc_lipo[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
             else:
-                kde = stats.gaussian_kde([avg_recall_lipo[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl])])
+                kde = stats.gaussian_kde([avg_recall_lipo[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
             if lg_ind == 0:
                 axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="{}".format(mdl2mdlnames[mdl]))
             else:
@@ -666,7 +672,7 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
             if plot_type == "mcc":
                 kde = stats.gaussian_kde([avg_mcc2_lipo[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
             else:
-                kde = stats.gaussian_kde([avg_prec_lipo[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl])])
+                kde = stats.gaussian_kde([avg_prec_lipo[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
             axs[1, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
             if lg_ind == 2:
                 axs[1, lg_ind].plot(x, kde(x), color=mdl2colors[
@@ -689,7 +695,7 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
             if plot_type == "mcc":
                 kde = stats.gaussian_kde([avg_mccs_tat[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
             else:
-                kde = stats.gaussian_kde([avg_recall_tat[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl])])
+                kde = stats.gaussian_kde([avg_recall_tat[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
             if lg_ind == 0:
                 axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="{}".format(mdl2mdlnames[mdl]))
             else:
@@ -700,7 +706,7 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
             if plot_type == "mcc":
                 kde = stats.gaussian_kde([avg_mccs2_tat[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
             else:
-                kde = stats.gaussian_kde([avg_prec_tat[mdl][i][lg_ind * 4] for i in range(no_of_mdls[mdl])])
+                kde = stats.gaussian_kde([avg_prec_tat[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
             axs[1, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
             if lg_ind == 2:
                 axs[1, lg_ind].plot(x, kde(x), color=mdl2colors[
@@ -979,9 +985,37 @@ def visualize_training_variance(mdl2results, mdl2results_hps=None):
                     [euk_hps_prec[i], neg_hps_prec[i], pos_hps_prec[i], arch_hps_prec[i]],
                     name='precision tol={}'.format(i), plot_hps=plot_hps)
 
+def extract_calibration_probs_for_mdl(model = "lr_sched_searchlrsched_step_wrmpLrSched_0_run_no_3_trFlds_", folder='lr_sched_search/'):
+    all_lg, all_seqs, all_tl, all_pred_lbls, sp2probs = [], [], [], [], {}
+    for tr_f in [[0,1],[0,2],[1,2]]:
+        prob_file = "{}{}_{}_best_sp_probs.bin".format(model, tr_f[0], tr_f[1])
+        preds_file = "{}{}_{}_best.bin".format(model, tr_f[0], tr_f[1])
+        life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename=folder+preds_file)
+        all_lg.extend(life_grp)
+        all_seqs.extend(seqs)
+        all_tl.extend(true_lbls)
+        all_pred_lbls.extend(pred_lbls)
+        sp2probs.update(pickle.load(open(folder+prob_file, "rb")))
+    get_prob_calibration_and_plot("", all_lg, all_seqs, all_tl, all_pred_lbls, sp2probs=sp2probs)
+
+
+def duplicate_Some_logs():
+    from subprocess import call
+
+    files = os.listdir("beam_test")
+    for f in files:
+        if "log" in f:
+            file = f.replace(".bin", "_best.bin")
+            cmd = ["cp", "beam_test/"+f, "beam_test/actual_beams/best_beam_"+file]
+            call(cmd)
+    exit(1)
+
 
 if __name__ == "__main__":
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="glbl_label_tests/", compare_mdl_plots=True)
+    # extract_calibration_probs_for_mdl()
+    # duplicate_Some_logs()
+    # exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="glbl_label_tests/", compare_mdl_plots=False)
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # visualize_training_variance(mdl2results)#, mdl2results_hps)

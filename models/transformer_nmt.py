@@ -238,7 +238,7 @@ class TransformerModel(nn.Module):
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
         outs = self.transformer(padded_src, padded_tgt, src_mask, tgt_mask, None, padding_mask_src, padding_mask_tgt,
                                 padding_mask_src)
-        if self.glbl_lbl_version == 2:
+        if self.glbl_lbl_version == 2 and self.use_glbl_lbls:
             return self.generator(outs), self.glbl_generator(torch.mean(outs.transpose(0,1), dim=1))
         return self.generator(outs)
 
