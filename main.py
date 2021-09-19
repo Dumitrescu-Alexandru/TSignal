@@ -86,6 +86,7 @@ def modify_param_search_args(args):
     run_name += "_"
     if 'patience' in param_set:
         run_name += "patience_{}".format(param_set['patience'])
+        args.patience = param_set['patience']
     if "test_beam" in param_set:
         args.test_beam = param_set["test_beam"]
     if 'use_glbl_lbls' in param_set:

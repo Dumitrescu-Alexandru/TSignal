@@ -1015,7 +1015,7 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="glbl_label_tests/", compare_mdl_plots=False)
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="some_run/", compare_mdl_plots=False)
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # visualize_training_variance(mdl2results)#, mdl2results_hps)

@@ -433,6 +433,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                          format(e, patience, valid_loss, best_valid_loss))
             patience -= 1
+        patience = 0
     if not deployment_model:
         model = load_model(run_name + "_best_eval.pth")
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"])
