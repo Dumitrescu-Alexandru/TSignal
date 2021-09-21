@@ -340,7 +340,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData()
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind)#, sets=['train'])
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)

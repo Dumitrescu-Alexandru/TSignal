@@ -66,9 +66,9 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
                 ind += 1
             predictions[grp2_ind[lg]] += get_acc_for_tolerence(ind, t, sp_letter)
 
-        # elif sp_info != sp_type and p[ind] == sp_letter:
-        #
-        #     predictions[grp2_ind[lg]] += np.array([0, 0, 0, 0, 1, 0, 1, 1, 1, 1])
+        elif sp_info != sp_type and p[ind] == sp_letter:
+
+            predictions[grp2_ind[lg]] += np.array([0, 0, 0, 0, 0, 0, 1, 1, 1, 1])
     if v:
         print(" count_tol_fn, count_complete_fn, count_otherSPpred", count_tol_fn, count_complete_fn, count_otherSPpred)
     all_recalls = []
@@ -341,8 +341,8 @@ def plot_losses(losses, name="param_search_0.2_2048_0.0001_"):
     axs.set_ylabel("Loss")
     axs.legend()
     axs.set_ylim(0, 0.2)
-    plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/" + name + "loss.png")
-
+    # plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/" + name + "loss.png")
+    plt.show()
 
 def plot_mcc(mccs, name="param_search_0.2_2048_0.0001_"):
     euk_mcc, neg_mcc, pos_mcc, arc_mcc = mccs
@@ -368,13 +368,13 @@ def plot_mcc(mccs, name="param_search_0.2_2048_0.0001_"):
 
     axs[1, 1].set_ylim(-1.1, 1.1)
     axs[1, 1].set_xlabel("epochs")
-    plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, "mcc"))
-
+    # plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, "mcc"))
+    plt.show()
 
 def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.2_2048_0.0001_"):
     cs_res_euk, cs_res_neg, cs_res_pos, cs_res_arc = results
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    for i in range(4):
+    for i in range(2,4):
         axs[0, 0].plot(cs_res_euk[i], label="Eukaryote {} tol={}".format(metric, i))
         axs[0, 0].set_ylabel(metric)
         axs[0, 0].legend()
@@ -396,8 +396,8 @@ def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.
 
         axs[1, 1].set_ylim(-0.1, 1.1)
 
-    plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, metric))
-
+    # plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, metric))
+    plt.show()
 
 def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder=""):
     all_results = []
@@ -484,8 +484,18 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
            cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc
 
 
+def remove_from_dictionary(res_dict, test_fld):
+    tb_removed = pickle.load(open("../sp_data/sp6_partitioned_data_test_{}.bin".format(test_fld[0]), "rb"))
+    tb_removed = tb_removed.keys()
+    trimmed_res_dict = {}
+
+    for seq, res in res_dict.items():
+        if seq not in tb_removed:
+            trimmed_res_dict[seq] = res
+    return trimmed_res_dict
+
 def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder="results_param_s_2/",
-                              only_cs_position=False):
+                              only_cs_position=False, remove_test_seqs=False):
     full_dict_results = {}
     epochs = []
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
@@ -500,7 +510,11 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
 
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
         res_dict = pickle.load(open(result_folder + run + "_{}_{}_best.bin".format(tr_folds[0], tr_folds[1]), "rb"))
-        full_dict_results.update(res_dict)
+        test_fld = list({0,1,2} - set(tr_folds))
+        if remove_test_seqs:
+            full_dict_results.update(remove_from_dictionary(res_dict, test_fld))
+        else:
+            full_dict_results.update(res_dict)
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin",
                                                                                    dict_=full_dict_results)
     mccs, mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP")
@@ -756,7 +770,8 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
         plt.legend(loc=(1.04, 1))
         plt.show()
 
-def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False, compare_mdl_plots=False):
+def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False, compare_mdl_plots=False,
+                              remove_test_seqs=False):
     files = os.listdir(result_folder)
     unique_params = set()
     for f in files:
@@ -777,7 +792,8 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, \
                all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo,\
         all_recalls_tat, all_precisions_tat,avg_epoch = extract_mean_test_results(run=u_p, result_folder=result_folder,
-                                                                                    only_cs_position=only_cs_position)
+                                                                                    only_cs_position=only_cs_position,
+                                                                                  remove_test_seqs=remove_test_seqs)
         all_recalls_lipo, all_precisions_lipo, \
         all_recalls_tat, all_precisions_tat, = list(np.reshape(np.array(all_recalls_lipo), -1)), list(np.reshape(np.array(all_precisions_lipo), -1)), \
                                                list(np.reshape(np.array(all_recalls_tat), -1)), list(np.reshape(np.array(all_precisions_tat), -1))
@@ -1071,13 +1087,15 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="huge_param_search/", compare_mdl_plots=False)
+    visualize_validation(run="noglbl_val_on_test_", folds=[0,2],folder="noglbl_val_on_test/")
+    # print("huh?")
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="noglbl_val_on_test/", compare_mdl_plots=False,
+                                            remove_test_seqs=False)
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # visualize_training_variance(mdl2results)#, mdl2results_hps)
     # extract_mean_test_results(run="param_search_0_2048_1e-05")
     # sanity_checks()
-    # visualize_validation(run="param_search_patience_60_w_nl_nh_0.0_4096_1e-05_2_8__folds_", folds=[0,1],folder="results_param_search_patience_60/")
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[0,2])
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[1,2])
     # life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin")
