@@ -333,14 +333,14 @@ def euk_importance_avg(cs_mcc):
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
-                        test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False):
-    logging.info("Log from here...")
+                        test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False, validate_on_mcc=True):
     test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
     partitions = [0,1,2] if deployment_model else partitions
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData()
+    train_sets = ['test', 'train'] if validate_on_test else ['train']
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind)#, sets=['train'])
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
@@ -360,6 +360,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup)
     best_avg_mcc = -1
     best_valid_loss = 5 ** 10
+    best_valid_mcc_and_recall = -1
     best_epoch = 0
     e = -1
     while patience != 0:
@@ -400,7 +401,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          epoch=e)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions \
                 = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
-            valid_loss = -np.mean(sp_pred_mccs)
+            valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
+                                             sets=["test"])
             # revert valid_loss to not change the loss condition next ( this won't be a loss
             # but it's the quickest way to test performance when validation with the test set
         else:
@@ -410,6 +412,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          epoch=e)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions \
                 = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
+        validate_on_mcc_and_rec = np.mean(sp_pred_mccs) + np.mean([all_recalls[i][1]] for i in range(4))
+        print(validate_on_mcc_and_rec, all_recalls)
         # sp_pred_mccs
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                                                        list(np.array(all_precisions).flatten()), list(
@@ -432,13 +436,15 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e)
 
         print("VALIDATION: avg mcc on epoch {}: {}".format(e, euk_importance_avg(sp_pred_mccs)))
-        if (valid_loss < best_valid_loss and eps == -1) or (eps != -1 and e == eps - 1):
+        if (valid_loss < best_valid_loss and eps == -1 and not validate_on_mcc) or (eps != -1 and e == eps - 1) or \
+                (validate_on_mcc_and_rec > best_valid_mcc_and_recall and eps == -1 and validate_on_mcc):
             best_epoch = e
             best_valid_loss = valid_loss
+            best_valid_mcc_and_recall = validate_on_mcc_and_rec
             save_model(model, run_name)
             if e == eps - 1:
                 patience = 0
-        elif e > 10 and valid_loss > best_valid_loss and eps == -1:
+        elif (e > 20 and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or (e > 20 and best_valid_mcc_and_recall > validate_on_mcc_and_rec and eps == -1 and validate_on_mcc):
             print("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                   format(e, patience, valid_loss, best_valid_loss))
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".

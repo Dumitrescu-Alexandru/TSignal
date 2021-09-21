@@ -1087,9 +1087,9 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    visualize_validation(run="noglbl_val_on_test_", folds=[0,2],folder="noglbl_val_on_test/")
+    visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0,2],folder="wlg10morepatience/")
     # print("huh?")
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="noglbl_val_on_test/", compare_mdl_plots=False,
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="wlg10morepatience/", compare_mdl_plots=False,
                                             remove_test_seqs=False)
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
