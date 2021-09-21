@@ -153,11 +153,11 @@ def sanity_check(file, args2):
     if len(param_names) != len(set(param_names)):
         print("WARNING: THE NUMBER OF UNIQUE MODEL NAMES IS NOT EQUAL TO THE NUMBER OF PARAMETERS! EXITING...")
         exit(1)
-    print(" ".join(param_names))
-    print(" ".join(param_logs))
-    print(" ".join(param_bins))
-    print(" ".join(param_bins_best))
-    exit(1)
+    # print(" ".join(param_names))
+    # print(" ".join(param_logs))
+    # print(" ".join(param_bins))
+    # print(" ".join(param_bins_best))
+    # exit(1)
 
 if __name__ == "__main__":
     date_now = str(datetime.datetime.now()).split(".")[0].replace("-", "").replace(":", "").replace(" ", "")
