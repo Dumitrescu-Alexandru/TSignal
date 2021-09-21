@@ -135,16 +135,25 @@ for seq_record in SeqIO.parse("train_set.fasta", "fasta"):
 #     elif cat not in train_categories2count:
 #         train_categories2count[cat] = 1
 lgandsptype2count = {}
-for i,s,l in zip(ids, seqs, lbls):
-    if "_".join(i.split("|")[1:3]) not in lgandsptype2count:
-        lgandsptype2count["_".join(i.split("|")[1:3])] = 1
-    else:
-        lgandsptype2count["_".join(i.split("|")[1:3])] += 1
+# for i,s,l in zip(ids, seqs, lbls):
+#     if "_".join(i.split("|")[1:3]) not in lgandsptype2count:
+#         lgandsptype2count["_".join(i.split("|")[1:3])] = 1
+#     else:
+#         lgandsptype2count["_".join(i.split("|")[1:3])] += 1
 
-print(lgandsptype2count)
-exit(1)
+# print(lgandsptype2count)
+# exit(1)
 partition_2_info = create_labeled_by_sp6_partition(ids, seqs, lbls)
-
+for part_id, part in partition_2_info.items():
+    lgandsptype2count = {}
+    seqs, lbls, ids = part
+    for i,s,l in zip(ids, seqs, lbls):
+        if "_".join(i.split("|")[1:3]) not in lgandsptype2count:
+            lgandsptype2count["_".join(i.split("|")[1:3])] = 1
+        else:
+            lgandsptype2count["_".join(i.split("|")[1:3])] += 1
+    print(part_id, lgandsptype2count)
+exit(1)
 for part_no, info in partition_2_info.items():
     train_part_info, test_part_info = split_train_test_partitions(info)
     # the split is done evenely across all global labels in conjunction with the life group information

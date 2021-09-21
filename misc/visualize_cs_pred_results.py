@@ -22,6 +22,8 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             return np.array([0, 0, 0, 1, 1, 0, 1, 1, 1, 0])
         elif ind != 0:
             # if ind==0, SP was predicted, but CS prediction is off for all tolerence levels, meaning it's a false positive
+            # if ind != 0, and teh corresponding SP was predicted, this becomes a false positive on CS predictions for all
+            # tolerance levels
             return np.array([0, 0, 0, 0, 1, 0, 1, 1, 1, 1])
         else:
             # if ind==0, SP was not even predicted (so there is no CS prediction) and this affects precision metric
@@ -51,14 +53,22 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
         is_sp = predicted_sp in sp_types
         if sp_info == sp_type:
 
+            #     # the precision was defined as the fraction of correct CS predictions over the number of predicted
+            #     # CS, recall as the fraction of correct CS predictions over the number of true CS. In both cases,
+            #     # a CS was only considered correct if it was predicted in the correct SP class (e.g. when the
+            #     # model predicts a CS in a Sec/SPI sequence, but predicts Sec/SPII as the sequence label, the
+            #     # sample is considered as no CS predicted).
+
+            # SO ONLY CONSIDER IT AS A FALSE NEGATIVE FOR THE APPROPRIATE correct-SP class?
             while (p[ind] == sp_letter or (p[ind] == predicted_sp and is_sp and only_cs_position)) and ind < len(p) - 1:
                 # when only_cs_position=True, the cleavage site positions will be taken into account irrespective of
                 # whether the predicted SP is the correct kind
                 ind += 1
             predictions[grp2_ind[lg]] += get_acc_for_tolerence(ind, t, sp_letter)
 
-        elif sp_info != "SP" and p[ind] == sp_letter:
-            predictions[grp2_ind[lg]] += np.array([0, 0, 0, 0, 0, 1, 0, 0, 0, 0])
+        # elif sp_info != sp_type and p[ind] == sp_letter:
+        #
+        #     predictions[grp2_ind[lg]] += np.array([0, 0, 0, 0, 1, 0, 1, 1, 1, 1])
     if v:
         print(" count_tol_fn, count_complete_fn, count_otherSPpred", count_tol_fn, count_complete_fn, count_otherSPpred)
     all_recalls = []
@@ -80,7 +90,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
                     all_precisions[-1].append(0.)
                 else:
                     all_precisions[-1].append(
-                        current_preds[i] / (current_preds[-1] + current_preds[i] + current_preds[i + 6]))
+                        current_preds[i] / (current_preds[i] + current_preds[i + 6]))
             total_positives.append(current_preds[4])
             false_positives.append(current_preds[5])
     return all_recalls, all_precisions, total_positives, false_positives, predictions
@@ -511,7 +521,7 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
     return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo,all_recalls_tat, all_precisions_tat, avg_epoch
 
 
-def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""):
+def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model="", metric="mcc"):
     tr_fold = [[0, 1], [1, 2], [0, 2]]
     all_best_mccs = []
     for t_f in tr_fold:
@@ -522,15 +532,30 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
         for l in lines:
             if best_mcc != -1:
                 continue
-            elif "VALIDATION" in l and "mcc" in l:
-                ep, mccs = l.split(":")[2], l.split(":")[4]
-                ep = int(ep.split("epoch")[-1].replace(" ", ""))
-                mccs = mccs.replace(" ", "").split(",")
-                mccs = [float(mcc) for mcc in mccs]
-                ep2mcc[ep] = mccs
+            elif "VALIDATION" in l and metric == "mcc":
+                if "mcc" in l:
+                    ep, mccs = l.split(":")[2], l.split(":")[4]
+                    ep = int(ep.split("epoch")[-1].replace(" ", ""))
+                    mccs = mccs.replace(" ", "").split(",")
+                    mccs = np.mean([float(mcc) for mcc in mccs])
+                    ep2mcc[ep] = mccs
+            elif "train/validation loss" in l and metric == "loss":
+
+                ep, mccs = l.split(":")[2], l.split(":")[3]
+                ep = int(ep.split("epoch")[-1].split(" ")[1])
+                if "," in mccs:
+                    mccs = float(mccs.replace(" ", "").split(",")[0].split("/")[1])
+                    ep2mcc[ep] = mccs/2
+                else:
+                    mccs = float(mccs.replace(" ", "").split("/")[1])
+                    ep2mcc[ep] = mccs
             elif "TEST" in l and "epoch" in l and "mcc" in l:
                 best_ep = int(l.split(":")[2].split("epoch")[-1].replace(" ", ""))
-                best_mcc = ep2mcc[best_ep]
+                avg_last_5 = []
+                for i in range(5):
+                    best_mcc = ep2mcc[best_ep-i]
+                    avg_last_5.append(best_mcc)
+                best_mcc = np.mean(avg_last_5)
         all_best_mccs.append(best_mcc)
     return np.mean(all_best_mccs)
 
@@ -542,6 +567,10 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
         mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions,\
             all_recalls_lipo, all_precisions_lipo,all_recalls_tat, all_precisions_tat, _ = results
         mdl = mdlind2mdlparams[ind].split("run_no")[0]
+        if "patience_30" in mdl:
+            mdl = "patience_30"
+        else:
+            mdl = "patience_60"
         if mdl in no_of_mdls:
             no_of_mdls[mdl] += 1
             avg_mcc[mdl].append(np.array(mccs))
@@ -580,26 +609,26 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
     print(set(models))
     # TODO: Configure this for model names (usually full names are quite long and ugly)
     mdl2mdlnames = {}
-    # for mdl in models:
-    #     if "best_beam_test_beam_search" not in mdl:
-    #         mdl2mdlnames[mdl] = "greedy search"
-    #     if "best_beam_test_beam_search" in mdl:
-    #         mdl2mdlnames[mdl] = "beam search"
     for mdl in models:
-        if "lr_sched_searchlrsched_step_wrmpLrSched_0_" in mdl:
-            mdl2mdlnames[mdl] = "step, 0 wrmp"
-
-        if "lr_sched_searchlrsched_expo_wrmpLrSched_10_" in mdl:
-            mdl2mdlnames[mdl] = "expo, 10 wrmp"
-
-        if "lr_sched_searchlrsched_expo_wrmpLrSched_0_" in mdl:
-            mdl2mdlnames[mdl] = "expo, 0 wrmp"
-
-        if "lr_sched_searchlrsched_step_wrmpLrSched_10_" in mdl:
-            mdl2mdlnames[mdl] = "step, 10 wrmp"
-
-        if "test_beam_search" in mdl:
-            mdl2mdlnames[mdl] = "no sched"
+        if "patience_30" in mdl:
+            mdl2mdlnames[mdl] = "patience 30"
+        else:
+            mdl2mdlnames[mdl] = "patience 60"
+    # for mdl in models:
+    #     if "lr_sched_searchlrsched_step_wrmpLrSched_0_" in mdl:
+    #         mdl2mdlnames[mdl] = "step, 0 wrmp"
+    #
+    #     if "lr_sched_searchlrsched_expo_wrmpLrSched_10_" in mdl:
+    #         mdl2mdlnames[mdl] = "expo, 10 wrmp"
+    #
+    #     if "lr_sched_searchlrsched_expo_wrmpLrSched_0_" in mdl:
+    #         mdl2mdlnames[mdl] = "expo, 0 wrmp"
+    #
+    #     if "lr_sched_searchlrsched_step_wrmpLrSched_10_" in mdl:
+    #         mdl2mdlnames[mdl] = "step, 10 wrmp"
+    #
+    #     if "test_beam_search" in mdl:
+    #         mdl2mdlnames[mdl] = "no sched"
     # FOR GLBL LBL
     # for mdl in models:
     #     if "glbl_lbl_search_use_glbl_lbls_version_1_weight_1_" in mdl:
@@ -732,7 +761,14 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     unique_params = set()
     for f in files:
         if "log" in f:
-            unique_params.add("_".join(f.split("_")[:-2]))
+            # check if all 3 folds have finished
+            dont_add = False
+            for tr_f in [[0,1],[1,2],[0,2]]:
+                if "_".join(f.split("_")[:-2]) + "_{}_{}_best.bin".format(tr_f[0], tr_f[1]) not in files:
+                    dont_add = True
+            if not dont_add:
+                unique_params.add("_".join(f.split("_")[:-2]))
+
     mdl2results = {}
     mdlind2mdlparams = {}
     # order results by the eukaryote mcc
@@ -753,60 +789,79 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     if compare_mdl_plots:
         get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results)
     best_to_worst_mdls = np.argsort(eukaryote_mcc)[::-1]
+    for mdl_ind in best_to_worst_mdls:
+        params = ""
+        mdl_params = mdlind2mdlparams[mdl_ind]
+        if "use_glbl_lbls" in mdl_params:
+            params += "wGlbl"
+        else:
+            params += "nGlbl"
+        # patience_ind = mdl_params.find("patience_") + len("patience_")
+        # patience = mdl_params[patience_ind:patience_ind+2]
+        # params += "_{}".format(patience)
+        nlayers = mdl_params[mdl_params.find("nlayers") + len("nlayers"):].split("_")[1]
+        params += "_{}".format(nlayers)
+        nhead = mdl_params[mdl_params.find("nhead") + len("nhead"):].split("_")[1]
+        params += "_{}".format(nhead)
+        lr_sched = mdl_params[mdl_params.find("lrsched") + len("lrsched"):].split("_")[1]
+        params += "_{}".format(lr_sched)
+        mdlind2mdlparams[mdl_ind] = params
+
     print("\n\nMCC SEC/SPI TABLE\n\n")
     for mdl_ind in best_to_worst_mdls:
-        mdl_params = " & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:])
-        print(mdl_params, "&", " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][0]]), "&", " & ".join([str(round(mcc,3)) for mcc in mdl2results[mdl_ind][1]]),
+        mdl_params = " & ".join(mdlind2mdlparams[mdl_ind].split("_"))
+        print(mdl_params, " & ", " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][0]]), "&",
+              " & ".join([str(round(mcc,3)) for mcc in mdl2results[mdl_ind][1][1:]]), " & ",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nRecall table SEC/SPI\n\n")
     for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
-              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][6]]), "&",
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][6]]), " & ",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nPrec table SEC/SPI\n\n")
     for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][7]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nRecall table SEC/SPII \n\n")
     for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][8]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nPrec table SEC/SPII \n\n")
     for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][9]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nRecall table TAT/SPI \n\n")
     for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][10]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nPrec table TAT/SPI \n\n")
     for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:]), "&",
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][11]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nMCC SEC/SPII TABLE\n\n")
     for mdl_ind in best_to_worst_mdls:
-        mdl_params = " & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:])
-        print(mdl_params, "&", " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][2]]), "&",
-              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][3]]),
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][2]]), "&",
+              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][3]]),  "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nMCC TAT/SPI TABLE\n\n")
     for mdl_ind in best_to_worst_mdls:
-        mdl_params = " & ".join(mdlind2mdlparams[mdl_ind].split("_")[6:])
-        print(mdl_params, "&", " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][4]]), "&",
-              " & ".join([str(round(mcc,3)) for mcc in mdl2results[mdl_ind][5]]),
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][4]]), "&",
+              " & ".join([str(round(mcc,3)) for mcc in mdl2results[mdl_ind][5]]),  "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     return mdl2results
@@ -985,7 +1040,8 @@ def visualize_training_variance(mdl2results, mdl2results_hps=None):
                     [euk_hps_prec[i], neg_hps_prec[i], pos_hps_prec[i], arch_hps_prec[i]],
                     name='precision tol={}'.format(i), plot_hps=plot_hps)
 
-def extract_calibration_probs_for_mdl(model = "lr_sched_searchlrsched_step_wrmpLrSched_0_run_no_3_trFlds_", folder='lr_sched_search/'):
+def extract_calibration_probs_for_mdl(model = "parameter_search_patience_60use_glbl_lbls_use_glbl_lbls_versio"
+                                              "n_1_weight_0.1_lr_1e-05_nlayers_3_nhead_16_lrsched_none_trFlds_", folder='huge_param_search/patience_60/'):
     all_lg, all_seqs, all_tl, all_pred_lbls, sp2probs = [], [], [], [], {}
     for tr_f in [[0,1],[0,2],[1,2]]:
         prob_file = "{}{}_{}_best_sp_probs.bin".format(model, tr_f[0], tr_f[1])
@@ -1015,7 +1071,7 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="some_run/", compare_mdl_plots=False)
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="huge_param_search/", compare_mdl_plots=False)
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # visualize_training_variance(mdl2results)#, mdl2results_hps)

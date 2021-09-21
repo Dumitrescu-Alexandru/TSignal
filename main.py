@@ -75,6 +75,7 @@ def parse_arguments():
     parser.add_argument("--wd", default=0., type=float)
     parser.add_argument("--glbl_lbl_weight", default=1., type=float)
     parser.add_argument("--glbl_lbl_version", default=1, type=float)
+    parser.add_argument("--validate_on_test", default=False, action="store_true")
     return parser.parse_args()
 
 def modify_param_search_args(args):
@@ -136,14 +137,27 @@ def modify_param_search_args(args):
 def sanity_check(file, args2):
     params = pickle.load(open(file, "rb"))
     param_names = []
+    param_logs = []
+    param_bins = []
+    param_bins_best = []
     for k,v in params.items():
-        args2.param_set_search_number = k
-        args2 = modify_param_search_args(args2)
-        param_names.append(args2.run_name)
-        args2 = parse_arguments()
+        if k in range(101,174):
+        # if k in range(180,216):
+            args2.param_set_search_number = k
+            args2 = modify_param_search_args(args2)
+            param_names.append(args2.run_name + "_best_eval.pth")
+            param_logs.append(args2.run_name + ".log")
+            param_bins.append(args2.run_name + ".bin")
+            param_bins_best.append(args2.run_name + "_best.bin")
+            args2 = parse_arguments()
     if len(param_names) != len(set(param_names)):
         print("WARNING: THE NUMBER OF UNIQUE MODEL NAMES IS NOT EQUAL TO THE NUMBER OF PARAMETERS! EXITING...")
         exit(1)
+    print(" ".join(param_names))
+    print(" ".join(param_logs))
+    print(" ".join(param_bins))
+    print(" ".join(param_bins_best))
+    exit(1)
 
 if __name__ == "__main__":
     date_now = str(datetime.datetime.now()).split(".")[0].replace("-", "").replace(":", "").replace(" ", "")
@@ -167,7 +181,8 @@ if __name__ == "__main__":
                                 ff_d=args.ff_d, partitions=args.train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
                                 train_oh=args.train_oh, deployment_model=args.deployment_model, lr_scheduler=args.lr_scheduler,
                                 lr_sched_warmup=args.lr_sched_warmup, test_beam=args.test_beam, wd=args.wd,
-                                glbl_lbl_weight=args.glbl_lbl_weight,glbl_lbl_version=args.glbl_lbl_version)
+                                glbl_lbl_weight=args.glbl_lbl_weight,glbl_lbl_version=args.glbl_lbl_version,
+                                validate_on_test=args.validate_on_test)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):

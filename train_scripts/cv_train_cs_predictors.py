@@ -333,7 +333,7 @@ def euk_importance_avg(cs_mcc):
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
-                        test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1):
+                        test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False):
     logging.info("Log from here...")
     test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
     partitions = [0,1,2] if deployment_model else partitions
@@ -394,12 +394,23 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 warmup_scheduler.step()
             else:
                 scheduler.step()
-        _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"], epoch=e)
-        valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions,
-                                         sets=["test"])
-        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions \
-            = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
-        print(euk_importance_avg(sp_pred_mccs), sp_pred_mccs)
+        if validate_on_test:
+            validate_partitions = list(test_partition)
+            _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
+                         epoch=e)
+            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions \
+                = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
+            valid_loss = -np.mean(sp_pred_mccs)
+            # revert valid_loss to not change the loss condition next ( this won't be a loss
+            # but it's the quickest way to test performance when validation with the test set
+        else:
+            valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions,
+                                             sets=["test"])
+            _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"],
+                         epoch=e)
+            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions \
+                = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
+        # sp_pred_mccs
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                                                        list(np.array(all_precisions).flatten()), list(
             np.array(total_positives).flatten())
@@ -427,7 +438,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             save_model(model, run_name)
             if e == eps - 1:
                 patience = 0
-        elif e > 20 and valid_loss > best_valid_loss and eps == -1:
+        elif e > 10 and valid_loss > best_valid_loss and eps == -1:
             print("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                   format(e, patience, valid_loss, best_valid_loss))
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
