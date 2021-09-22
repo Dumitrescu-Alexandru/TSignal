@@ -1,5 +1,7 @@
 import pickle
 import random
+
+import matplotlib.pyplot as plt
 from Bio import SeqIO
 
 def split_train_test_partitions(partition, split_perc=0.1):
@@ -120,12 +122,12 @@ def create_files(inds, lbls, seqs, train=False):
         pickle.dump([seqs, lbls, inds], open("raw_sp6_bench_data.bin", "wb"))
 
 seqs, lbls, ids, global_lbls = [], [], [], []
-
+uid = []
 for seq_record in SeqIO.parse("train_set.fasta", "fasta"):
     seqs.append(seq_record.seq[:len(seq_record.seq) // 2])
     lbls.append(seq_record.seq[len(seq_record.seq) // 2:])
     ids.append(seq_record.id)
-
+    uid.append(seq_record.id.split("|")[-1])
 
 # for seq_record in SeqIO.parse("benchmark_set_sp5.fasta", "fasta"):
 #     id_sequences_train.append((seq_record.id, seq_record.seq))
@@ -143,17 +145,55 @@ lgandsptype2count = {}
 
 # print(lgandsptype2count)
 # exit(1)
+lgandsptype2counts = []
+lgandsptype2count_total = {}
 partition_2_info = create_labeled_by_sp6_partition(ids, seqs, lbls)
 for part_id, part in partition_2_info.items():
     lgandsptype2count = {}
+
     seqs, lbls, ids = part
     for i,s,l in zip(ids, seqs, lbls):
         if "_".join(i.split("|")[1:3]) not in lgandsptype2count:
             lgandsptype2count["_".join(i.split("|")[1:3])] = 1
+        if "_".join(i.split("|")[1:3]) not in lgandsptype2count_total:
+            lgandsptype2count_total["_".join(i.split("|")[1:3])] = 1
         else:
             lgandsptype2count["_".join(i.split("|")[1:3])] += 1
+            lgandsptype2count_total["_".join(i.split("|")[1:3])] += 1
+    if "ARCHAEA_SP" not in lgandsptype2count:
+        lgandsptype2count["ARCHAEA_SP"] = 0
+    lgandsptype2counts.append(lgandsptype2count)
     print(part_id, lgandsptype2count)
+
+plot_for = ["EUKARYA_NO_SP", "EUKARYA_SP", "NEGATIVE_NO_SP", "NEGATIVE_SP", "POSITIVE_NO_SP", "POSITIVE_SP", "ARCHAEA_NO_SP", "ARCHAEA_SP"]
+
+def plot_lg_dists(lgandsptype2counts):
+    import numpy as np
+    line_w = 0.25
+    x_positions = []
+    heights = []
+    totals = []
+    for i in range(1, 9):
+        x_positions.extend([i-line_w, i, i+line_w])
+    for pf in plot_for:
+        total = lgandsptype2count_total[pf]
+        totals.append(total)
+        heights.extend([lgandsptype2counts[0][pf] /total, lgandsptype2counts[1][pf] /total, lgandsptype2counts[2][pf] /total])
+    plt.bar([x_positions[i*3] for i in range(8)], [heights[i*3] for i in range(8)], width=line_w, label="partition 1")
+    plt.bar([x_positions[i*3+1] for i in range(8)], [heights[i*3+1] for i in range(8)], width=line_w, label="partition 2")
+    plt.bar([x_positions[i*3+2] for i in range(8)], [heights[i*3+2] for i in range(8)], width=line_w, label="partition 3")
+    plt.legend()
+    plt.xticks(list(range(1,9)),[plot_for[i] + "\n" + str(totals[i]) for i in range(8)])
+    plt.xlabel("Life group, SP/NO-SP; No. of datapoints")
+    plt.ylabel("Percentage from that life group")
+    plt.show()
+
+plot_lg_dists(lgandsptype2counts)
+
 exit(1)
+
+
+
 for part_no, info in partition_2_info.items():
     train_part_info, test_part_info = split_train_test_partitions(info)
     # the split is done evenely across all global labels in conjunction with the life group information

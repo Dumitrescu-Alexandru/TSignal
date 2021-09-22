@@ -310,7 +310,7 @@ def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, 
         "{}_{}, epoch {}: Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
             beam_txt, test_on, ep, *all_precisions))
     logging.info(
-        "{}_{}, epoch {}: Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+        "{}_{}, epoch {}: Mean cs f1: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
             beam_txt, test_on, ep,*np.concatenate(all_f1_scores)))
 
 
@@ -376,6 +376,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         losses = 0
         losses_glbl = 0
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
+            continue
             seqs, lbl_seqs, _, glbl_lbls = batch
             if use_glbl_lbls:
                 logits, glbl_logits = model(seqs, lbl_seqs)
@@ -418,7 +419,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          epoch=e)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores \
                 = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
-        validate_on_f1_score = np.mean([all_f1_scores[i][1] for i in range(4)])
+        validate_on_f1_score = np.mean([all_f1_scores[i][1] for i in range(4)]) if not np.isnan(all_f1_scores[3][0]) \
+            else np.mean([all_f1_scores[i][1] for i in range(3)])
         # sp_pred_mccs
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                                                        list(np.array(all_precisions).flatten()), list(
@@ -460,6 +462,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                          format(e, patience, val_metric, best_val_metrics))
             patience -= 1
+        patience=0
     if not deployment_model:
         model = load_model(run_name + "_best_eval.pth")
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"])
