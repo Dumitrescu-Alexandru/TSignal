@@ -463,22 +463,22 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     if not deployment_model:
         model = load_model(run_name + "_best_eval.pth")
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"])
-        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+        sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
             np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
-        log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch)
+        log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch, all_f1_scores=all_f1_scores)
         pos_fp_info = total_positives
         pos_fp_info.extend(false_positives)
         if test_beam:
             model = load_model(run_name + "_best_eval.pth")
             evaluate(model, sp_data.lbl2ind, run_name="best_beam_" + run_name , partitions=test_partition,
                      sets=["train", "test"], use_beams_search=True)
-            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
+            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
                 get_cs_and_sp_pred_results(filename="best_beam_" + run_name +".bin".format(e), v=False)
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
                 np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
-            log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch, beam_txt="using_bm_search")
+            log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch, beam_txt="using_bm_search", all_f1_scores=all_f1_scores)
             pos_fp_info = total_positives
             pos_fp_info.extend(false_positives)
 
