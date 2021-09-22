@@ -451,10 +451,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             if e == eps - 1:
                 patience = 0
         elif (e > 20 and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or (e > 20 and best_valid_mcc_and_recall > validate_on_f1_score and eps == -1 and validate_on_mcc):
+            if validate_on_mcc:
+                best_val_metrics, val_metric = best_valid_mcc_and_recall, validate_on_f1_score
+            else:
+                best_val_metrics, val_metric = best_valid_loss, valid_loss
             print("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
-                  format(e, patience, valid_loss, best_valid_loss))
+                  format(e, patience, val_metric, best_val_metrics))
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
-                         format(e, patience, valid_loss, best_valid_loss))
+                         format(e, patience, val_metric, best_val_metrics))
             patience -= 1
     if not deployment_model:
         model = load_model(run_name + "_best_eval.pth")

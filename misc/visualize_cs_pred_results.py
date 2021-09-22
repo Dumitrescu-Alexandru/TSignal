@@ -408,8 +408,18 @@ def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0, 1], fold
     euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, \
     cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = extract_results(run, folds=folds,
                                                                                              folder=folder)
+    cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc = [[], [], [], []], [[], [], [], []], \
+                                                                     [[], [], [], []], [[], [], [], []]
+    all_f1 = [[[], [], [], []],[[], [], [], []],[[], [], [], []],[[], [], [], []]]
+    for lg_ind, (lg_rec, lg_prec) in enumerate([(cs_recalls_euk, cs_precs_euk), (cs_recalls_neg, cs_precs_neg),
+                                                (cs_recalls_pos, cs_precs_pos),(cs_recalls_euk, cs_precs_pos)]):
+        for tol in range(4):
+            for prec, rec in zip(lg_rec[tol], lg_prec[tol]):
+                all_f1[lg_ind][tol].append(2 * prec * rec / (prec + rec) if prec + rec else 0)
+    cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc = all_f1
     plot_mcc([euk_mcc, neg_mcc, pos_mcc, arc_mcc], name=run)
     plot_losses([train_loss, valid_loss], name=run)
+    extract_and_plot_prec_recall([cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc], metric="f1", name=run)
     extract_and_plot_prec_recall([cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, cs_recalls_arc], metric="recall",
                                  name=run)
     extract_and_plot_prec_recall([cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc], metric="precision", name=run)
@@ -423,6 +433,8 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
                                                                      [[], [], [], []], [[], [], [], []]
     cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = [[], [], [], []], [[], [], [], []], \
                                                              [[], [], [], []], [[], [], [], []]
+
+
     with open(folder + run + "{}_{}.log".format(folds[0], folds[1]), "rt") as f:
         lines = f.readlines()
     for l in lines:
@@ -530,13 +542,14 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
         v = False
     else:
         v = False
-    all_recalls, all_precisions, _, _, _ = \
+    all_recalls, all_precisions, _, _, _, f1_scores = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="SP")
-    all_recalls_lipo, all_precisions_lipo, _, _, _ = \
+    all_recalls_lipo, all_precisions_lipo, _, _, _, f1_scores_lipo= \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="LIPO")
-    all_recalls_tat, all_precisions_tat, _, _, _ = \
+    all_recalls_tat, all_precisions_tat, _, _, _, f1_scores_tat = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TAT")
-    return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo,all_recalls_tat, all_precisions_tat, avg_epoch
+    return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, \
+           all_precisions_lipo,all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_lipo
 
 
 def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model="", metric="mcc"):
@@ -774,8 +787,29 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
         plt.legend(loc=(1.04, 1))
         plt.show()
 
+def get_f1_scores(rec, prec):
+    return [2 * rec[i] * prec[i]/ (rec[i] + prec[i]) if rec[i] +prec[i] != 0 else 0 for i in range(len(rec))]
+
 def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False, compare_mdl_plots=False,
                               remove_test_seqs=False):
+    sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556, 0.556, 0.583]
+    sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
+    sp6_recalls_tat = [0.706, 0.765, 0.784, 0.804, 0.556, 0.556, 0.667, 0.667, 0.333, 0.444, 0.444,0.444]
+    sp6_precs_sp1 = [0.661, 0.685, 0.715, 0.733, 0.534, 0.562, 0.575, 0.603, 0.632, 0.632, 0.632, 0.632, 0.643, 0.714,0.714 , 0.75]
+    sp6_precs_sp2 = [0.913, 0.913, 0.917, 0.925, 0.929, 0.938, 0.938,0.938, 0.583, 0.583, 0.583, 0.583]
+    sp6_precs_tat = [0.679, 0.736, 0.755, 0.774, 0.714, 0.714, 0.857, 0.857, 0.375, 0.5, 0.5, 0.5]
+    sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
+    sp6_f1_sp2 = get_f1_scores(sp6_precs_sp2, sp6_precs_sp2)
+    sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
+    sp6_recalls_sp1 = [str(round(sp6_r_sp1, 2)) for sp6_r_sp1 in sp6_recalls_sp1]
+    sp6_recalls_sp2 = [str(round(sp6_r_sp2, 2)) for sp6_r_sp2 in sp6_recalls_sp2]
+    sp6_recalls_tat = [str(round(sp6_r_tat, 2)) for sp6_r_tat in sp6_recalls_tat]
+    sp6_precs_sp1 = [str(round(sp6_prec_sp1, 2)) for sp6_prec_sp1 in sp6_precs_sp1]
+    sp6_precs_sp2 = [str(round(sp6_p_sp2, 2)) for sp6_p_sp2 in sp6_precs_sp2]
+    sp6_precs_tat = [str(round(sp6_p_tat, 2)) for sp6_p_tat in sp6_precs_tat]
+    sp6_f1_sp1 = [str(round(sp6_f1_sp1_, 2)) for sp6_f1_sp1_ in sp6_f1_sp1]
+    sp6_f1_sp2 = [str(round(sp6_f1_sp2_, 2)) for sp6_f1_sp2_ in sp6_f1_sp2]
+    sp6_f1_tat = [str(round(sp6_f1_tat_, 2)) for sp6_f1_tat_ in sp6_f1_tat]
     files = os.listdir(result_folder)
     unique_params = set()
     for f in files:
@@ -795,15 +829,16 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     for ind, u_p in enumerate(unique_params):
         mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, \
                all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo,\
-        all_recalls_tat, all_precisions_tat,avg_epoch = extract_mean_test_results(run=u_p, result_folder=result_folder,
-                                                                                    only_cs_position=only_cs_position,
-                                                                                  remove_test_seqs=remove_test_seqs)
+        all_recalls_tat, all_precisions_tat,avg_epoch,f1_scores, f1_scores_lipo, f1_scores_tat\
+            = extract_mean_test_results(run=u_p, result_folder=result_folder,
+                                                only_cs_position=only_cs_position,
+                                              remove_test_seqs=remove_test_seqs)
         all_recalls_lipo, all_precisions_lipo, \
         all_recalls_tat, all_precisions_tat, = list(np.reshape(np.array(all_recalls_lipo), -1)), list(np.reshape(np.array(all_precisions_lipo), -1)), \
                                                list(np.reshape(np.array(all_recalls_tat), -1)), list(np.reshape(np.array(all_precisions_tat), -1))
         mdl2results[ind] = (mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, list(np.reshape(np.array(all_recalls), -1)),
                             list(np.reshape(np.array(all_precisions), -1)),all_recalls_lipo, all_precisions_lipo,
-                            all_recalls_tat, all_precisions_tat, avg_epoch)
+                            all_recalls_tat, all_precisions_tat, f1_scores, f1_scores_lipo, f1_scores_tat, avg_epoch)
         mdlind2mdlparams[ind] = u_p
         eukaryote_mcc.append(get_best_corresponding_eval_mcc(result_folder, u_p))
     if compare_mdl_plots:
@@ -834,37 +869,65 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
               " & ".join([str(round(mcc,3)) for mcc in mdl2results[mdl_ind][1][1:]]), " & ",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
+    print("\n\nF1 table SEC/SPI\n\n")
+    no_of_params = len(mdlind2mdlparams[best_to_worst_mdls[0]].split("_"))
+    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_sp1), " & \\\\ \\hline")
+    for mdl_ind in best_to_worst_mdls:
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-4])]), " & ",
+              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
     print("\n\nRecall table SEC/SPI\n\n")
+    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_sp1), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][6]]), " & ",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nPrec table SEC/SPI\n\n")
+    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_sp1), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][7]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
+    print("\n\nF1 table SEC/SPII \n\n")
+    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_sp2), " & \\\\ \\hline")
+    for mdl_ind in best_to_worst_mdls:
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-3])]), "&",
+              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
     print("\n\nRecall table SEC/SPII \n\n")
+    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_sp2), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][8]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nPrec table SEC/SPII \n\n")
+    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_sp2), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][9]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
+    print("\n\nF1 table TAT/SPI \n\n")
+    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_tat), " & \\\\ \\hline")
+    for mdl_ind in best_to_worst_mdls:
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-2])]), "&",
+              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
     print("\n\nRecall table TAT/SPI \n\n")
+    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_tat), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][10]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nPrec table TAT/SPI \n\n")
+    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_tat), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][11]]), "&",
@@ -1088,12 +1151,13 @@ def duplicate_Some_logs():
 
 
 if __name__ == "__main__":
+
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    # visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[1, 2],folder="wlg10morepatience/")
-    # visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0,2],folder="val_on_test/")
-    # visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0,2],folder="wlg10morepatience/")
+    visualize_validation(run="val_on_test_", folds=[0, 1],folder="val_on_test/")
+    visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[1, 2],folder="wlg10morepatience/")
+    visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0,2],folder="wlg10morepatience/")
     # print("huh?")
     mdl2results = extract_all_param_results(only_cs_position=False, result_folder="val_on_test/", compare_mdl_plots=False,
                                             remove_test_seqs=False)
