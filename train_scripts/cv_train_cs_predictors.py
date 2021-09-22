@@ -295,18 +295,24 @@ def load_model(model_path, dict_file=None):
     return model
 
 
-def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1, beam_txt="Greedy"):
+def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1, beam_txt="Greedy", all_f1_scores=None):
     print("{}_{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on, ep, *sp_pred_mccs))
     print("{}_{}, epoch {} Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(beam_txt,
         test_on, ep, *all_recalls))
     print("{}_{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(beam_txt,
         test_on, ep, *all_precisions))
+    print("{}_{}, epoch {} Mean cs f1-score: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(beam_txt,
+        test_on, ep, *np.concatenate(all_f1_scores)))
     logging.info("{}_{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on, ep, *sp_pred_mccs))
     logging.info("{}_{}, epoch {}: Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         beam_txt,test_on, ep, *all_recalls))
     logging.info(
         "{}_{}, epoch {}: Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
             beam_txt, test_on, ep, *all_precisions))
+    logging.info(
+        "{}_{}, epoch {}: Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+            beam_txt, test_on, ep,*np.concatenate(all_f1_scores)))
+
 
 def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0):
     def get_schduler_type(op, lr_sched):
@@ -399,7 +405,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             validate_partitions = list(test_partition)
             _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
                          epoch=e)
-            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions \
+            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores \
                 = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
             valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
                                              sets=["test"])
@@ -410,10 +416,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                              sets=["test"])
             _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"],
                          epoch=e)
-            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions \
+            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores \
                 = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
-        validate_on_mcc_and_rec = np.mean(sp_pred_mccs) + np.mean([all_recalls[i][1]] for i in range(4))
-        print(validate_on_mcc_and_rec, all_recalls)
+        validate_on_f1_score = np.mean([all_f1_scores[i][1] for i in range(4)])
         # sp_pred_mccs
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                                                        list(np.array(all_precisions).flatten()), list(
@@ -433,18 +438,19 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             print("On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
             logging.info(
                 "On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
-        log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e)
+        log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e,
+                                         all_f1_scores=all_f1_scores)
 
         print("VALIDATION: avg mcc on epoch {}: {}".format(e, euk_importance_avg(sp_pred_mccs)))
         if (valid_loss < best_valid_loss and eps == -1 and not validate_on_mcc) or (eps != -1 and e == eps - 1) or \
-                (validate_on_mcc_and_rec > best_valid_mcc_and_recall and eps == -1 and validate_on_mcc):
+                (validate_on_f1_score > best_valid_mcc_and_recall and eps == -1 and validate_on_mcc):
             best_epoch = e
             best_valid_loss = valid_loss
-            best_valid_mcc_and_recall = validate_on_mcc_and_rec
+            best_valid_mcc_and_recall = validate_on_f1_score
             save_model(model, run_name)
             if e == eps - 1:
                 patience = 0
-        elif (e > 20 and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or (e > 20 and best_valid_mcc_and_recall > validate_on_mcc_and_rec and eps == -1 and validate_on_mcc):
+        elif (e > 20 and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or (e > 20 and best_valid_mcc_and_recall > validate_on_f1_score and eps == -1 and validate_on_mcc):
             print("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                   format(e, patience, valid_loss, best_valid_loss))
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".

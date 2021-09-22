@@ -27,7 +27,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             return np.array([0, 0, 0, 0, 1, 0, 1, 1, 1, 1])
         else:
             # if ind==0, SP was not even predicted (so there is no CS prediction) and this affects precision metric
-            # tp/(tp+fp). It means this isnt a tp or a fp, its a fn
+            # tp/(tp+fp). It means this a fn
             return np.array([0, 0, 0, 0, 1, 0, 0, 0, 0, 0])
     sptype2letter = {'TAT':'T', 'LIPO':'L', 'PILIN':'P', 'TATLIPO':'T', 'SP':'S'}
     sp_types = ["S", "T", "L", "P"]
@@ -73,6 +73,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
         print(" count_tol_fn, count_complete_fn, count_otherSPpred", count_tol_fn, count_complete_fn, count_otherSPpred)
     all_recalls = []
     all_precisions = []
+    all_f1_scores = []
     total_positives = []
     false_positives = []
     for life_grp, ind in grp2_ind.items():
@@ -85,15 +86,18 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
                                            [current_preds[i] / (current_preds[i] + current_preds[5]) for i in range(4)]))
             all_recalls.append([current_preds[i] / current_preds[4] for i in range(4)])
             all_precisions.append([])
+            all_f1_scores.append([])
             for i in range(4):
                 if current_preds[5] + current_preds[i] == 0:
                     all_precisions[-1].append(0.)
                 else:
                     all_precisions[-1].append(
                         current_preds[i] / (current_preds[i] + current_preds[i + 6]))
+            current_recs, current_precs = all_recalls[-1], all_precisions[-1]
+            all_f1_scores[-1].extend([ 0 if current_recs[i] * current_precs[i] == 0 else 2 * current_recs[i] * current_precs[i] / (current_recs[i] + current_precs[i]) for i in range(4)  ])
             total_positives.append(current_preds[4])
             false_positives.append(current_preds[5])
-    return all_recalls, all_precisions, total_positives, false_positives, predictions
+    return all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores
 
 
 def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="SP"):
@@ -308,18 +312,18 @@ def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabili
     if probabilities_file is not None:
         get_prob_calibration_and_plot(probabilities_file, life_grp, seqs, true_lbls, pred_lbls)
     sp_pred_mccs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v)
-    all_recalls, all_precisions, total_positives, false_positives, predictions = get_cs_acc(life_grp, seqs, true_lbls,
-                                                                                            pred_lbls, v=v)
+    all_recalls, all_precisions, total_positives, \
+        false_positives, predictions, all_f1_scores = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v)
     if return_everything:
         sp_pred_mccs,sp_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v, return_mcc2=True, sp_type="SP")
         lipo_pred_mccs,lipo_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v, return_mcc2=True, sp_type="LIPO")
         tat_pred_mccs,tat_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v, return_mcc2=True, sp_type="TAT")
 
-        all_recalls_lipo, all_precisions_lipo, _, _, _ = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO")
-        all_recalls_tat, all_precisions_tat, _, _, _ = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT")
+        all_recalls_lipo, all_precisions_lipo, _, _, _, all_f1_scores_lipo = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO")
+        all_recalls_tat, all_precisions_tat, _, _, _, all_f1_scores_tat = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT")
         return sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs,lipo_pred_mccs2, tat_pred_mccs,tat_pred_mccs2, \
-               all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat
-    return sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions
+               all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat
+    return sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores
 
 
 def get_summary_sp_acc(sp_pred_accs):
@@ -1087,9 +1091,11 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0,2],folder="wlg10morepatience/")
+    # visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[1, 2],folder="wlg10morepatience/")
+    # visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0,2],folder="val_on_test/")
+    # visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0,2],folder="wlg10morepatience/")
     # print("huh?")
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="wlg10morepatience/", compare_mdl_plots=False,
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="val_on_test/", compare_mdl_plots=False,
                                             remove_test_seqs=False)
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
