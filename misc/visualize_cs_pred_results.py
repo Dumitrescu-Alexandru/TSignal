@@ -378,7 +378,7 @@ def plot_mcc(mccs, name="param_search_0.2_2048_0.0001_"):
 def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.2_2048_0.0001_"):
     cs_res_euk, cs_res_neg, cs_res_pos, cs_res_arc = results
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    for i in range(2,4):
+    for i in range(4):
         axs[0, 0].plot(cs_res_euk[i], label="Eukaryote {} tol={}".format(metric, i))
         axs[0, 0].set_ylabel(metric)
         axs[0, 0].legend()
@@ -495,6 +495,15 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
             cs_precs_arc[1].append(prec_res[13])
             cs_precs_arc[2].append(prec_res[14])
             cs_precs_arc[3].append(prec_res[15])
+
+    # fix for logs that have f1 score written as "precision"...
+    if len(cs_precs_pos[0])  == 2* len(cs_recalls_pos[0]):
+        len_cs_rec = len(cs_recalls_pos[0])
+        for j in range(4):
+            cs_precs_euk[j], cs_precs_neg[j], cs_precs_pos[j], cs_precs_arc[j] = [cs_precs_euk[j][i*2] for i in range(len_cs_rec)], \
+                                                                                 [cs_precs_neg[j][i*2] for i in range(len_cs_rec)], \
+                                                                                 [cs_precs_pos[j][i*2] for i in range(len_cs_rec)], \
+                                                                                 [cs_precs_arc[j][i*2] for i in range(len_cs_rec)]
 
     return euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, \
            cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc
