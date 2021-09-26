@@ -473,7 +473,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                                                        list(np.array(all_precisions).flatten()), list(
             np.array(total_positives).flatten())
-        if use_glbl_lbls:
+        if use_glbl_lbls or form_sp_reg_data:
             print("On epoch {} total train/validation loss and glbl loss: {}/{}, {}".format(e, losses / len(
                 dataset_loader),
                                                                                             valid_loss,
