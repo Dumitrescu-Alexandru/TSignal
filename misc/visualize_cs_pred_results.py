@@ -408,11 +408,9 @@ def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0, 1], fold
     euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, \
     cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = extract_results(run, folds=folds,
                                                                                              folder=folder)
-    cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc = [[], [], [], []], [[], [], [], []], \
-                                                                     [[], [], [], []], [[], [], [], []]
     all_f1 = [[[], [], [], []],[[], [], [], []],[[], [], [], []],[[], [], [], []]]
     for lg_ind, (lg_rec, lg_prec) in enumerate([(cs_recalls_euk, cs_precs_euk), (cs_recalls_neg, cs_precs_neg),
-                                                (cs_recalls_pos, cs_precs_pos),(cs_recalls_euk, cs_precs_pos)]):
+                                                (cs_recalls_pos, cs_precs_pos),(cs_recalls_arc, cs_precs_arc)]):
         for tol in range(4):
             for prec, rec in zip(lg_rec[tol], lg_prec[tol]):
                 all_f1[lg_ind][tol].append(2 * prec * rec / (prec + rec) if prec + rec else 0)
@@ -1164,12 +1162,13 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
+
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="some_run/", compare_mdl_plots=False,
+                                            remove_test_seqs=False)
     visualize_validation(run="val_on_test_", folds=[0, 1],folder="val_on_test/")
     visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[1, 2],folder="wlg10morepatience/")
     visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0,2],folder="wlg10morepatience/")
     # print("huh?")
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="val_on_test/", compare_mdl_plots=False,
-                                            remove_test_seqs=False)
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # visualize_training_variance(mdl2results)#, mdl2results_hps)

@@ -37,7 +37,7 @@ class TokenEmbedding(nn.Module):
 
 class InputEmbeddingEncoder(nn.Module):
     def __init__(self, partitions=[0, 1, 2], data_folder="sp_data/", lg2ind=None, use_glbl_lbls=False, aa2ind=None,
-                 glbl_lbl_version=1):
+                 glbl_lbl_version=1, form_sp_reg_data=False):
         # only create dictionaries from sequences to embeddings (as sequence embeddings are already computed by a bert
         # model
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -65,10 +65,10 @@ class InputEmbeddingEncoder(nn.Module):
             # that will be used for global classification
             self.eos_bos_cls_embs = TokenEmbedding(3, 1024) if use_glbl_lbls else TokenEmbedding(2, 1024)
             self.lg_embs = TokenEmbedding(len(lg2ind.keys()), 1024) if lg2ind is not None else None
-            self.use_glbl_lbls = use_glbl_lbls
+            self.use_glbl_lbls = False if form_sp_reg_data else use_glbl_lbls
         else:
             # add CLS, LG tokens:
-            self.use_glbl_lbls = use_glbl_lbls
+            self.use_glbl_lbls = False if form_sp_reg_data else use_glbl_lbls
             self.use_lg = lg2ind is not None
             self.aa2ind = aa2ind
             no_of_tokens = len(self.aa2ind.keys())
@@ -172,8 +172,9 @@ class TransformerModel(nn.Module):
 
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5,
                  data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
-                 no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1):
+                 no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False):
         super().__init__()
+        self.form_sp_reg_data = form_sp_reg_data
         self.model_type = 'Transformer'
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.pos_encoder = PositionalEncoding(d_model, dropout)
@@ -186,15 +187,16 @@ class TransformerModel(nn.Module):
         # input_encoder is just a dictionary with {sequence:embedding} with embeddings from bert LM
         aa2ind = None if not train_oh else aa2ind
         self.input_encoder = InputEmbeddingEncoder(partitions=[0, 1, 2], data_folder=data_folder, lg2ind=lg2ind, 
-                                                   use_glbl_lbls=use_glbl_lbls, aa2ind=aa2ind, glbl_lbl_version=glbl_lbl_version)
+                                                   use_glbl_lbls=use_glbl_lbls, aa2ind=aa2ind, glbl_lbl_version=glbl_lbl_version,
+                                                   form_sp_reg_data=form_sp_reg_data)
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
         self.label_encoder = TokenEmbedding(ntoken, d_hid, lbl2ind=lbl2ind)
         self.d_model = d_model
         self.generator = nn.Linear(d_model, ntoken).to(self.device)
-        self.use_glbl_lbls = use_glbl_lbls
+        self.use_glbl_lbls = False if form_sp_reg_data else use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
-        self.glbl_generator = nn.Linear(d_model, no_glbl_lbls).to(self.device)
-
+        self.glbl_generator = nn.Linear(ntoken, no_glbl_lbls).to(self.device) if self.form_sp_reg_data \
+            else nn.Linear(d_model, no_glbl_lbls).to(self.device)
 
     def encode(self, src):
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
@@ -240,6 +242,9 @@ class TransformerModel(nn.Module):
                                 padding_mask_src)
         if self.glbl_lbl_version == 2 and self.use_glbl_lbls:
             return self.generator(outs), self.glbl_generator(torch.mean(outs.transpose(0,1), dim=1))
+        elif self.form_sp_reg_data:
+            preds = self.generator(outs)
+            return preds, self.glbl_generator(torch.mean(torch.sigmoid(preds.transpose(0,1)), dim=1))
         return self.generator(outs)
 
         # * math.sqrt(self.d_model)

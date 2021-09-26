@@ -13,7 +13,6 @@ import pickle
 import torch.nn as nn
 import torch.optim as optim
 import torch
-
 sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn
@@ -21,11 +20,12 @@ from models.transformer_nmt import TransformerModel
 
 
 def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
-               ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1):
+               ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
+               form_sp_reg_data=False):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
-                             glbl_lbl_version=glbl_lbl_version)
+                             glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -60,7 +60,7 @@ def generate_square_subsequent_mask(sz):
     return mask
 
 
-def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
+def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False):
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     src = src
@@ -85,12 +85,12 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
             out = model.decode(ys, memory.to(device), tgt_mask.to(device))
             out = out.transpose(0, 1)
             prob = model.generator(out[:, -1])
-        if i == 0:
+        if i == 0 and not form_sp_reg_data:
             # extract the sp-presence probabilities
             sp_probs = [sp_prb.item() for sp_prb in torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
             all_seq_sp_probs = [[sp_prob.item()] for sp_prob in torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
             all_seq_sp_logits = [[sp_prob.item()] for sp_prob in prob[:, lbl2ind['S']]]
-        else:
+        elif not form_sp_reg_data:
             # used to update the sequences of probabilities
             softmax_probs = torch.nn.functional.softmax(prob, dim=-1)
             next_sp_probs = softmax_probs[:, lbl2ind['S']]
@@ -106,6 +106,9 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None):
             current_ys.append(ys[bach_ind])
             current_ys[-1].append(next_word[bach_ind])
         ys = current_ys
+    if form_sp_reg_data:
+        return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
+               model.glbl_generator(torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1))
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 
 def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=3):
@@ -203,8 +206,14 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=3):
 
     return ys, torch.tensor([0.1])
 
-def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False):
+def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False, form_sp_reg_data=False):
     model.eval()
+    if form_sp_reg_data:
+        tgt_tokens, probs, sp_probs, \
+        all_sp_probs, all_seq_sp_logits, sp_type_probs = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind,
+                                                                       tgt=tgt,form_sp_reg_data=form_sp_reg_data)
+        return tgt_tokens, probs, sp_probs, \
+        all_sp_probs, all_seq_sp_logits, sp_type_probs
     if use_beams_search:
         tgt_tokens, probs  = beam_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
         sp_probs, all_sp_probs, all_seq_sp_logits = None, None, None
@@ -213,12 +222,13 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_b
     return tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits
 
 
-def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"]):
+def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"],
+                        form_sp_reg_data=False, simplified=False):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     model.eval()
-    sp_data = SPCSpredictionData()
+    sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified)
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets)
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data)
 
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=test_batch_size, shuffle=False,
@@ -229,6 +239,8 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
         with torch.no_grad():
             if model.use_glbl_lbls:
                 logits, _ = model(src, tgt)
+            elif form_sp_reg_data:
+                logits, _ = model(src, tgt)
             else:
                 logits = model(src, tgt)
         targets = padd_add_eos_tkn(tgt, sp_data.lbl2ind)
@@ -237,18 +249,36 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
         # print("Number of sequences tested: {}".format(ind * test_batch_size))
     return total_loss / len(dataset_loader)
 
+def modify_sp_subregion_preds(pred_tokens, sp_type):
+    pred_sptype = torch.argmax(sp_type).item()
+    sp_type2inds = {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5}
+    sp_inds2type = {v:k for k,v in sp_type2inds.items()}
+    sptype2letter = {'NO_SP': "W", 'SP': "S", 'TATLIPO': "T", 'LIPO': "L", 'TAT': "T", 'PILIN': "P"}
+    if sp_inds2type[pred_sptype] != "NO_SP":
+        non_sp_positions = [pred_tokens.find("I"), pred_tokens.find("O"), pred_tokens.find("M")]
+        non_sp_positions = [non_sp_position if non_sp_position >= 0 else len(pred_tokens) for non_sp_position in non_sp_positions]
+        first_non_sp_pred = min(non_sp_positions)
+        # if a +1 cysteine is predicted AFTER the cs, then move behind 1 position
+        if pred_tokens[first_non_sp_pred-1] == "C":
+            first_non_sp_pred = first_non_sp_pred-1
+        new_pred_tokens_string = sptype2letter[sp_inds2type[pred_sptype]] * first_non_sp_pred
+        new_pred_tokens_string += pred_tokens[first_non_sp_pred:]
+    else:
+        new_pred_tokens_string = pred_tokens
+
+    return new_pred_tokens_string
 
 def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1, dataset_loader=None,
-             use_beams_search=False):
+             use_beams_search=False, form_sp_reg_data=False, simplified=False):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
     seqs2probs = {}
     model.eval()
     val_or_test = "test" if len(sets) == 2 else "validation"
     if dataset_loader is None:
-        sp_data = SPCSpredictionData()
+        sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified)
         sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                    glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets)
+                                    glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data)
 
         dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                      batch_size=test_batch_size, shuffle=False,
@@ -261,13 +291,22 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         # print("Number of sequences tested: {}".format(ind * test_batch_size))
         src = src
         tgt = tgt
-        predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = \
-            translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search)
+        if form_sp_reg_data:
+            predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
+                translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
+                          form_sp_reg_data=form_sp_reg_data)
+        else:
+            predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = \
+                translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
+                          form_sp_reg_data=form_sp_reg_data)
         true_targets = padd_add_eos_tkn(tgt, lbl2ind)
-        if not use_beams_search:
-            total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
-        for s, t, pt in zip(src, tgt, predicted_tokens):
+        # if not use_beams_search:
+        #     total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
+        for s, t, pt, sp_type in zip(src, tgt, predicted_tokens, sp_type_probs):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
+            if form_sp_reg_data:
+                new_predicted_lbls = modify_sp_subregion_preds(predicted_lbls, sp_type)
+                predicted_lbls = new_predicted_lbls
             eval_dict[s] = predicted_lbls[:len(t)]
         if sp_probs is not None:
             for s, sp_prob, all_sp_probs, all_sp_logits in zip(src, sp_probs, all_sp_probs, all_seq_sp_logits):
@@ -339,14 +378,15 @@ def euk_importance_avg(cs_mcc):
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
-                        test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False, validate_on_mcc=True):
+                        test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False, validate_on_mcc=True,
+                        form_sp_reg_data=False, simplified=False):
     test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
     partitions = [0,1,2] if deployment_model else partitions
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    sp_data = SPCSpredictionData()
+    sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified)
     train_sets = ['test', 'train'] if validate_on_test else ['train']
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets)
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=form_sp_reg_data)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
@@ -358,13 +398,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     model = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
                        ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
-                       glbl_lbl_version=glbl_lbl_version)
+                       glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_glbl = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
     warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup)
-    best_avg_mcc = -1
     best_valid_loss = 5 ** 10
     best_valid_mcc_and_recall = -1
     best_epoch = 0
@@ -378,6 +417,16 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
             seqs, lbl_seqs, _, glbl_lbls = batch
             if use_glbl_lbls:
+                logits, glbl_logits = model(seqs, lbl_seqs)
+                optimizer.zero_grad()
+                targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
+                loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
+                losses += loss.item()
+
+                loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
+                losses_glbl += loss_glbl.item()
+                loss += loss_glbl * glbl_lbl_weight
+            elif form_sp_reg_data:
                 logits, glbl_logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
@@ -404,18 +453,18 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if validate_on_test:
             validate_partitions = list(test_partition)
             _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
-                         epoch=e)
+                         epoch=e, form_sp_reg_data=form_sp_reg_data,simplified=simplified)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores \
                 = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
             valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
-                                             sets=["test"])
+                                             sets=["test"], form_sp_reg_data=form_sp_reg_data,simplified=simplified)
             # revert valid_loss to not change the loss condition next ( this won't be a loss
             # but it's the quickest way to test performance when validation with the test set
         else:
             valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions,
-                                             sets=["test"])
+                                             sets=["test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified)
             _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"],
-                         epoch=e)
+                         epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores \
                 = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
         validate_on_f1_score = np.mean([all_f1_scores[i][1] for i in range(4)]) if not np.isnan(all_f1_scores[3][0]) \
@@ -451,7 +500,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             save_model(model, run_name)
             if e == eps - 1:
                 patience = 0
-        elif (e > 20 and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or (e > 20 and best_valid_mcc_and_recall > validate_on_f1_score and eps == -1 and validate_on_mcc):
+        elif (e > 20 and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
+                (e > 20 and best_valid_mcc_and_recall > validate_on_f1_score and eps == -1 and validate_on_mcc):
             if validate_on_mcc:
                 best_val_metrics, val_metric = best_valid_mcc_and_recall, validate_on_f1_score
             else:
@@ -463,7 +513,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             patience -= 1
     if not deployment_model:
         model = load_model(run_name + "_best_eval.pth")
-        evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"])
+        evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
+                 form_sp_reg_data=form_sp_reg_data, simplified=simplified)
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(

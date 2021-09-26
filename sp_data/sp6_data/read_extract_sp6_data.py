@@ -147,12 +147,44 @@ lgandsptype2count = {}
 # exit(1)
 lgandsptype2counts = []
 lgandsptype2count_total = {}
+preds_best_mdl = {}
+for tr_f in [[0,1],[0,2],[1,2]]:
+    best_mdl = "../../misc/huge_param_search/parameter_search_patience_30use_glbl_lbls_use_glbl_lbls_version_1_weight_0.1_lr_1e-05_nlayers_3_nhead_16_lrsched_none_trFlds_"
+    best_mdl = best_mdl  + "{}_{}_best.bin".format(tr_f[0], tr_f[1])
+    preds_best_mdl.update(pickle.load(open(best_mdl, "rb")))
+print(len(set(preds_best_mdl.keys())))
+import numpy as np
+
+
+def get_hydrophobicity(seq, lbls, window=7, sp_type="S"):
+    is_sp = lbls[0] == sp_type
+    add_lr_aa = window//2
+    start_pos, end_pos = add_lr_aa, len(seq)-add_lr_aa
+    all_hydrophobs = []
+    relative_diff = 0
+    for i in range(start_pos, end_pos):
+        total_hydro = 0
+        for j in range(i - add_lr_aa, i + add_lr_aa):
+            total_hydro += kyte_doolittle_hydrophobicity[seq[j]]
+        all_hydrophobs.append(total_hydro)
+    if is_sp:
+        end_sp = lbls.rfind(sp_type)
+        h_region_ind = np.argmax(all_hydrophobs[:end_sp - 3]) + 3
+        relative_diff = end_sp - h_region_ind
+        return relative_diff, h_region_ind, end_sp
+
+kyte_doolittle_hydrophobicity = {"A":1.8, "C":2.5, "D":-3.5, "E":-3.5, "F":2.8, "G":-0.4, "H":-3.2, "I":4.5,"K":-3.9,
+                                 "L":3.8, "M":1.9, "N":-3.5, "P":-1.6, "Q":-3.5, "R":-4.5, "S":-0.8, "T":-0.7, "V":4.2, "W":-0.9, "Y":-1.3}
 partition_2_info = create_labeled_by_sp6_partition(ids, seqs, lbls)
 for part_id, part in partition_2_info.items():
     lgandsptype2count = {}
 
     seqs, lbls, ids = part
     for i,s,l in zip(ids, seqs, lbls):
+        if i.split("|")[-2] == "PILIN":# and i.split("|")[1] == "POSITIVE":# and i.split("|")[1] == "NEGATIVE" and (preds_best_mdl[s][0] == "L" or preds_best_mdl[s][0] == "T"):
+            print(get_hydrophobicity(s, l, sp_type="T"))
+            print(s)
+            print(l)
         if "_".join(i.split("|")[1:3]) not in lgandsptype2count:
             lgandsptype2count["_".join(i.split("|")[1:3])] = 1
         if "_".join(i.split("|")[1:3]) not in lgandsptype2count_total:
