@@ -21,11 +21,12 @@ from models.transformer_nmt import TransformerModel
 
 def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
-               form_sp_reg_data=False):
+               form_sp_reg_data=False, version2_agregation="max"):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
-                             glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data)
+                             glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
+                             version2_agregation=version2_agregation)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -69,7 +70,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     sp_logits = []
     all_seq_sp_probs = []
     all_seq_sp_logits = []
-
+    # used for glbl label version 2
+    all_outs = []
     with torch.no_grad():
         memory = model.encode(src)
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
@@ -84,6 +86,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
             out = model.decode(ys, memory.to(device), tgt_mask.to(device))
             out = out.transpose(0, 1)
+            all_outs.append(out[:, -1])
             prob = model.generator(out[:, -1])
         if i == 0 and not form_sp_reg_data:
             # extract the sp-presence probabilities
@@ -106,10 +109,18 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             current_ys.append(ys[bach_ind])
             current_ys[-1].append(next_word[bach_ind])
         ys = current_ys
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if form_sp_reg_data:
-        glbl_labels = model.glbl_generator(memory.transpose(0,1)[:,1,:]) \
-                            if model.use_glbl_lbls and model.glbl_lbl_version == 1 else \
-                      model.glbl_generator(torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1))
+        if model.glbl_lbl_version == 2 and model.use_glbl_lbls:
+            if model.version2_agregation == "max":
+                glbl_labels = model.glbl_generator(torch.max(torch.stack(all_outs).transpose(0,1), dim=1)[0])
+            elif model.version2_agregation == "avg":
+                glbl_labels = model.glbl_generator(torch.mean(torch.stack(all_outs).transpose(0,1), dim=1))
+
+        elif model.glbl_lbl_version == 1 and model.use_glbl_lbls:
+            glbl_labels = model.glbl_generator(memory.transpose(0,1)[:,1,:])
+        else:
+            glbl_labels = model.glbl_generator(torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1))
         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
                glbl_labels
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
@@ -383,7 +394,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False, validate_on_mcc=True,
-                        form_sp_reg_data=False, simplified=False):
+                        form_sp_reg_data=False, simplified=False, version2_agregation="max"):
     test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
     partitions = [0,1,2] if deployment_model else partitions
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -402,7 +413,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     model = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
                        ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
-                       glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data)
+                       glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
+                       version2_agregation=version2_agregation)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_glbl = torch.nn.CrossEntropyLoss()

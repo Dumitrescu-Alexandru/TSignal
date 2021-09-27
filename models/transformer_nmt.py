@@ -172,10 +172,12 @@ class TransformerModel(nn.Module):
 
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5,
                  data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
-                 no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False):
+                 no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
+                 version2_agregation="max"):
         super().__init__()
         self.form_sp_reg_data = form_sp_reg_data
         self.model_type = 'Transformer'
+        self.version2_agregation = "max"
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.pos_encoder = PositionalEncoding(d_model, dropout)
         self.transformer = Transformer(d_model=d_hid,
@@ -241,7 +243,11 @@ class TransformerModel(nn.Module):
         outs = self.transformer(padded_src, padded_tgt, src_mask, tgt_mask, None, padding_mask_src, padding_mask_tgt,
                                 padding_mask_src)
         if self.glbl_lbl_version == 2 and self.use_glbl_lbls:
-            return self.generator(outs), self.glbl_generator(torch.mean(outs.transpose(0,1), dim=1))
+            if self.version2_agregation == "max":
+                return self.generator(outs), self.glbl_generator(torch.max(outs.transpose(0,1), dim=1)[0])
+            elif self.version2_agregation == "avg":
+                return self.generator(outs), self.glbl_generator(torch.mean(outs.transpose(0,1), dim=1))
+
         elif self.form_sp_reg_data:
             preds = self.generator(outs)
             return preds, self.glbl_generator(torch.mean(torch.sigmoid(preds.transpose(0,1)), dim=1))

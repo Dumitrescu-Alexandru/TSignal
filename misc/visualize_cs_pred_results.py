@@ -1162,10 +1162,14 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-
-    visualize_validation(run="deailed_sp_v1_", folds=[0, 1],folder="detailed_sp/")
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="detailed_sp/", compare_mdl_plots=False,
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="detailed_sp/",
+                                            compare_mdl_plots=False,
                                             remove_test_seqs=False)
+    visualize_validation(run="deailed_sp_v1_", folds=[0, 1],folder="detailed_sp/")
+    visualize_validation(run="glbl_lg_deailed_sp_v1_", folds=[0, 1],folder="glbl_deailed_sp_v1/")
+
+
+
     visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[1, 2],folder="wlg10morepatience/")
     visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0,2],folder="wlg10morepatience/")
     # print("huh?")
