@@ -65,10 +65,10 @@ class InputEmbeddingEncoder(nn.Module):
             # that will be used for global classification
             self.eos_bos_cls_embs = TokenEmbedding(3, 1024) if use_glbl_lbls else TokenEmbedding(2, 1024)
             self.lg_embs = TokenEmbedding(len(lg2ind.keys()), 1024) if lg2ind is not None else None
-            self.use_glbl_lbls = False if form_sp_reg_data else use_glbl_lbls
+            self.use_glbl_lbls = use_glbl_lbls
         else:
             # add CLS, LG tokens:
-            self.use_glbl_lbls = False if form_sp_reg_data else use_glbl_lbls
+            self.use_glbl_lbls = use_glbl_lbls
             self.use_lg = lg2ind is not None
             self.aa2ind = aa2ind
             no_of_tokens = len(self.aa2ind.keys())
@@ -193,9 +193,9 @@ class TransformerModel(nn.Module):
         self.label_encoder = TokenEmbedding(ntoken, d_hid, lbl2ind=lbl2ind)
         self.d_model = d_model
         self.generator = nn.Linear(d_model, ntoken).to(self.device)
-        self.use_glbl_lbls = False if form_sp_reg_data else use_glbl_lbls
+        self.use_glbl_lbls = use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
-        self.glbl_generator = nn.Linear(ntoken, no_glbl_lbls).to(self.device) if self.form_sp_reg_data \
+        self.glbl_generator = nn.Linear(ntoken, no_glbl_lbls).to(self.device) if self.form_sp_reg_data and not use_glbl_lbls\
             else nn.Linear(d_model, no_glbl_lbls).to(self.device)
 
     def encode(self, src):

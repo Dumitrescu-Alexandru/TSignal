@@ -107,8 +107,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             current_ys[-1].append(next_word[bach_ind])
         ys = current_ys
     if form_sp_reg_data:
+        glbl_labels = model.glbl_generator(memory.transpose(0,1)[:,1,:]) \
+                            if model.use_glbl_lbls and model.glbl_lbl_version == 1 else \
+                      model.glbl_generator(torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1))
         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
-               model.glbl_generator(torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1))
+               glbl_labels
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 
 def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=3):
@@ -299,6 +302,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
             predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
                           form_sp_reg_data=form_sp_reg_data)
+            sp_type_probs = [""] * len(predicted_tokens)
         true_targets = padd_add_eos_tkn(tgt, lbl2ind)
         # if not use_beams_search:
         #     total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()

@@ -149,7 +149,8 @@ lgandsptype2counts = []
 lgandsptype2count_total = {}
 preds_best_mdl = {}
 for tr_f in [[0,1],[0,2],[1,2]]:
-    best_mdl = "../../misc/huge_param_search/parameter_search_patience_30use_glbl_lbls_use_glbl_lbls_version_1_weight_0.1_lr_1e-05_nlayers_3_nhead_16_lrsched_none_trFlds_"
+    # best_mdl = "../../misc/huge_param_search/parameter_search_patience_30use_glbl_lbls_use_glbl_lbls_version_1_weight_0.1_lr_1e-05_nlayers_3_nhead_16_lrsched_none_trFlds_"
+    best_mdl = "../../misc/detailed_sp/deailed_sp_v1_"
     best_mdl = best_mdl  + "{}_{}_best.bin".format(tr_f[0], tr_f[1])
     preds_best_mdl.update(pickle.load(open(best_mdl, "rb")))
 print(len(set(preds_best_mdl.keys())))
@@ -181,10 +182,11 @@ for part_id, part in partition_2_info.items():
 
     seqs, lbls, ids = part
     for i,s,l in zip(ids, seqs, lbls):
-        if i.split("|")[-2] == "PILIN":# and i.split("|")[1] == "POSITIVE":# and i.split("|")[1] == "NEGATIVE" and (preds_best_mdl[s][0] == "L" or preds_best_mdl[s][0] == "T"):
+        if i.split("|")[-2] == "TAT":# and i.split("|")[1] == "EUKARYA" and preds_best_mdl[s][0] != "S":# and i.split("|")[1] == "NEGATIVE" and (preds_best_mdl[s][0] == "L" or preds_best_mdl[s][0] == "T"):
             print(get_hydrophobicity(s, l, sp_type="T"))
             print(s)
             print(l)
+            print(preds_best_mdl[s])
         if "_".join(i.split("|")[1:3]) not in lgandsptype2count:
             lgandsptype2count["_".join(i.split("|")[1:3])] = 1
         if "_".join(i.split("|")[1:3]) not in lgandsptype2count_total:
@@ -199,28 +201,28 @@ for part_id, part in partition_2_info.items():
 
 plot_for = ["EUKARYA_NO_SP", "EUKARYA_SP", "NEGATIVE_NO_SP", "NEGATIVE_SP", "POSITIVE_NO_SP", "POSITIVE_SP", "ARCHAEA_NO_SP", "ARCHAEA_SP"]
 
-def plot_lg_dists(lgandsptype2counts):
-    import numpy as np
-    line_w = 0.25
-    x_positions = []
-    heights = []
-    totals = []
-    for i in range(1, 9):
-        x_positions.extend([i-line_w, i, i+line_w])
-    for pf in plot_for:
-        total = lgandsptype2count_total[pf]
-        totals.append(total)
-        heights.extend([lgandsptype2counts[0][pf] /total, lgandsptype2counts[1][pf] /total, lgandsptype2counts[2][pf] /total])
-    plt.bar([x_positions[i*3] for i in range(8)], [heights[i*3] for i in range(8)], width=line_w, label="partition 1")
-    plt.bar([x_positions[i*3+1] for i in range(8)], [heights[i*3+1] for i in range(8)], width=line_w, label="partition 2")
-    plt.bar([x_positions[i*3+2] for i in range(8)], [heights[i*3+2] for i in range(8)], width=line_w, label="partition 3")
-    plt.legend()
-    plt.xticks(list(range(1,9)),[plot_for[i] + "\n" + str(totals[i]) for i in range(8)])
-    plt.xlabel("Life group, SP/NO-SP; No. of datapoints")
-    plt.ylabel("Percentage from that life group")
-    plt.show()
-
-plot_lg_dists(lgandsptype2counts)
+# def plot_lg_dists(lgandsptype2counts):
+#     import numpy as np
+#     line_w = 0.25
+#     x_positions = []
+#     heights = []
+#     totals = []
+#     for i in range(1, 9):
+#         x_positions.extend([i-line_w, i, i+line_w])
+#     for pf in plot_for:
+#         total = lgandsptype2count_total[pf]
+#         totals.append(total)
+#         heights.extend([lgandsptype2counts[0][pf] /total, lgandsptype2counts[1][pf] /total, lgandsptype2counts[2][pf] /total])
+#     plt.bar([x_positions[i*3] for i in range(8)], [heights[i*3] for i in range(8)], width=line_w, label="partition 1")
+#     plt.bar([x_positions[i*3+1] for i in range(8)], [heights[i*3+1] for i in range(8)], width=line_w, label="partition 2")
+#     plt.bar([x_positions[i*3+2] for i in range(8)], [heights[i*3+2] for i in range(8)], width=line_w, label="partition 3")
+#     plt.legend()
+#     plt.xticks(list(range(1,9)),[plot_for[i] + "\n" + str(totals[i]) for i in range(8)])
+#     plt.xlabel("Life group, SP/NO-SP; No. of datapoints")
+#     plt.ylabel("Percentage from that life group")
+#     plt.show()
+#
+# plot_lg_dists(lgandsptype2counts)
 
 exit(1)
 
