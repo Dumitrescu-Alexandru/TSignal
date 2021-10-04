@@ -20,7 +20,7 @@ def create_param_set_cs_predictors():
     # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
 
     parameters = {"nlayers": [3,5,8],"nheads":[8,16],
-                  "lr": [0.00001], 'use_glbl_lbls':[1], 'glbl_label_version':[2],
+                  "lr": [0.00001], 'use_glbl_lbls':[1], 'glbl_lbl_version':[2],
                   "train_folds": [[0,1],[0,2],[1,2]], 'patience':[30],
                   'dropout':[0,0.3,0.5]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
