@@ -19,10 +19,10 @@ def create_param_set_cs_predictors():
     #               'glbl_lbl_version':[1,2]}
     # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
 
-    parameters = {"nlayers": [2,3,4],"nheads":[8,16],
-                  "lr": [0.00001], 'use_glbl_lbls':[0,1], 'glbl_label_version':[2],
-                  'lr_scheduler':['none', 'step', 'expo'], "train_folds": [[0,1],[0,2],[1,2]], 'patience':[30, 60],
-                  'glbl_lbl_weight':[0.1]}
+    parameters = {"nlayers": [3,5,8],"nheads":[8,16],
+                  "lr": [0.00001], 'use_glbl_lbls':[1], 'glbl_label_version':[2],
+                  "train_folds": [[0,1],[0,2],[1,2]], 'patience':[30],
+                  'dropout':[0,0.3,0.5]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
     group_params = list(ParameterGrid(parameters))
@@ -138,6 +138,7 @@ def modify_param_search_args(args):
     return args
 
 def sanity_check(file, args2):
+    exit(1)
     params = pickle.load(open(file, "rb"))
     param_names = []
     param_logs = []

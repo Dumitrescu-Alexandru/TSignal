@@ -3,7 +3,30 @@ import random
 
 import matplotlib.pyplot as plt
 from Bio import SeqIO
+def parse_scan_prosites_results():
+    id2stuff = {}
+    next_app =False
+    next_append=False
+    with open("scan_prosite_results.fasta", "rt") as f:
+        lines = f.readlines()
+    for ind, f_ in enumerate(lines):
+        if f_[0] == ">":
+            id = f_.split("|")[0].replace(">","")
+        elif "Twin arginine translocation" in f_:
+            next_append = True
+        elif "score" in f_:
+            next_app = True
+        elif next_app and next_append and id not in id2stuff:
+            id2stuff[id] = lines[ind+2]
+            next_app = False
+            next_append=False
+    for k,v in id2stuff.items():
+        print(k,v)
 
+
+
+# parse_scan_prosites_results()
+# exit(1)
 def split_train_test_partitions(partition, split_perc=0.1):
     lgrp_and_sptype_2_inds = {}
     for ind, (seq, lbls, glbl_info) in enumerate(zip(*partition)):
@@ -148,12 +171,21 @@ lgandsptype2count = {}
 lgandsptype2counts = []
 lgandsptype2count_total = {}
 preds_best_mdl = {}
+seq2modified_lbls = {}
 for tr_f in [[0,1],[0,2],[1,2]]:
     # best_mdl = "../../misc/huge_param_search/parameter_search_patience_30use_glbl_lbls_use_glbl_lbls_version_1_weight_0.1_lr_1e-05_nlayers_3_nhead_16_lrsched_none_trFlds_"
-    best_mdl = "../../misc/detailed_sp/deailed_sp_v1_"
+    best_mdl = "../../misc/detailed_v2_glbl_max/v2_max_glbl_lg_deailed_sp_v1_"
     best_mdl = best_mdl  + "{}_{}_best.bin".format(tr_f[0], tr_f[1])
     preds_best_mdl.update(pickle.load(open(best_mdl, "rb")))
-print(len(set(preds_best_mdl.keys())))
+import pickle
+for tr_f in [0,1,2]:
+
+    # best_mdl = "../../misc/huge_param_search/parameter_search_patience_30use_glbl_lbls_use_glbl_lbls_version_1_weight_0.1_lr_1e-05_nlayers_3_nhead_16_lrsched_none_trFlds_"
+    train_d = pickle.load(open("../sp6_partitioned_data_sublbls_train_{}.bin".format(tr_f), "rb"))
+    test_d = pickle.load(open("../sp6_partitioned_data_sublbls_test_{}.bin".format(tr_f), "rb"))
+    seq2modified_lbls.update({k :v[1] for k,v in train_d.items()})
+    seq2modified_lbls.update({k :v[1] for k,v in test_d.items()})
+
 import numpy as np
 
 
@@ -172,21 +204,53 @@ def get_hydrophobicity(seq, lbls, window=7, sp_type="S"):
         end_sp = lbls.rfind(sp_type)
         h_region_ind = np.argmax(all_hydrophobs[:end_sp - 3]) + 3
         relative_diff = end_sp - h_region_ind
-        return relative_diff, h_region_ind, end_sp
+        return h_region_ind
 
 kyte_doolittle_hydrophobicity = {"A":1.8, "C":2.5, "D":-3.5, "E":-3.5, "F":2.8, "G":-0.4, "H":-3.2, "I":4.5,"K":-3.9,
                                  "L":3.8, "M":1.9, "N":-3.5, "P":-1.6, "Q":-3.5, "R":-4.5, "S":-0.8, "T":-0.7, "V":4.2, "W":-0.9, "Y":-1.3}
 partition_2_info = create_labeled_by_sp6_partition(ids, seqs, lbls)
+fasta_tat_lines = []
+conf_1, conf_2, conf_3, conf_4, conf_5 = 0, 0, 0, 0, 0
+
 for part_id, part in partition_2_info.items():
     lgandsptype2count = {}
 
     seqs, lbls, ids = part
+    import re
+
+    # for first_RR in ["R", "K"]:
+    #     for second_RR in ["R", "N", "K", "Q"]:
+    #         for following_aa in ["D", "E", "R", "K", "H", "N", "Q", "S", "T", "Y", "G", "A",
+    #                              "V"]:
     for i,s,l in zip(ids, seqs, lbls):
-        if i.split("|")[-2] == "TAT":# and i.split("|")[1] == "EUKARYA" and preds_best_mdl[s][0] != "S":# and i.split("|")[1] == "NEGATIVE" and (preds_best_mdl[s][0] == "L" or preds_best_mdl[s][0] == "T"):
-            print(get_hydrophobicity(s, l, sp_type="T"))
-            print(s)
-            print(l)
-            print(preds_best_mdl[s])
+        if "TAT" in i.split("|")[-2] and  i.split("|")[1] == "ARCHAEA":# and i.split("|")[1] == "EUKARYA" and preds_best_mdl[s][0] != "S":# and i.split("|")[1] == "NEGATIVE" and (preds_best_mdl[s][0] == "L" or preds_best_mdl[s][0] == "T"):
+            # if preds_best_mdl[s][0] != "S":
+                # print(get_hydrophobicity(s, l, sp_type="T"))
+
+            if "SRR" in s or "TRR" in s:
+                conf_1 +=1
+            elif len(re.findall("RR.F", s)) != 0:
+                conf_2 +=1
+            elif len(re.findall("[R][RNKQ][DERKHNQSTYGAV]", s[:l.rfind("T")])) != 0:
+                # print(re.findall("[R][RNKQ][DERKHNQSTYGAV]", s[:l.rfind("T")]))
+                conf_3 +=1
+            elif len(re.findall("[RK][R][DERKHNQSTYGAV]", s)) != 0:
+                print(re.findall("[RK][R][DERKHNQSTYGAV]", s[:l.rfind("T")]))
+                conf_4 +=1
+            elif "RR" in s:
+                conf_5 +=1
+            else:
+                print(s)
+            # else:
+            #     print(s)
+            #     print([(m.start(0), m.end(0)) for m in re.finditer("S|TRR", s)]
+
+
+            # fasta_tat_lines.append(">"+str(i) +"\n")
+            # fasta_tat_lines.append(str(s)+"\n")
+            # print(l)
+            # print(seq2modified_lbls[s])
+            # print(preds_best_mdl[s])
         if "_".join(i.split("|")[1:3]) not in lgandsptype2count:
             lgandsptype2count["_".join(i.split("|")[1:3])] = 1
         if "_".join(i.split("|")[1:3]) not in lgandsptype2count_total:
@@ -198,9 +262,11 @@ for part_id, part in partition_2_info.items():
         lgandsptype2count["ARCHAEA_SP"] = 0
     lgandsptype2counts.append(lgandsptype2count)
     print(part_id, lgandsptype2count)
+    print(conf_1, conf_2, conf_3, conf_4, conf_5)
 
 plot_for = ["EUKARYA_NO_SP", "EUKARYA_SP", "NEGATIVE_NO_SP", "NEGATIVE_SP", "POSITIVE_NO_SP", "POSITIVE_SP", "ARCHAEA_NO_SP", "ARCHAEA_SP"]
-
+# with open("rr_sequences.fasta", "wt") as f:
+#     f.writelines(fasta_tat_lines)
 # def plot_lg_dists(lgandsptype2counts):
 #     import numpy as np
 #     line_w = 0.25

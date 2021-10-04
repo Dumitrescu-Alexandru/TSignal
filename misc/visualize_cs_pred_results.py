@@ -556,7 +556,7 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
     all_recalls_tat, all_precisions_tat, _, _, _, f1_scores_tat = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TAT")
     return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, \
-           all_precisions_lipo,all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_lipo
+           all_precisions_lipo,all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat
 
 
 def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model="", metric="mcc"):
@@ -1162,10 +1162,18 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="detailed_sp/",
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="crct_simplified_glblv2_max/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
-    visualize_validation(run="deailed_sp_v1_", folds=[0, 1],folder="detailed_sp/")
+    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="drop_large_crct_v2_max_glbl_lg_deailed_sp_v1/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1],folder="crct_simplified_glblv2_max/")
+
+    visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1],folder="crct_simplified_glblv2_max/")
+    visualize_validation(run="parameter_search_patience_30lr_1e-05_nlayers_3_nhead_16_lrsched_step_trFlds_", folds=[0, 1],folder="huge_param_search/")
+    visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1],folder="crct_simplified_glblv2_max/")
     visualize_validation(run="glbl_lg_deailed_sp_v1_", folds=[0, 1],folder="glbl_deailed_sp_v1/")
 
 

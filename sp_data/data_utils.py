@@ -188,11 +188,11 @@ class SPCSpredictionData:
                 modified_lbls += "S" if self.simplified else "n"
                 current_len = len(modified_lbls)
                 # add nh <- N (uncertain n or h label) until the most hydrophobic aa at h_ind
-                modified_lbls += "S" if self.simplified else "h" * (h_ind - current_len)
+                modified_lbls += "S" * (h_ind - current_len) if self.simplified  else "h" * (h_ind - current_len)
                 # certain h subregion label at the most hydrophobic aa
                 modified_lbls += "S" if self.simplified else "h"
                 # uncertain hc <- H label until the last 3 aa in the signal peptide
-                modified_lbls += "S" if self.simplified else "H" * (last_ind - h_ind - 3)
+                modified_lbls += "S" * (last_ind - h_ind - 3) if self.simplified else "H" * (last_ind - h_ind - 3)
                 # certain c label subregion for the last 3 aa
                 modified_lbls += "S" * 3 if self.simplified else "c" * 3
                 modified_lbls += lbls[last_ind +1:]
