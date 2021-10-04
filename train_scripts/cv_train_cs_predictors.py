@@ -61,7 +61,7 @@ def generate_square_subsequent_mask(sz):
     return mask
 
 
-def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False):
+def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None):
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     src = src
@@ -72,8 +72,14 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     all_seq_sp_logits = []
     # used for glbl label version 2
     all_outs = []
+    all_outs_2nd_mdl = []
     with torch.no_grad():
         memory = model.encode(src)
+        if second_model is not None:
+            memory_2nd_mdl = model.encode(src)
+        else:
+            memory_2nd_mdl = None
+
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
     ys = []
     if not ys:
@@ -84,10 +90,16 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     for i in range(max(seq_lens) + 1):
         with torch.no_grad():
             tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
+            if second_model is not None:
+                out_2nd_mdl = second_model.decode(ys, memory_2nd_mdl.to(device), tgt_mask.to(device))
+                out_2nd_mdl = out_2nd_mdl.transpose(0, 1)
+                prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
+                all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
             out = model.decode(ys, memory.to(device), tgt_mask.to(device))
             out = out.transpose(0, 1)
-            all_outs.append(out[:, -1])
             prob = model.generator(out[:, -1])
+            all_outs.append(out[:, -1])
+
         if i == 0 and not form_sp_reg_data:
             # extract the sp-presence probabilities
             sp_probs = [sp_prb.item() for sp_prb in torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
@@ -102,7 +114,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 all_seq_sp_probs[seq_prb_ind].append(next_sp_probs[seq_prb_ind].item())
                 all_seq_sp_logits[seq_prb_ind].append(next_sp_logits[seq_prb_ind].item())
         all_probs.append(prob)
-        _, next_words = torch.max(prob, dim=1)
+        if second_model is not None:
+            _, next_words = torch.max( torch.nn.functional.softmax(prob, dim=-1) +
+                                       torch.nn.functional.softmax(prob_2nd_mdl, dim=-1), dim=1 )
+        else:
+            _, next_words = torch.max(prob, dim=1)
         next_word = [nw.item() for nw in next_words]
         current_ys = []
         for bach_ind in range(len(src)):
@@ -113,14 +129,29 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     if form_sp_reg_data:
         if model.glbl_lbl_version == 2 and model.use_glbl_lbls:
             if model.version2_agregation == "max":
-                glbl_labels = model.glbl_generator(torch.max(torch.stack(all_outs).transpose(0,1), dim=1)[0])
+                glbl_labels = model.glbl_generator(torch.max(torch.stack(all_outs).transpose(0,1), dim=1)[0], -1)
+                if second_model is not None:
+                    glbl_labels = torch.nn.functional.softmax(glbl_labels) + \
+                        torch.nn.functional.softmax(second_model.glbl_generator(
+                        torch.max(torch.stack(all_outs_2nd_mdl).transpose(0,1), dim=1)[0]), -1)
+
+
             elif model.version2_agregation == "avg":
                 glbl_labels = model.glbl_generator(torch.mean(torch.stack(all_outs).transpose(0,1), dim=1))
-
+                if second_model is not None:
+                    glbl_labels = torch.nn.functional.softmax(glbl_labels) + \
+                        torch.nn.functional.softmax(second_model.glbl_generator(
+                        torch.mean(torch.stack(all_outs_2nd_mdl).transpose(0,1), dim=1)), -1)
         elif model.glbl_lbl_version == 1 and model.use_glbl_lbls:
             glbl_labels = model.glbl_generator(memory.transpose(0,1)[:,1,:])
+            if second_model is not None:
+                glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
+                              torch.nn.functional.softmax( second_model.glbl_generator(memory_2nd_mdl.transpose(0,1)[:,1,:]), dim=-1)
         else:
             glbl_labels = model.glbl_generator(torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1))
+            if second_model is not None:
+                glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
+                              second_model.glbl_generator(torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1), dim=-1)
         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
                glbl_labels
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
@@ -220,12 +251,14 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=3):
 
     return ys, torch.tensor([0.1])
 
-def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False, form_sp_reg_data=False):
+def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False, form_sp_reg_data=False,
+              second_model=None):
     model.eval()
     if form_sp_reg_data:
         tgt_tokens, probs, sp_probs, \
         all_sp_probs, all_seq_sp_logits, sp_type_probs = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind,
-                                                                       tgt=tgt,form_sp_reg_data=form_sp_reg_data)
+                                                                       tgt=tgt,form_sp_reg_data=form_sp_reg_data,
+                                                                       second_model=second_model)
         return tgt_tokens, probs, sp_probs, \
         all_sp_probs, all_seq_sp_logits, sp_type_probs
     if use_beams_search:
@@ -283,11 +316,13 @@ def modify_sp_subregion_preds(pred_tokens, sp_type):
     return new_pred_tokens_string
 
 def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1, dataset_loader=None,
-             use_beams_search=False, form_sp_reg_data=False, simplified=False):
+             use_beams_search=False, form_sp_reg_data=False, simplified=False, second_model=None):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
     seqs2probs = {}
     model.eval()
+    if second_model is not None:
+        second_model.eval()
     val_or_test = "test" if len(sets) == 2 else "validation"
     if dataset_loader is None:
         sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified)
@@ -308,11 +343,11 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         if form_sp_reg_data:
             predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
-                          form_sp_reg_data=form_sp_reg_data)
+                          form_sp_reg_data=form_sp_reg_data, second_model=second_model)
         else:
             predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
-                          form_sp_reg_data=form_sp_reg_data)
+                          form_sp_reg_data=form_sp_reg_data, second_model=second_model)
             sp_type_probs = [""] * len(predicted_tokens)
         true_targets = padd_add_eos_tkn(tgt, lbl2ind)
         # if not use_beams_search:
@@ -341,6 +376,13 @@ def save_model(model, model_name=""):
     torch.save(model, folder + model_name + "_best_eval.pth")
     model.input_encoder.update()
 
+def other_fold_mdl_finished(model_name="", tr_f=0, val_f=1):
+    folder = get_data_folder()
+    current_fold_mdl_name = model_name + "_best_eval.pth"
+    other_fold_mdl_name = "_".join(current_fold_mdl_name.split("_")[:-6]) + "_t_{}_v_{}".format(val_f, tr_f) + "_best_eval.pth"
+    if os.path.exists(folder + other_fold_mdl_name):
+        return other_fold_mdl_name
+    return False
 
 def load_model(model_path, dict_file=None):
     folder = get_data_folder()
@@ -395,7 +437,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False, validate_on_mcc=True,
                         form_sp_reg_data=False, simplified=False, version2_agregation="max", validate_partition=None):
-    test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
+    if validate_partition is not None:
+        test_partition = {partitions[0], validate_partition}
+    else:
+        test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
     partitions = [0,1,2] if deployment_model else partitions
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified)
@@ -529,10 +574,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                          format(e, patience, val_metric, best_val_metrics))
             patience -= 1
-    if not deployment_model and validate_partition is not None:
+    other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
+    if not deployment_model and not validate_partition is not None or (validate_partition is not None and other_mdl_name):
         model = load_model(run_name + "_best_eval.pth")
+        second_model = load_model(other_mdl_name) if other_mdl_name else None
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
-                 form_sp_reg_data=form_sp_reg_data, simplified=simplified)
+                 form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model)
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(

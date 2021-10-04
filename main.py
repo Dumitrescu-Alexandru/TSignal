@@ -19,9 +19,8 @@ def create_param_set_cs_predictors():
     #               'glbl_lbl_version':[1,2]}
     # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
 
-    parameters = {"nlayers": [3,5,8],"nheads":[8,16],
-                  "lr": [0.00001], 'use_glbl_lbls':[1], 'glbl_lbl_version':[2],
-                  "train_folds": [[0,1],[0,2],[1,2]], 'patience':[30],
+    parameters = {"train_folds": [[0,1],[0,2],[1,2]], "nlayers": [3,5,8],"nheads":[8,16],
+                  "lr": [0.00001], 'use_glbl_lbls':[1], 'glbl_lbl_version':[2], 'patience':[30],
                   'dropout':[0,0.3,0.5]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
@@ -135,11 +134,15 @@ def modify_param_search_args(args):
     if "run_number" in param_set:
         run_name += "run_no_{}_".format(param_set['run_number'])
     if 'train_folds' in param_set:
-        if args.validate_partition in param_set:
+        args.train_folds = param_set['train_folds']
+    if 'validate_partition' in param_set:
+        args.validate_partition = param_set['validate_partition']
 
-            args.train_folds = param_set['train_folds']
     # use the train folds in the name of the model regardless
-    run_name += "trFlds_{}_{}".format(args.train_folds[0], args.train_folds[1])
+    if args.validate_partition is not None:
+        run_name += "_t_{}_v_{}".format(args.train_folds[0], args.validate_partition)
+    else:
+        run_name += "trFlds_{}_{}".format(args.train_folds[0], args.train_folds[1])
     args.run_name = run_name
     return args
 
@@ -150,15 +153,14 @@ def sanity_check(file, args2):
     param_bins = []
     param_bins_best = []
     for k,v in params.items():
-        if k in range(101,174):
         # if k in range(180,216):
-            args2.param_set_search_number = k
-            args2 = modify_param_search_args(args2)
-            param_names.append(args2.run_name + "_best_eval.pth")
-            param_logs.append(args2.run_name + ".log")
-            param_bins.append(args2.run_name + ".bin")
-            param_bins_best.append(args2.run_name + "_best.bin")
-            args2 = parse_arguments()
+        args2.param_set_search_number = k
+        args2 = modify_param_search_args(args2)
+        param_names.append(args2.run_name + "_best_eval.pth")
+        param_logs.append(args2.run_name + ".log")
+        param_bins.append(args2.run_name + ".bin")
+        param_bins_best.append(args2.run_name + "_best.bin")
+        args2 = parse_arguments()
     if len(param_names) != len(set(param_names)):
         print("WARNING: THE NUMBER OF UNIQUE MODEL NAMES IS NOT EQUAL TO THE NUMBER OF PARAMETERS! EXITING...")
         exit(1)
