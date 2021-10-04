@@ -138,7 +138,6 @@ def modify_param_search_args(args):
     return args
 
 def sanity_check(file, args2):
-    exit(1)
     params = pickle.load(open(file, "rb"))
     param_names = []
     param_logs = []
