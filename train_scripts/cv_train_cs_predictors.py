@@ -394,12 +394,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False, validate_on_mcc=True,
-                        form_sp_reg_data=False, simplified=False, version2_agregation="max"):
+                        form_sp_reg_data=False, simplified=False, version2_agregation="max", validate_partition=None):
     test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
     partitions = [0,1,2] if deployment_model else partitions
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified)
-    train_sets = ['test', 'train'] if validate_on_test else ['train']
+    train_sets = ['test', 'train'] if validate_on_test or validate_partition is not None else ['train']
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=form_sp_reg_data)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
@@ -477,9 +477,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             # revert valid_loss to not change the loss condition next ( this won't be a loss
             # but it's the quickest way to test performance when validation with the test set
         else:
-            valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions,
-                                             sets=["test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified)
-            _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=partitions, sets=["test"],
+            valid_sets = ["train", "test"] if validate_partition is not None else ["test"]
+            validate_partitions = [validate_partition] if validate_partition is not None else partitions
+            valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
+                                             sets=valid_sets, form_sp_reg_data=form_sp_reg_data, simplified=simplified)
+            _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=valid_sets,
                          epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores \
                 = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
@@ -527,7 +529,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
                          format(e, patience, val_metric, best_val_metrics))
             patience -= 1
-    if not deployment_model:
+    if not deployment_model and validate_partition is not None:
         model = load_model(run_name + "_best_eval.pth")
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
                  form_sp_reg_data=form_sp_reg_data, simplified=simplified)

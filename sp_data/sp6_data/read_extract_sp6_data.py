@@ -210,7 +210,7 @@ kyte_doolittle_hydrophobicity = {"A":1.8, "C":2.5, "D":-3.5, "E":-3.5, "F":2.8, 
                                  "L":3.8, "M":1.9, "N":-3.5, "P":-1.6, "Q":-3.5, "R":-4.5, "S":-0.8, "T":-0.7, "V":4.2, "W":-0.9, "Y":-1.3}
 partition_2_info = create_labeled_by_sp6_partition(ids, seqs, lbls)
 fasta_tat_lines = []
-conf_1, conf_2, conf_3, conf_4, conf_5 = 0, 0, 0, 0, 0
+conf_1, conf_2, conf_3, conf_4, conf_5, conf_6 = 0, 0, 0, 0, 0, 0
 
 for part_id, part in partition_2_info.items():
     lgandsptype2count = {}
@@ -223,11 +223,12 @@ for part_id, part in partition_2_info.items():
     #         for following_aa in ["D", "E", "R", "K", "H", "N", "Q", "S", "T", "Y", "G", "A",
     #                              "V"]:
     for i,s,l in zip(ids, seqs, lbls):
-        if "TAT" in i.split("|")[-2] and  i.split("|")[1] == "ARCHAEA":# and i.split("|")[1] == "EUKARYA" and preds_best_mdl[s][0] != "S":# and i.split("|")[1] == "NEGATIVE" and (preds_best_mdl[s][0] == "L" or preds_best_mdl[s][0] == "T"):
+        if "TAT" in i.split("|")[-2] and  i.split("|")[1] == "NEGATIVE":# and i.split("|")[1] == "EUKARYA" and preds_best_mdl[s][0] != "S":# and i.split("|")[1] == "NEGATIVE" and (preds_best_mdl[s][0] == "L" or preds_best_mdl[s][0] == "T"):
             # if preds_best_mdl[s][0] != "S":
                 # print(get_hydrophobicity(s, l, sp_type="T"))
 
             if "SRR" in s or "TRR" in s:
+                print(s.find(re.findall("[ST]RR", s[:l.rfind("T")])[0]), s)
                 conf_1 +=1
             elif len(re.findall("RR.F", s)) != 0:
                 conf_2 +=1
@@ -239,6 +240,8 @@ for part_id, part in partition_2_info.items():
                 conf_4 +=1
             elif "RR" in s:
                 conf_5 +=1
+            elif "MNDAAPQNPGQDEAKGTGEKDNGGSMSPRSALRTTAGVAGAGLGLSALGTGTASASVPEAAQTAVPAAES" == s:
+                conf_6 += 1
             else:
                 print(s)
             # else:
@@ -262,7 +265,7 @@ for part_id, part in partition_2_info.items():
         lgandsptype2count["ARCHAEA_SP"] = 0
     lgandsptype2counts.append(lgandsptype2count)
     print(part_id, lgandsptype2count)
-    print(conf_1, conf_2, conf_3, conf_4, conf_5)
+    print(conf_1, conf_2, conf_3, conf_4, conf_5, conf_6)
 
 plot_for = ["EUKARYA_NO_SP", "EUKARYA_SP", "NEGATIVE_NO_SP", "NEGATIVE_SP", "POSITIVE_NO_SP", "POSITIVE_SP", "ARCHAEA_NO_SP", "ARCHAEA_SP"]
 # with open("rr_sequences.fasta", "wt") as f:

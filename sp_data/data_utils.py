@@ -68,6 +68,20 @@ class SPCSpredictionData:
                                          "L": 3.8, "M": 1.9, "N": -3.5, "P": -1.6, "Q": -3.5, "R": -4.5, "S": -0.8,
                                          "T": -0.7, "V": 4.2, "W": -0.9, "Y": -1.3}
 
+        def get_pos_rr_motif_v2(s, l):
+            if "SRR" in s[:l.rfind("T")-3] or "TRR" in s[:l.rfind("T") -3]:
+                return re.findall("[ST]RR", s[:l.rfind("T")])[0]
+            elif len(re.findall("RR.F", s[:l.rfind("T")-3])) != 0:
+                return re.findall("RR.F", s)[0]
+            elif len(re.findall("[R][RNKQ][DERKHNQSTYGAV]", s[:l.rfind("T")-3])) != 0:
+                # print(re.findall("[R][RNKQ][DERKHNQSTYGAV]", s[:l.rfind("T")]))
+                return re.findall("[R][RNKQ][DERKHNQSTYGAV]", s[:l.rfind("T")-3])[0]
+            elif len(re.findall("[RK][R][DERKHNQSTYGAV]", s)) != 0:
+                return re.findall("[RK][R][DERKHNQSTYGAV]", s[:l.rfind("T")-3])[0]
+            elif "RR" in s:
+                return "RR"
+            elif "MNDAAPQNPGQDEAKGTGEKDNGGSMSPRSALRTTAGVAGAGLGLSALGTGTASASVPEAAQTAVPAAES" == s:
+                return "RS"
         def get_pos_of_rr_motif(seq_, lbls_, l_g=None):
             seq_ = seq_[:lbls_.rfind("T")]
             mtfs_found = []
@@ -143,12 +157,13 @@ class SPCSpredictionData:
             # after motif: D,E, R, K, H , N, Q, S, T, Y, G, F
 
         def get_hydro_values(seq_, lbls_, sp_aa_lbl="S", start_ind=3):
+
             last_ind = lbls_.rfind(sp_aa_lbl)
             hydro_vals = []
             for i in range(start_ind, last_ind - 2):
                 # window of 7 is used for the hydro values, determining the h region
                 # compute these for all SP labels, except last 3 which are
-                hydro_vals.append(sum([kyte_doolittle_hydrophobicity[seq[j]] for j in range(i-3,i+4)]))
+                hydro_vals.append(sum([kyte_doolittle_hydrophobicity[seq_[j]] for j in range(i-3,i+4)]))
             h_ind = np.argmax(hydro_vals)+ start_ind
             return h_ind, last_ind
         possible_sp_letters = ["S", "T", "L", "P"]
@@ -178,7 +193,8 @@ class SPCSpredictionData:
                 modified_lbls += "C"
                 modified_lbls += lbls[last_ind+2:]
             elif glbl_lbl == "TAT":
-                motif = get_pos_of_rr_motif(seq, lbls)
+                # motif = get_pos_of_rr_motif(seq, lbls)
+                motif = get_pos_rr_motif_v2(seq, lbls)
                 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2654714/
                 # RR motif is a little more complicated
                 h_ind, last_ind = get_hydro_values(seq, lbls, sp_aa_lbl=sp_letter, start_ind=seq.find(motif) + 3)
@@ -197,7 +213,8 @@ class SPCSpredictionData:
                 modified_lbls += "S" * 3 if self.simplified else "c" * 3
                 modified_lbls += lbls[last_ind +1:]
             elif glbl_lbl == "TATLIPO":
-                motif = get_pos_of_rr_motif(seq, lbls)
+                # motif = get_pos_of_rr_motif(seq, lbls)
+                motif = get_pos_rr_motif_v2(seq, lbls)
                 h_ind, last_ind = get_hydro_values(seq, lbls, sp_aa_lbl=sp_letter, start_ind=seq.find(motif) + 3)
                 # nnnnnnnRRn (n region has the RR motif and one single n after).
                 modified_lbls = "S" * seq.find(motif) if self.simplified else "n" * seq.find(motif)

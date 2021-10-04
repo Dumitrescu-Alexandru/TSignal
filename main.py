@@ -79,6 +79,7 @@ def parse_arguments():
     parser.add_argument("--form_sp_reg_data", default=False, action="store_true")
     parser.add_argument("--simplified", default=True, action="store_true")
     parser.add_argument("--version2_agregation", default="max",type=str)
+    parser.add_argument("--validate_partition", default=None,type=int)
     return parser.parse_args()
 
 def modify_param_search_args(args):
@@ -107,6 +108,9 @@ def modify_param_search_args(args):
     if 'dos' in param_set:
         args.dropout = param_set['dos']
         run_name += "dos_{}_".format(args.dropout)
+    if "dropout" in param_set:
+        args.dropout = param_set['dropout']
+        run_name += "dos_{}_".format(args.dropout)
     if 'lr' in param_set:
         args.lr = param_set['lr']
         run_name += "lr_{}_".format(args.lr)
@@ -131,7 +135,9 @@ def modify_param_search_args(args):
     if "run_number" in param_set:
         run_name += "run_no_{}_".format(param_set['run_number'])
     if 'train_folds' in param_set:
-        args.train_folds = param_set['train_folds']
+        if args.validate_partition in param_set:
+
+            args.train_folds = param_set['train_folds']
     # use the train folds in the name of the model regardless
     run_name += "trFlds_{}_{}".format(args.train_folds[0], args.train_folds[1])
     args.run_name = run_name
@@ -175,7 +181,8 @@ if __name__ == "__main__":
         sanity_check("param_groups_by_id_cs.bin", args2)
         if args.param_set_search_number != -1:
             args = modify_param_search_args(args)
-
+        elif args.validate_partition is not None:
+            args.run_name += "_t_{}_v_{}".format(args.train_folds[0], args.validate_partition)
         logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
         logging.info("Started training")
         args.train_folds = [int(tf) for tf in args.train_folds]
@@ -186,7 +193,8 @@ if __name__ == "__main__":
                                 lr_sched_warmup=args.lr_sched_warmup, test_beam=args.test_beam, wd=args.wd,
                                 glbl_lbl_weight=args.glbl_lbl_weight,glbl_lbl_version=args.glbl_lbl_version,
                                 validate_on_test=args.validate_on_test, form_sp_reg_data=args.form_sp_reg_data,
-                                simplified=args.simplified, version2_agregation=args.version2_agregation)
+                                simplified=args.simplified, version2_agregation=args.version2_agregation,
+                                validate_partition=args.validate_partition)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
