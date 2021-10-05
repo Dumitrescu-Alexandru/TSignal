@@ -527,7 +527,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             # revert valid_loss to not change the loss condition next ( this won't be a loss
             # but it's the quickest way to test performance when validation with the test set
         else:
-            valid_sets = ["test"] if validate_partition is not None else ["test"]
+            valid_sets = ["train", "test"] if validate_partition is not None else ["test"]
             validate_partitions = [validate_partition] if validate_partition is not None else partitions
             valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
                                              sets=valid_sets, form_sp_reg_data=form_sp_reg_data, simplified=simplified)
@@ -583,7 +583,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     if not deployment_model and not validate_partition is not None or (validate_partition is not None and other_mdl_name):
         model = load_model(run_name + "_best_eval.pth")
         second_model = load_model(other_mdl_name) if other_mdl_name else None
-        evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["test"],
+        evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
                  form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model)
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False)
