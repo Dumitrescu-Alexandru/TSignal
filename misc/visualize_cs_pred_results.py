@@ -867,6 +867,9 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         params += "_{}".format(nhead)
         lr_sched = mdl_params[mdl_params.find("lrsched") + len("lrsched"):].split("_")[1]
         params += "_{}".format(lr_sched)
+        if "dos" in mdl_params:
+            dos = mdl_params[mdl_params.find("dos"):].split("_")[1]
+            params += "_{}".format(dos)
         mdlind2mdlparams[mdl_ind] = params
 
     print("\n\nMCC SEC/SPI TABLE\n\n")
@@ -1163,12 +1166,12 @@ if __name__ == "__main__":
     # duplicate_Some_logs()
     # exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="crct_simplified_glblv2_max/",
+                                            result_folder="param_s_v2_data/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False, result_folder="drop_large_crct_v2_max_glbl_lg_deailed_sp_v1/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
+    # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="drop_large_crct_v2_max_glbl_lg_deailed_sp_v1/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False)
     visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1],folder="crct_simplified_glblv2_max/")
 
     visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1],folder="crct_simplified_glblv2_max/")

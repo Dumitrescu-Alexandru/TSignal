@@ -129,11 +129,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     if form_sp_reg_data:
         if model.glbl_lbl_version == 2 and model.use_glbl_lbls:
             if model.version2_agregation == "max":
-                glbl_labels = model.glbl_generator(torch.max(torch.stack(all_outs).transpose(0,1), dim=1)[0], -1)
+                glbl_labels = model.glbl_generator(torch.max(torch.stack(all_outs).transpose(0,1), dim=1)[0])
                 if second_model is not None:
-                    glbl_labels = torch.nn.functional.softmax(glbl_labels) + \
+                    glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=1) + \
                         torch.nn.functional.softmax(second_model.glbl_generator(
-                        torch.max(torch.stack(all_outs_2nd_mdl).transpose(0,1), dim=1)[0]), -1)
+                        torch.max(torch.stack(all_outs_2nd_mdl).transpose(0,1), dim=1)[0]), dim=1)
 
 
             elif model.version2_agregation == "avg":
@@ -438,7 +438,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False, validate_on_mcc=True,
                         form_sp_reg_data=False, simplified=False, version2_agregation="max", validate_partition=None):
     if validate_partition is not None:
-        test_partition = {partitions[0], validate_partition}
+        test_partition = {0,1,2} - {partitions[0], validate_partition}
     else:
         test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
     partitions = [0,1,2] if deployment_model else partitions

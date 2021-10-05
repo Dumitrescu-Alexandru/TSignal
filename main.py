@@ -180,8 +180,8 @@ if __name__ == "__main__":
         args2 = parse_arguments()
         if not os.path.exists("param_groups_by_id_cs.bin"):
             create_param_set_cs_predictors()
-        sanity_check("param_groups_by_id_cs.bin", args2)
         if args.param_set_search_number != -1:
+            sanity_check("param_groups_by_id_cs.bin", args2)
             args = modify_param_search_args(args)
         elif args.validate_partition is not None:
             args.run_name += "_t_{}_v_{}".format(args.train_folds[0], args.validate_partition)
