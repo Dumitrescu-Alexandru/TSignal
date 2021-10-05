@@ -475,7 +475,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     best_valid_mcc_and_recall = -1
     best_epoch = 0
     e = -1
-    patience = 0
     while patience != 0:
         print("\n\nLR:",optimizer.param_groups[0]['lr'],"\n\n")
         model.train()
