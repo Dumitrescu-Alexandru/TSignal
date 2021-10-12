@@ -73,10 +73,11 @@ def parse_arguments():
     parser.add_argument("--test_beam", default=False, action="store_true")
     parser.add_argument("--wd", default=0., type=float)
     parser.add_argument("--glbl_lbl_weight", default=1., type=float)
-    parser.add_argument("--glbl_lbl_version", default=1, type=float)
+    parser.add_argument("--glbl_lbl_version", default=1, type=int)
     parser.add_argument("--validate_on_test", default=False, action="store_true")
     parser.add_argument("--form_sp_reg_data", default=False, action="store_true")
     parser.add_argument("--simplified", default=True, action="store_true")
+    parser.add_argument("--very_simplified", default=True, action="store_true")
     parser.add_argument("--version2_agregation", default="max",type=str)
     parser.add_argument("--validate_partition", default=None,type=int)
     return parser.parse_args()
@@ -196,7 +197,7 @@ if __name__ == "__main__":
                                 glbl_lbl_weight=args.glbl_lbl_weight,glbl_lbl_version=args.glbl_lbl_version,
                                 validate_on_test=args.validate_on_test, form_sp_reg_data=args.form_sp_reg_data,
                                 simplified=args.simplified, version2_agregation=args.version2_agregation,
-                                validate_partition=args.validate_partition)
+                                validate_partition=args.validate_partition,very_simplified=args.very_simplified)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):

@@ -1165,9 +1165,9 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    visualize_validation(run="sp6_train_test_val_trFlds_", folds=[0, 1],folder="sp6_cv_method/")
+    visualize_validation(run="sp6_train_test_val_flds01_t_0_v_1_", folds=[0, 1],folder="sp6_cv_method/")
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="sp6_cv_method/",
+                                            result_folder="param_s_v2_data/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="drop_large_crct_v2_max_glbl_lg_deailed_sp_v1/",

@@ -8,6 +8,7 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer, Transformer
 from torch.utils.data import dataset
+from models.binary_sp_classifier import BinarySPClassifier
 
 
 class TokenEmbedding(nn.Module):
@@ -175,6 +176,7 @@ class TransformerModel(nn.Module):
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
                  version2_agregation="max"):
         super().__init__()
+        self.add_lg_info = lg2ind is not None
         self.form_sp_reg_data = form_sp_reg_data
         self.model_type = 'Transformer'
         self.version2_agregation = "max"
@@ -197,8 +199,12 @@ class TransformerModel(nn.Module):
         self.generator = nn.Linear(d_model, ntoken).to(self.device)
         self.use_glbl_lbls = use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
-        self.glbl_generator = nn.Linear(ntoken, no_glbl_lbls).to(self.device) if self.form_sp_reg_data and not use_glbl_lbls\
-            else nn.Linear(d_model, no_glbl_lbls).to(self.device)
+        if self.form_sp_reg_data and not use_glbl_lbls:
+            self.glbl_generator = nn.Linear(ntoken, no_glbl_lbls).to(self.device)
+        elif use_glbl_lbls and self.glbl_lbl_version != 3:
+            self.glbl_generator = nn.Linear(d_model, no_glbl_lbls).to(self.device)
+        elif self.use_glbl_lbls and self.glbl_lbl_version == 3:
+            self.glbl_generator = BinarySPClassifier(input_size=1024, output_size=no_glbl_lbls).to(self.device)
 
     def encode(self, src):
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
@@ -224,6 +230,16 @@ class TransformerModel(nn.Module):
         outs = self.transformer.decoder(padded_tgt, memory, tgt_mask, tgt_key_padding_mask=padding_mask_tgt)
         return self.generator(outs), self.glbl_generator(memory.transpose(0,1)[:,1,:])
 
+    def get_v3_glbl_lbls(self, src):
+        src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
+        if self.add_lg_info:
+            trim_ind_l , trim_ind_r = 2, 1
+        else:
+            trim_ind_l , trim_ind_r = 0, 0
+        src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for  i in range(len(src))]
+        padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
+        return self.glbl_generator(padded_src_glbl.transpose(2, 1))
+
     def forward(self, src: Tensor, tgt: list) -> Tensor:
         """
         Args:
@@ -235,6 +251,12 @@ class TransformerModel(nn.Module):
         if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             return self.forward_glb_lbls(src, tgt)
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
+        if self.glbl_lbl_version == 3:
+            if self.add_lg_info:
+                trim_ind_l , trim_ind_r = 2, 1
+            else:
+                trim_ind_l , trim_ind_r = 0, 0
+            src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for  i in range(len(src))]
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
         padded_src = self.pos_encoder(padded_src.transpose(0,1))
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
@@ -247,7 +269,9 @@ class TransformerModel(nn.Module):
                 return self.generator(outs), self.glbl_generator(torch.max(outs.transpose(0,1), dim=1)[0])
             elif self.version2_agregation == "avg":
                 return self.generator(outs), self.glbl_generator(torch.mean(outs.transpose(0,1), dim=1))
-
+        elif self.glbl_lbl_version == 3 and self.use_glbl_lbls:
+            padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
+            return self.generator(outs), self.glbl_generator(padded_src_glbl.transpose(2,1))
         elif self.form_sp_reg_data:
             preds = self.generator(outs)
             return preds, self.glbl_generator(torch.mean(torch.sigmoid(preds.transpose(0,1)), dim=1))

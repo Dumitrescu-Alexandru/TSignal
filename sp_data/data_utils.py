@@ -10,16 +10,17 @@ from Bio import SeqIO
 
 
 class SPCSpredictionData:
-    def __init__(self, lbl2ind=None, form_sp_reg_data=False, simplified=True):
+    def __init__(self, lbl2ind=None, form_sp_reg_data=False, simplified=True, very_simplified=True):
         self.aa2ind = {}
         self.lbl2ind = {}
         self.glbl_lbl_2ind = {}
-        self.simplified = simplified
+        self.simplified = simplified if not very_simplified else True
+        self.very_simplified = very_simplified
         self.data_folder = self.get_data_folder()
         self.lg2ind = {}
         self.form_sp_reg_data = form_sp_reg_data
         if form_sp_reg_data:
-            self.set_dicts(form_sp_reg_data, simplified)
+            self.set_dicts(form_sp_reg_data)
             self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts_subregion_lbls.bin", "rb"))
         else:
             self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
@@ -30,10 +31,19 @@ class SPCSpredictionData:
         # else:
         #     self.form_lbl_inds()
 
-    def set_dicts(self, form_sp_reg_data=False, simplified=False):
+    def set_dicts(self, form_sp_reg_data=False):
 
         if form_sp_reg_data:
-            if simplified:
+            if self.very_simplified:
+                dicts = [{'S': 0, 'O': 1, 'M': 2, 'I': 3, 'PD': 4, 'BS': 5, 'ES': 6},
+                         {'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
+                         {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5},
+                         {'V': 0, 'R': 1, 'D': 2, 'E': 3, 'H': 4, 'A': 5, 'G': 6, 'Y': 7, 'W': 8, 'F': 9, 'M': 10,
+                          'K': 11,
+                          'L': 12,
+                          'I': 13, 'C': 14, 'Q': 15, 'S': 16, 'P': 17, 'N': 18, 'T': 19, 'PD': 20, 'BS': 21,
+                          'ES': 22}]
+            elif self.simplified:
                 dicts = [{'S': 0, 'R': 1, 'C': 2, 'O': 3, 'M': 4, 'I': 5, 'PD': 6, 'BS': 7, 'ES': 8},
                          {'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
                          {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5},
@@ -190,7 +200,7 @@ class SPCSpredictionData:
                 modified_lbls += "S" * (last_ind - h_ind - 3) if self.simplified else "h" * (last_ind - h_ind - 3)
                 modified_lbls += "S" * 3 if self.simplified else "B" * 3
                 # in LIPO/TATLIPO, there is always a cysteine aa after CS
-                modified_lbls += "C"
+                modified_lbls += "C" if not self.very_simplified else lbls[last_ind+1]
                 modified_lbls += lbls[last_ind+2:]
             elif glbl_lbl == "TAT":
                 # motif = get_pos_of_rr_motif(seq, lbls)
@@ -200,7 +210,7 @@ class SPCSpredictionData:
                 h_ind, last_ind = get_hydro_values(seq, lbls, sp_aa_lbl=sp_letter, start_ind=seq.find(motif) + 3)
                 # nnnnnnnRRn (n region has the RR motif and one single n after).
                 modified_lbls = "S" * seq.find(motif) if self.simplified else "n" * seq.find(motif)
-                modified_lbls += "R" * 2
+                modified_lbls += "R" * 2 if not self.very_simplified else "S" * 2
                 modified_lbls += "S" if self.simplified else "n"
                 current_len = len(modified_lbls)
                 # add nh <- N (uncertain n or h label) until the most hydrophobic aa at h_ind
@@ -218,7 +228,7 @@ class SPCSpredictionData:
                 h_ind, last_ind = get_hydro_values(seq, lbls, sp_aa_lbl=sp_letter, start_ind=seq.find(motif) + 3)
                 # nnnnnnnRRn (n region has the RR motif and one single n after).
                 modified_lbls = "S" * seq.find(motif) if self.simplified else "n" * seq.find(motif)
-                modified_lbls += "R" * 2
+                modified_lbls += "R" * 2 if not self.very_simplified else "S" * 2
                 modified_lbls += "S" if self.simplified else "n"
                 current_len = len(modified_lbls)
                 # add nh <- N (uncertain n or h label) until the most hydrophobic aa at h_ind
@@ -229,7 +239,7 @@ class SPCSpredictionData:
                 modified_lbls += "S" * (last_ind - h_ind - 3) if self.simplified else "h" * (last_ind - h_ind - 3)
                 # certain c label subregion for the last 3 aa
                 modified_lbls += "S" * 3 if self.simplified else "B" * 3
-                modified_lbls += "C"
+                modified_lbls += "C" if not self.very_simplified else lbls[last_ind + 1]
                 modified_lbls += lbls[last_ind + 2:]
             elif glbl_lbl == "PILIN":
                 return lbls.replace("P", "S")
