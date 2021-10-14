@@ -80,6 +80,7 @@ def parse_arguments():
     parser.add_argument("--very_simplified", default=True, action="store_true")
     parser.add_argument("--version2_agregation", default="max",type=str)
     parser.add_argument("--validate_partition", default=None,type=int)
+    parser.add_argument("--validate_on_mcc", default=False,action="store_true")
     return parser.parse_args()
 
 def modify_param_search_args(args):
@@ -197,7 +198,8 @@ if __name__ == "__main__":
                                 glbl_lbl_weight=args.glbl_lbl_weight,glbl_lbl_version=args.glbl_lbl_version,
                                 validate_on_test=args.validate_on_test, form_sp_reg_data=args.form_sp_reg_data,
                                 simplified=args.simplified, version2_agregation=args.version2_agregation,
-                                validate_partition=args.validate_partition,very_simplified=args.very_simplified)
+                                validate_partition=args.validate_partition,very_simplified=args.very_simplified,
+                                validate_on_mcc=args.validate_on_mcc)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):

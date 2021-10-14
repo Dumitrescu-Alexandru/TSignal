@@ -600,8 +600,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores \
                 = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
-        validate_on_f1_score = np.mean([all_f1_scores[i][1] for i in range(4)]) if not np.isnan(all_f1_scores[3][0]) \
-            else np.mean([all_f1_scores[i][1] for i in range(3)])
+        if validate_on_mcc:
+            patiente_metric = np.mean(sp_pred_mccs)
+        else:
+            patiente_metric = np.mean([all_f1_scores[i][1] for i in range(4)]) if not np.isnan(all_f1_scores[3][0]) \
+                else np.mean([all_f1_scores[i][1] for i in range(3)])
         # sp_pred_mccs
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                                                        list(np.array(all_precisions).flatten()), list(
@@ -626,23 +629,23 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
         print("VALIDATION: avg mcc on epoch {}: {}".format(e, euk_importance_avg(sp_pred_mccs)))
         if (valid_loss < best_valid_loss and eps == -1 and not validate_on_mcc) or (eps != -1 and e == eps - 1) or \
-                (validate_on_f1_score > best_valid_mcc_and_recall and eps == -1 and validate_on_mcc):
+                (patiente_metric > best_valid_mcc_and_recall and eps == -1 and validate_on_mcc):
             best_epoch = e
             best_valid_loss = valid_loss
-            best_valid_mcc_and_recall = validate_on_f1_score
+            best_valid_mcc_and_recall = patiente_metric
             save_model(model, run_name)
             if e == eps - 1:
                 patience = 0
         elif (e > 20 and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
-                (e > 20 and best_valid_mcc_and_recall > validate_on_f1_score and eps == -1 and validate_on_mcc):
+                (e > 20 and best_valid_mcc_and_recall > patiente_metric and eps == -1 and validate_on_mcc):
             if validate_on_mcc:
-                best_val_metrics, val_metric = best_valid_mcc_and_recall, validate_on_f1_score
+                best_val_metrics, val_metric = best_valid_mcc_and_recall, patiente_metric
             else:
                 best_val_metrics, val_metric = best_valid_loss, valid_loss
-            print("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
-                  format(e, patience, val_metric, best_val_metrics))
-            logging.info("On epoch {} dropped patience to {} because on valid result {} compared to best {}.".
-                         format(e, patience, val_metric, best_val_metrics))
+            print("On epoch {} dropped patience to {} because on valid result {} from epoch {} compared to best {}.".
+                  format(e, patience, val_metric, best_epoch, best_val_metrics))
+            logging.info("On epoch {} dropped patience to {} because on valid result {} from epoch {} compared to best {}.".
+                         format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
     if not deployment_model and not validate_partition is not None or (

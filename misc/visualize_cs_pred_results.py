@@ -1,3 +1,4 @@
+import torch.nn
 from scipy import stats
 import matplotlib.pyplot as plt
 from sklearn.metrics import matthews_corrcoef as compute_mcc
@@ -1161,15 +1162,15 @@ def duplicate_Some_logs():
 
 
 if __name__ == "__main__":
-
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    visualize_validation(run="sp6_train_test_val_flds01_t_0_v_1_", folds=[0, 1],folder="sp6_cv_method/")
+    visualize_validation(run="separate_glbl_cs_", folds=[0, 1],folder="separate-glbl/")
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="param_s_v2_data/",
+                                            result_folder="separate-glbl/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
+
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="drop_large_crct_v2_max_glbl_lg_deailed_sp_v1/",
     #                                         compare_mdl_plots=False,
     #                                         remove_test_seqs=False)
