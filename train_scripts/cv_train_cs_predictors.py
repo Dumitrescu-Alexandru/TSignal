@@ -583,8 +583,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             validate_partitions = list(test_partition)
             _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
                          epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified,very_simplified=very_simplified)
-            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores \
-                = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
+            sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
+            all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
+            all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
+                get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True)
             valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
                                              sets=["test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
                                              very_simplified=very_simplified)
@@ -598,10 +600,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                              very_simplified=very_simplified)
             _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=valid_sets,
                          epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
-            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores \
-                = get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False)
+            sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
+            all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
+            all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
+                get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True)
         if validate_on_mcc:
-            patiente_metric = np.mean(sp_pred_mccs)
+            patiente_metric = np.mean(sp_pred_mccs2)
         else:
             patiente_metric = np.mean([all_f1_scores[i][1] for i in range(4)]) if not np.isnan(all_f1_scores[3][0]) \
                 else np.mean([all_f1_scores[i][1] for i in range(3)])
@@ -627,7 +631,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e,
                                          all_f1_scores=all_f1_scores)
 
-        print("VALIDATION: avg mcc on epoch {}: {}".format(e, euk_importance_avg(sp_pred_mccs)))
+        print("VALIDATION: avg mcc on epoch {}: {}".format(e, np.mean(sp_pred_mccs2)))
         if (valid_loss < best_valid_loss and eps == -1 and not validate_on_mcc) or (eps != -1 and e == eps - 1) or \
                 (patiente_metric > best_valid_mcc_and_recall and eps == -1 and validate_on_mcc):
             best_epoch = e

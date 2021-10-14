@@ -323,7 +323,8 @@ def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabili
         all_recalls_lipo, all_precisions_lipo, _, _, _, all_f1_scores_lipo = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO")
         all_recalls_tat, all_precisions_tat, _, _, _, all_f1_scores_tat = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT")
         return sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs,lipo_pred_mccs2, tat_pred_mccs,tat_pred_mccs2, \
-               all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat
+               all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat,     \
+               all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores
     return sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores
 
 
