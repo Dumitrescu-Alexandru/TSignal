@@ -1166,11 +1166,11 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
+    visualize_validation(run="tune_cs_v2_folds_", folds=[0, 1],folder="tune_cs_v2/")
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tune_cs/",
+                                            result_folder="tune_cs_v2/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
-    visualize_validation(run="tune_cs_folds_", folds=[0, 1],folder="tune_cs/")
 
     visualize_validation(run="validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2],folder="separate-glbl-mcc2-drop/")
     visualize_validation(run="tune_cs_run_", folds=[0, 1],folder="tune_cs_test/")
