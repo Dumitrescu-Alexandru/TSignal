@@ -174,14 +174,14 @@ class TransformerModel(nn.Module):
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5,
                  data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
-                 version2_agregation="max"):
+                 version2_agregation="max", input_drop=False):
         super().__init__()
         self.add_lg_info = lg2ind is not None
         self.form_sp_reg_data = form_sp_reg_data
         self.model_type = 'Transformer'
         self.version2_agregation = "max"
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.pos_encoder = PositionalEncoding(d_model, dropout)
+        self.pos_encoder = PositionalEncoding(d_model, dropout=dropout if input_drop else 0)
         self.transformer = Transformer(d_model=d_hid,
                                        nhead=nhead,
                                        num_encoder_layers=nlayers,
@@ -299,7 +299,7 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        x = x + self.pe[:x.size(0)]
+        x = self.dropout(x + self.pe[:x.size(0)])
         return x
 
 
