@@ -504,7 +504,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False,
                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
-                        validate_partition=None, very_simplified=False):
+                        validate_partition=None, very_simplified=False, tune_cs=5):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -549,12 +549,34 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 logits, glbl_logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
-                loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
-                losses += loss.item()
+                if tune_cs > 0 and patience < 10:
+                    sps = list(np.argwhere(np.array(glbl_lbls) != 0).flatten())
+                    logits = logits[:, sps, :]
+                    targets = targets[sps, :]
+                    seq_indices = []
+                    element_indices = []
+                    for ind_, (l, t) in enumerate(zip(logits, targets)):
+                        t = list(t.cpu().numpy())
+                        t.reverse()
+                        last_sp_ind = len(t) - t.index(0) - 1
+                        sp_inds = list(range(last_sp_ind - tune_cs, last_sp_ind + tune_cs))
+                        seq_indices.extend(sp_inds)
+                        element_indices.extend([ind_] * tune_cs * 2)
+                    logits = logits[seq_indices, element_indices, :]
+                    targets = targets.transpose(1, 0)[seq_indices, element_indices]
+                    loss = loss_fn(logits.reshape(-1, logits.shape[-1]), targets.reshape(-1))
+                    losses += loss.item()
 
-                loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
-                losses_glbl += loss_glbl.item()
-                loss += loss_glbl * glbl_lbl_weight
+                    loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
+                    losses_glbl += loss_glbl.item()
+                    loss += loss_glbl * glbl_lbl_weight
+                else:
+                    loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
+                    losses += loss.item()
+
+                    loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
+                    losses_glbl += loss_glbl.item()
+                    loss += loss_glbl * glbl_lbl_weight
             elif form_sp_reg_data:
                 logits, glbl_logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()

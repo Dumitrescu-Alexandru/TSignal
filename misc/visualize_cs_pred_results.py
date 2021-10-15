@@ -1166,11 +1166,20 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    visualize_validation(run="separate_glbl_cs_", folds=[0, 1],folder="separate-glbl/")
+    visualize_validation(run="validate_on_mcc2_separate_glbl_cs_", folds=[0, 1],folder="separate-glbl-mcc2/")
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl/",
+                                            result_folder="separate-glbl-mcc2/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
+
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl-mcc/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    # visualize_validation(run="separate_glbl_cs_", folds=[0, 1],folder="separate-glbl/")
+    visualize_validation(run="validate_on_mcc_separate_glbl_cs_", folds=[0, 1],folder="separate-glbl-mcc/")
+
 
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="drop_large_crct_v2_max_glbl_lg_deailed_sp_v1/",
     #                                         compare_mdl_plots=False,
