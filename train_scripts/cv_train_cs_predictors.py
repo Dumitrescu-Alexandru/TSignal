@@ -530,6 +530,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                        version2_agregation=version2_agregation, input_drop=input_drop)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
+    loss_fn_tune = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
     loss_fn_glbl = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
     warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup)
@@ -550,21 +551,20 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
                 if tune_cs > 0 and patience < 10:
-                    sps = list(np.argwhere(np.array(glbl_lbls) != 0).flatten())
-                    logits = logits[:, sps, :]
-                    targets = targets[sps, :]
                     seq_indices = []
-                    element_indices = []
-                    for ind_, (l, t) in enumerate(zip(logits, targets)):
-                        t = list(t.cpu().numpy())
-                        t.reverse()
-                        last_sp_ind = len(t) - t.index(0) - 1
-                        sp_inds = list(range(last_sp_ind - tune_cs, last_sp_ind + tune_cs))
-                        seq_indices.extend(sp_inds)
-                        element_indices.extend([ind_] * tune_cs * 2)
-                    logits = logits[seq_indices, element_indices, :]
-                    targets = targets.transpose(1, 0)[seq_indices, element_indices]
-                    loss = loss_fn(logits.reshape(-1, logits.shape[-1]), targets.reshape(-1))
+                    seq_dim = logits.shape[0]
+                    for ind_, (gl, t) in enumerate(zip(glbl_lbls, targets)):
+                        if gl != 0:
+                            t = list(t.cpu().numpy())
+                            t.reverse()
+                            last_sp_ind = len(t) - t.index(0) - 1
+                            sp_inds = list(range(last_sp_ind - tune_cs, last_sp_ind + tune_cs))
+                            seq_indices.extend([si + seq_dim * ind_ for si in sp_inds])
+
+                    loss = loss_fn_tune(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
+                    loss *= 0.1
+                    loss[seq_indices] *= 10
+                    loss = torch.mean(loss)
                     losses += loss.item()
 
                     loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
@@ -573,7 +573,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 else:
                     loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
                     losses += loss.item()
-
                     loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
                     losses_glbl += loss_glbl.item()
                     loss += loss_glbl * glbl_lbl_weight
