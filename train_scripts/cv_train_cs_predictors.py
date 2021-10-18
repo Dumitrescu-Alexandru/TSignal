@@ -453,7 +453,7 @@ def load_model(model_path, dict_file=None):
 
 
 def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1,
-                                     beam_txt="Greedy", all_f1_scores=None):
+                                     beam_txt="Greedy", all_f1_scores=None,sptype_f1=None):
     print(
         "{}_{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on, ep, *sp_pred_mccs))
     print("{}_{}, epoch {} Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
@@ -465,6 +465,9 @@ def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, 
     print("{}_{}, epoch {} Mean cs f1-score: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         beam_txt,
         test_on, ep, *np.concatenate(all_f1_scores)))
+    print("{}_{}, epoch {} Mean class preds F1Score: {}, {}, {}, {}".format(
+        beam_txt,
+        test_on, ep, *sptype_f1))
     logging.info("{}_{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on, ep,
                                                                                             *sp_pred_mccs))
     logging.info(
@@ -476,6 +479,9 @@ def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, 
     logging.info(
         "{}_{}, epoch {}: Mean cs f1: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
             beam_txt, test_on, ep, *np.concatenate(all_f1_scores)))
+    logging.info("{}_{}, epoch {} Mean cs F1Score: {}, {}, {}, {}".format(
+        beam_txt,
+        test_on, ep, *sptype_f1))
 
 
 def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0, use_swa=False):
@@ -544,7 +550,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     if use_swa:
         warmup_scheduler = None
         swa_model = AveragedModel(model)
-        scheduler = SWALR(optimizer, swa_lr=0.00001, anneal_strategy="cos", anneal_epochs=10)
+        scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)
     else:
         warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
     best_valid_loss = 5 ** 10
@@ -625,8 +631,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified,very_simplified=very_simplified)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
-            all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-                get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True)
+            all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
+                get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
             valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
                                              sets=["test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
                                              very_simplified=very_simplified)
@@ -642,8 +648,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
-            all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-                get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True)
+            all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
+                get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
         if validate_on_mcc:
             patiente_metric = np.mean(sp_pred_mccs2)
         else:
@@ -669,7 +675,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info(
                 "On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e,
-                                         all_f1_scores=all_f1_scores)
+                                         all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
 
         print("VALIDATION: avg mcc on epoch {}: {}".format(e, np.mean(sp_pred_mccs2)))
         if (valid_loss < best_valid_loss and eps == -1 and not validate_on_mcc) or (eps != -1 and e == eps - 1) or \

@@ -111,14 +111,15 @@ def get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls):
     groups_tp_tn_fp_fn = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
     grp2_ind = {"EUKARYA": 0, "NEGATIVE": 1, "POSITIVE": 2, "ARCHAEA": 3}
     for lg, s, tl, pl in zip(life_grp, seqs, true_lbls, pred_lbls):
+        lg = lg.split("|")[0]
         if tl[0] == pl[0] and tl[0] == "S":
-            groups_tp_tn_fp_fn[grp2_ind[lg]][0] = 1
+            groups_tp_tn_fp_fn[grp2_ind[lg]][0] += 1
         elif tl[0] != "S" and pl[0] != "S":
-            groups_tp_tn_fp_fn[grp2_ind[lg]][1] = 1
+            groups_tp_tn_fp_fn[grp2_ind[lg]][1] += 1
         elif tl[0] == "S" and pl[0] != "S":
-            groups_tp_tn_fp_fn[grp2_ind[lg]][3] = 1
+            groups_tp_tn_fp_fn[grp2_ind[lg]][3] += 1
         elif tl[0] != "S" and pl[0] == "S":
-            groups_tp_tn_fp_fn[grp2_ind[lg]][2] = 1
+            groups_tp_tn_fp_fn[grp2_ind[lg]][2] += 1
     recs = [groups_tp_tn_fp_fn[i][0] / (groups_tp_tn_fp_fn[i][0] + groups_tp_tn_fp_fn[i][3]) for i in range(4)]
     precs = [groups_tp_tn_fp_fn[i][0] / (groups_tp_tn_fp_fn[i][0] + groups_tp_tn_fp_fn[i][2]) for i in range(4)]
     return [ (2 * recs[i] * precs[i]) / (precs[i] + recs[i]) for i in range(4)]
@@ -365,9 +366,17 @@ def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabili
                                                                                      pred_lbls, v=False,
                                                                                      only_cs_position=False,
                                                                                      sp_type="TAT")
+        if return_class_prec_rec:
+            return sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
+                   all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
+                   all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, \
+                   get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls)
         return sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
                all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
                all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores
+    if return_class_prec_rec:
+        return sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, \
+               get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls)
     return sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores
 
 
@@ -570,7 +579,7 @@ def remove_from_dictionary(res_dict, test_fld):
 
 
 def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder="results_param_s_2/",
-                              only_cs_position=False, remove_test_seqs=False):
+                              only_cs_position=False, remove_test_seqs=False, return_sptype_f1=False):
     full_dict_results = {}
     epochs = []
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
@@ -610,6 +619,9 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="LIPO")
     all_recalls_tat, all_precisions_tat, _, _, _, f1_scores_tat = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TAT")
+    if return_sptype_f1:
+        return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, \
+               all_precisions_lipo, all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat, get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls)
     return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, \
            all_precisions_lipo, all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat
 
@@ -902,10 +914,10 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     for ind, u_p in enumerate(unique_params):
         mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, \
         all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo, \
-        all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat \
+        all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat, f1_scores_sptype \
             = extract_mean_test_results(run=u_p, result_folder=result_folder,
                                         only_cs_position=only_cs_position,
-                                        remove_test_seqs=remove_test_seqs)
+                                        remove_test_seqs=remove_test_seqs, return_sptype_f1=True)
         all_recalls_lipo, all_precisions_lipo, \
         all_recalls_tat, all_precisions_tat, = list(np.reshape(np.array(all_recalls_lipo), -1)), list(
             np.reshape(np.array(all_precisions_lipo), -1)), \
@@ -914,7 +926,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         mdl2results[ind] = (
         mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, list(np.reshape(np.array(all_recalls), -1)),
         list(np.reshape(np.array(all_precisions), -1)), all_recalls_lipo, all_precisions_lipo,
-        all_recalls_tat, all_precisions_tat, f1_scores, f1_scores_lipo, f1_scores_tat, avg_epoch)
+        all_recalls_tat, all_precisions_tat, f1_scores, f1_scores_lipo, f1_scores_tat, f1_scores_sptype, avg_epoch)
         mdlind2mdlparams[ind] = u_p
         eukaryote_mcc.append(get_best_corresponding_eval_mcc(result_folder, u_p))
     if compare_mdl_plots:
@@ -953,7 +965,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_sp1), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-4])]), " & ",
+              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-5])]), " & ",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nRecall table SEC/SPI\n\n")
@@ -974,7 +986,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_sp2), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-3])]), "&",
+              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-4])]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nRecall table SEC/SPII \n\n")
@@ -995,7 +1007,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_tat), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-2])]), "&",
+              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-3])]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nRecall table TAT/SPI \n\n")
@@ -1024,6 +1036,12 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][4]]), "&",
               " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][5]]), "&",
+              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+    print("\n\nSP-type preds F1\n\n")
+    for mdl_ind in best_to_worst_mdls:
+        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][-2]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     return mdl2results
@@ -1235,6 +1253,11 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl-mcc2-drop/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_large2_01drop_mdl/",
                                             compare_mdl_plots=False,
