@@ -696,7 +696,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         save_model(swa_model.module, run_name)
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
-    if not deployment_model and not validate_partition is not None and 1 ==0 or (
+    if not deployment_model and not validate_partition is not None or (
             validate_partition is not None and other_mdl_name):
         model = load_model(run_name + "_best_eval.pth")
         second_model = load_model(other_mdl_name) if other_mdl_name else None
