@@ -1,3 +1,4 @@
+from utils.swa_bn_update import update_bn
 from torch.optim.swa_utils import AveragedModel, SWALR
 from ignite.handlers.param_scheduler import create_lr_scheduler_with_warmup
 from torch.optim.lr_scheduler import ExponentialLR, StepLR, CosineAnnealingWarmRestarts
@@ -523,8 +524,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    swa_start = 65
-    anneal_epochs = 10
+    swa_start = 1
+    anneal_epochs = 3
     if len(sp_data.lg2ind.keys()) <= 1 or not use_lg_info:
         lg2ind = None
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
@@ -611,12 +612,13 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             if e < lr_sched_warmup and lr_sched_warmup > 2:
                 warmup_scheduler.step()
             else:
-                if use_swa and e >= swa_start:
+                if use_swa and e + 1 >= swa_start:
                     scheduler.step()
                 elif not use_swa:
                     scheduler.step()
-                if use_swa and e >= swa_start + anneal_epochs:
+                if use_swa and e + 1>= swa_start + anneal_epochs:
                     swa_model.update_parameters(model)
+
         if validate_on_test:
             validate_partitions = list(test_partition)
             _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
@@ -690,7 +692,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
     if use_swa:
-        torch.optim.swa_utils.update_bn(dataset_loader, swa_model)
+        update_bn(dataset_loader, swa_model)
         save_model(swa_model, run_name)
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
