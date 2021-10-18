@@ -428,16 +428,9 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
 
 def save_model(model, model_name=""):
     folder = get_data_folder()
-    try:
-        model.input_encoder.seq2emb = {}
-    except:
-        model.module.input_encoder.seq2emb = {}
+    model.input_encoder.seq2emb = {}
     torch.save(model, folder + model_name + "_best_eval.pth")
-    try:
-        model.input_encoder.update()
-    except:
-        model.modudle.input_encoder.update()
-
+    model.input_encoder.update()
 
 
 def other_fold_mdl_finished(model_name="", tr_f=0, val_f=1):
@@ -700,7 +693,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             patience -= 1
     if use_swa:
         update_bn(dataset_loader, swa_model)
-        save_model(swa_model, run_name)
+        save_model(swa_model.module, run_name)
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
     if not deployment_model and not validate_partition is not None and 1 ==0 or (
