@@ -1,5 +1,6 @@
+from torch.optim.swa_utils import AveragedModel, SWALR
 from ignite.handlers.param_scheduler import create_lr_scheduler_with_warmup
-from torch.optim.lr_scheduler import ExponentialLR, StepLR
+from torch.optim.lr_scheduler import ExponentialLR, StepLR, CosineAnnealingWarmRestarts
 from tqdm import tqdm
 import logging
 import sys
@@ -476,14 +477,18 @@ def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, 
             beam_txt, test_on, ep, *np.concatenate(all_f1_scores)))
 
 
-def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0):
+def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0, use_swa=False):
     def get_schduler_type(op, lr_sched):
+        if use_swa:
+            return CosineAnnealingWarmRestarts(optimizer=op, T_0=10)
         if lr_sched == "expo":
             return ExponentialLR(optimizer=op, gamma=0.98)
         elif lr_sched == "step":
             return StepLR(optimizer=op, gamma=0.1, step_size=20)
+        elif lr_sched == "cos":
+            return CosineAnnealingWarmRestarts(optimizer=op)
 
-    if lr_scheduler == "none":
+    if lr_scheduler == "none" and not use_swa:
         return None, None
     elif lr_sched_warmup >= 2:
         scheduler = get_schduler_type(opt, lr_scheduler)
@@ -504,7 +509,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False,
                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
-                        validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False):
+                        validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -518,6 +523,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
+    swa_start = 65
+    anneal_epochs = 10
     if len(sp_data.lg2ind.keys()) <= 1 or not use_lg_info:
         lg2ind = None
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
@@ -533,13 +540,18 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     loss_fn_tune = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
     loss_fn_glbl = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
-    warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup)
+    if use_swa:
+        warmup_scheduler = None
+        swa_model = AveragedModel(model)
+        scheduler = SWALR(optimizer, swa_lr=0.00001, anneal_strategy="cos", anneal_epochs=10)
+    else:
+        warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
     best_valid_loss = 5 ** 10
     best_valid_mcc_and_recall = -1
     best_epoch = 0
     e = -1
     while patience != 0:
-        print("\n\nLR:", optimizer.param_groups[0]['lr'], "\n\n")
+        print("LR:", optimizer.param_groups[0]['lr'])
         model.train()
         e += 1
         losses = 0
@@ -599,7 +611,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             if e < lr_sched_warmup and lr_sched_warmup > 2:
                 warmup_scheduler.step()
             else:
-                scheduler.step()
+                if use_swa and e >= swa_start:
+                    scheduler.step()
+                elif not use_swa:
+                    scheduler.step()
+                if use_swa and e >= swa_start + anneal_epochs:
+                    swa_model.update_parameters(model)
         if validate_on_test:
             validate_partitions = list(test_partition)
             _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
@@ -672,8 +689,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} from epoch {} compared to best {}.".
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
+    if use_swa:
+        torch.optim.swa_utils.update_bn(dataset_loader, swa_model)
+        save_model(swa_model, run_name)
+
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
-    if not deployment_model and not validate_partition is not None or (
+    if not deployment_model and not validate_partition is not None and 1 ==0 or (
             validate_partition is not None and other_mdl_name):
         model = load_model(run_name + "_best_eval.pth")
         second_model = load_model(other_mdl_name) if other_mdl_name else None
