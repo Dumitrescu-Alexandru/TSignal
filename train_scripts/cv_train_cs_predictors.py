@@ -428,9 +428,16 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
 
 def save_model(model, model_name=""):
     folder = get_data_folder()
-    model.input_encoder.seq2emb = {}
+    try:
+        model.input_encoder.seq2emb = {}
+    except:
+        model.module.input_encoder.seq2emb = {}
     torch.save(model, folder + model_name + "_best_eval.pth")
-    model.input_encoder.update()
+    try:
+        model.input_encoder.update()
+    except:
+        model.modudle.input_encoder.update()
+
 
 
 def other_fold_mdl_finished(model_name="", tr_f=0, val_f=1):
