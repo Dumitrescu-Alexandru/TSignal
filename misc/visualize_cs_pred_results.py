@@ -30,7 +30,8 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             # if ind==0, SP was not even predicted (so there is no CS prediction) and this affects precision metric
             # tp/(tp+fp). It means this a fn
             return np.array([0, 0, 0, 0, 1, 0, 0, 0, 0, 0])
-    sptype2letter = {'TAT':'T', 'LIPO':'L', 'PILIN':'P', 'TATLIPO':'T', 'SP':'S'}
+
+    sptype2letter = {'TAT': 'T', 'LIPO': 'L', 'PILIN': 'P', 'TATLIPO': 'T', 'SP': 'S'}
     sp_types = ["S", "T", "L", "P"]
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
     # order of elemnts in below list:
@@ -84,7 +85,8 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             if v:
                 print("Recall {}: {}".format(life_grp, [current_preds[i] / current_preds[4] for i in range(4)]))
                 print("Prec {}: {}".format(life_grp,
-                                           [current_preds[i] / (current_preds[i] + current_preds[5]) for i in range(4)]))
+                                           [current_preds[i] / (current_preds[i] + current_preds[5]) for i in
+                                            range(4)]))
             all_recalls.append([current_preds[i] / current_preds[4] for i in range(4)])
             all_precisions.append([])
             all_f1_scores.append([])
@@ -95,10 +97,31 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
                     all_precisions[-1].append(
                         current_preds[i] / (current_preds[i] + current_preds[i + 6]))
             current_recs, current_precs = all_recalls[-1], all_precisions[-1]
-            all_f1_scores[-1].extend([ 0 if current_recs[i] * current_precs[i] == 0 else 2 * current_recs[i] * current_precs[i] / (current_recs[i] + current_precs[i]) for i in range(4)  ])
+            all_f1_scores[-1].extend([0 if current_recs[i] * current_precs[i] == 0 else 2 * current_recs[i] *
+                                                                                        current_precs[i] / (
+                                                                                                    current_recs[i] +
+                                                                                                    current_precs[i])
+                                      for i in range(4)])
             total_positives.append(current_preds[4])
             false_positives.append(current_preds[5])
     return all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores
+
+
+def get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls):
+    groups_tp_tn_fp_fn = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+    grp2_ind = {"EUKARYA": 0, "NEGATIVE": 1, "POSITIVE": 2, "ARCHAEA": 3}
+    for lg, s, tl, pl in zip(life_grp, seqs, true_lbls, pred_lbls):
+        if tl[0] == pl[0] and tl[0] == "S":
+            groups_tp_tn_fp_fn[grp2_ind[lg]][0] = 1
+        elif tl[0] != "S" and pl[0] != "S":
+            groups_tp_tn_fp_fn[grp2_ind[lg]][1] = 1
+        elif tl[0] == "S" and pl[0] != "S":
+            groups_tp_tn_fp_fn[grp2_ind[lg]][3] = 1
+        elif tl[0] != "S" and pl[0] == "S":
+            groups_tp_tn_fp_fn[grp2_ind[lg]][2] = 1
+    recs = [groups_tp_tn_fp_fn[i][0] / (groups_tp_tn_fp_fn[i][0] + groups_tp_tn_fp_fn[i][3]) for i in range(4)]
+    precs = [groups_tp_tn_fp_fn[i][0] / (groups_tp_tn_fp_fn[i][0] + groups_tp_tn_fp_fn[i][2]) for i in range(4)]
+    return [ (2 * recs[i] * precs[i]) / (precs[i] + recs[i]) for i in range(4)]
 
 
 def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="SP"):
@@ -111,13 +134,13 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, retu
     # Matthews correlation coefficient (MCC) both true and false positive and negative predictions are counted at
     # the sequence level
     grp2_ind = {"EUKARYA": 0, "NEGATIVE": 1, "POSITIVE": 2, "ARCHAEA": 3}
-    lg2sp_letter = {'TAT':'T', 'LIPO':'L', 'PILIN':'P', 'TATLIPO':'T', 'SP':'S'}
+    lg2sp_letter = {'TAT': 'T', 'LIPO': 'L', 'PILIN': 'P', 'TATLIPO': 'T', 'SP': 'S'}
     sp_type_letter = lg2sp_letter[sp_type]
-    predictions = [ [[], []], [[], []], [[], []], [[], []]]
-    predictions_mcc2 = [ [[], []], [[],[]], [[],[]], [[],[]] ]
+    predictions = [[[], []], [[], []], [[], []], [[], []]]
+    predictions_mcc2 = [[[], []], [[], []], [[], []], [[], []]]
     zv = 0
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
-        zv +=1
+        zv += 1
         lg, sp_info = l.split("|")
         if sp_info == sp_type or sp_info == "NO_SP":
             p = p.replace("ES", "J")
@@ -173,7 +196,7 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, retu
                     mccs2.append(-1)
                 else:
                     mccs2.append(compute_mcc(predictions_mcc2[grp2_ind[grp]][0]
-                                            , predictions_mcc2[grp2_ind[grp]][1]))
+                                             , predictions_mcc2[grp2_ind[grp]][1]))
                 if v:
                     print("{}: {}".format(grp, mccs2[-1]))
         return mccs, mccs2
@@ -183,15 +206,16 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, retu
 def get_bin(p, bins):
     for i in range(len(bins)):
         if bins[i] < p <= bins[i + 1]:
-
             return i
+
 
 def get_cs_preds_by_tol(tl, pl):
     pl = pl.replace("ES", "")
-    correct_by_tol = [0,0,0,0]
+    correct_by_tol = [0, 0, 0, 0]
     for tol in range(4):
         correct_by_tol[tol] = int(tl.rfind("S") - tol <= pl.rfind("S") <= tl.rfind("S") + tol)
     return correct_by_tol
+
 
 def plot_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_acc):
     import matplotlib
@@ -202,17 +226,21 @@ def plot_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_acc):
     accs = [acc_to_perc[0] for acc_to_perc in resulted_perc_by_acc]
     total_counts_per_acc = list(total_counts_per_acc)
     percs = [acc_to_perc[1] for acc_to_perc in resulted_perc_by_acc]
-    bars_width = accs[0]-accs[1]
+    bars_width = accs[0] - accs[1]
     plt.title(name)
-    plt.bar(accs, accs, width=bars_width, alpha=0.5, linewidth=2, edgecolor="black", color='blue', label='Perfect calibration')
+    plt.bar(accs, accs, width=bars_width, alpha=0.5, linewidth=2, edgecolor="black", color='blue',
+            label='Perfect calibration')
     plt.bar(accs, percs, width=bars_width, alpha=0.5, color='red', label="Model's calibration",
-            tick_label=["{}\n{}".format(str(round(accs[i],2)), str(total_counts_per_acc[i])) for i in range(len(accs))])
+            tick_label=["{}\n{}".format(str(round(accs[i], 2)), str(total_counts_per_acc[i])) for i in
+                        range(len(accs))])
     plt.xlabel("Prob/No of preds")
     plt.ylabel("Prob")
     plt.legend()
     plt.show()
 
-def get_prob_calibration_and_plot(probabilities_file="", life_grp=None, seqs=None, true_lbls=None, pred_lbls=None, bins=15, plot=True, sp2probs=None):
+
+def get_prob_calibration_and_plot(probabilities_file="", life_grp=None, seqs=None, true_lbls=None, pred_lbls=None,
+                                  bins=15, plot=True, sp2probs=None):
     # initialize bins
     bin_limmits = np.linspace(0, 1, bins)
     correct_calibration_accuracies = [(bin_limmits[i] + bin_limmits[i + 1]) / 2 for i in range(bins - 1)]
@@ -226,7 +254,7 @@ def get_prob_calibration_and_plot(probabilities_file="", life_grp=None, seqs=Non
         lg = lg.split("|")[0]
         crct_cal_acc_2_correct_preds = {crct_cal_acc: 0 for crct_cal_acc in correct_calibration_accuracies}
         crct_cal_acc_2_totals = {crct_cal_acc: 0 for crct_cal_acc in correct_calibration_accuracies}
-        wrap_dict = {'total':crct_cal_acc_2_totals, 'correct':crct_cal_acc_2_correct_preds}
+        wrap_dict = {'total': crct_cal_acc_2_totals, 'correct': crct_cal_acc_2_correct_preds}
         binary_sp_calibration_by_grp[lg] = wrap_dict
         tol_based_cs_accs = {}
         for tol in range(4):
@@ -245,41 +273,46 @@ def get_prob_calibration_and_plot(probabilities_file="", life_grp=None, seqs=Non
         if tl[0] == "S":
             binary_sp_calibration_by_grp[lg]['total'][coresp_acc] += 1
             if pl[0] == "S":
-                binary_sp_calibration_by_grp[lg]['correct'][coresp_acc]+= 1
+                binary_sp_calibration_by_grp[lg]['correct'][coresp_acc] += 1
         if tl[0] == pl[0] == "S":
             correct_preds_by_tol = get_cs_preds_by_tol(tl, pl)
             for tol in range(4):
                 cs_by_lg_and_tol_accs[lg][tol]['correct'][coresp_acc] += correct_preds_by_tol[tol]
                 cs_by_lg_and_tol_accs[lg][tol]['total'][coresp_acc] += 1
-    binary_ece, cs_ece = [], [[],[],[],[]]
+    binary_ece, cs_ece = [], [[], [], [], []]
     for lg_ind, lg in enumerate(['EUKARYA', 'NEGATIVE', 'POSITIVE', 'ARCHAEA']):
         correct_binary_preds, total_binary_preds = binary_sp_calibration_by_grp[lg]['correct'].values(), \
-                                             binary_sp_calibration_by_grp[lg]['total'].values()
+                                                   binary_sp_calibration_by_grp[lg]['total'].values()
         results = []
         current_binary_ece = []
         for ind, (crct, ttl) in enumerate(zip(correct_binary_preds, total_binary_preds)):
             actual_acc = crct / ttl if ttl != 0 else 0
             results.append((correct_calibration_accuracies[ind], actual_acc if ttl != 0 else 0))
-            current_binary_ece.append(np.abs(correct_calibration_accuracies[ind] - actual_acc) * (ttl/sum(total_binary_preds)))
-        binary_ece.append(round(sum(current_binary_ece),3))
+            current_binary_ece.append(
+                np.abs(correct_calibration_accuracies[ind] - actual_acc) * (ttl / sum(total_binary_preds)))
+        binary_ece.append(round(sum(current_binary_ece), 3))
         if plot:
             print("Binary preds for {} with ECE {}: ".format(lg, sum(current_binary_ece)), results, total_binary_preds)
-            plot_reliability_diagrams(results, "Binary sp pred results for {} with ECE {}".format(lg, round(sum(current_binary_ece),3)), total_binary_preds)
+            plot_reliability_diagrams(results, "Binary sp pred results for {} with ECE {}".format(lg, round(
+                sum(current_binary_ece), 3)), total_binary_preds)
         for tol in range(4):
             correct_cs_preds, total_cs_preds = cs_by_lg_and_tol_accs[lg][tol]['correct'].values(), \
                                                cs_by_lg_and_tol_accs[lg][tol]['total'].values()
             results = []
             current_cs_ece = []
             for ind, (crct, ttl) in enumerate(zip(correct_cs_preds, total_cs_preds)):
-                results.append((correct_calibration_accuracies[ind], crct/ttl if ttl != 0 else 0))
-                actual_acc = crct/ttl if ttl != 0 else 0
-                current_cs_ece.append(np.abs(correct_calibration_accuracies[ind]- actual_acc) *(ttl/sum(total_binary_preds)))
-            cs_ece[lg_ind].append(round(sum(current_cs_ece),3))
+                results.append((correct_calibration_accuracies[ind], crct / ttl if ttl != 0 else 0))
+                actual_acc = crct / ttl if ttl != 0 else 0
+                current_cs_ece.append(
+                    np.abs(correct_calibration_accuracies[ind] - actual_acc) * (ttl / sum(total_binary_preds)))
+            cs_ece[lg_ind].append(round(sum(current_cs_ece), 3))
             if plot:
-                plot_reliability_diagrams(results, "CS pred results for tol {} for {} with ECE {}".format(tol,lg, round(sum(current_cs_ece),3)), total_cs_preds)
+                plot_reliability_diagrams(results, "CS pred results for tol {} for {} with ECE {}".format(tol, lg,
+                                                                                                          round(
+                                                                                                              sum(current_cs_ece),
+                                                                                                              3)),
+                                          total_cs_preds)
                 print("Cs preds for {} for tol {}:".format(lg, tol), results)
-
-
 
 
 def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_fold=2, dict_=None):
@@ -308,22 +341,32 @@ def get_data_folder():
         return "/scratch/project2003818/dumitra1/sp_data/"
 
 
-def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabilities_file=None,return_everything=False):
+def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabilities_file=None, return_everything=False,
+                               return_class_prec_rec=False):
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename=filename)
     if probabilities_file is not None:
         get_prob_calibration_and_plot(probabilities_file, life_grp, seqs, true_lbls, pred_lbls)
     sp_pred_mccs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v)
     all_recalls, all_precisions, total_positives, \
-        false_positives, predictions, all_f1_scores = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v)
+    false_positives, predictions, all_f1_scores = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v)
     if return_everything:
-        sp_pred_mccs,sp_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v, return_mcc2=True, sp_type="SP")
-        lipo_pred_mccs,lipo_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v, return_mcc2=True, sp_type="LIPO")
-        tat_pred_mccs,tat_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v, return_mcc2=True, sp_type="TAT")
+        sp_pred_mccs, sp_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v,
+                                                               return_mcc2=True, sp_type="SP")
+        lipo_pred_mccs, lipo_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v,
+                                                                   return_mcc2=True, sp_type="LIPO")
+        tat_pred_mccs, tat_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v,
+                                                                 return_mcc2=True, sp_type="TAT")
 
-        all_recalls_lipo, all_precisions_lipo, _, _, _, all_f1_scores_lipo = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO")
-        all_recalls_tat, all_precisions_tat, _, _, _, all_f1_scores_tat = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT")
-        return sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs,lipo_pred_mccs2, tat_pred_mccs,tat_pred_mccs2, \
-               all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat,     \
+        all_recalls_lipo, all_precisions_lipo, _, _, _, all_f1_scores_lipo = get_cs_acc(life_grp, seqs, true_lbls,
+                                                                                        pred_lbls, v=False,
+                                                                                        only_cs_position=False,
+                                                                                        sp_type="LIPO")
+        all_recalls_tat, all_precisions_tat, _, _, _, all_f1_scores_tat = get_cs_acc(life_grp, seqs, true_lbls,
+                                                                                     pred_lbls, v=False,
+                                                                                     only_cs_position=False,
+                                                                                     sp_type="TAT")
+        return sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
+               all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
                all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores
     return sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores
 
@@ -349,6 +392,7 @@ def plot_losses(losses, name="param_search_0.2_2048_0.0001_"):
     axs.set_ylim(0, 0.2)
     # plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/" + name + "loss.png")
     plt.show()
+
 
 def plot_mcc(mccs, name="param_search_0.2_2048_0.0001_"):
     euk_mcc, neg_mcc, pos_mcc, arc_mcc = mccs
@@ -376,6 +420,7 @@ def plot_mcc(mccs, name="param_search_0.2_2048_0.0001_"):
     axs[1, 1].set_xlabel("epochs")
     # plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, "mcc"))
     plt.show()
+
 
 def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.2_2048_0.0001_"):
     cs_res_euk, cs_res_neg, cs_res_pos, cs_res_arc = results
@@ -405,14 +450,15 @@ def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.
     # plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, metric))
     plt.show()
 
+
 def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder=""):
     all_results = []
     euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, \
     cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = extract_results(run, folds=folds,
                                                                                              folder=folder)
-    all_f1 = [[[], [], [], []],[[], [], [], []],[[], [], [], []],[[], [], [], []]]
+    all_f1 = [[[], [], [], []], [[], [], [], []], [[], [], [], []], [[], [], [], []]]
     for lg_ind, (lg_rec, lg_prec) in enumerate([(cs_recalls_euk, cs_precs_euk), (cs_recalls_neg, cs_precs_neg),
-                                                (cs_recalls_pos, cs_precs_pos),(cs_recalls_arc, cs_precs_arc)]):
+                                                (cs_recalls_pos, cs_precs_pos), (cs_recalls_arc, cs_precs_arc)]):
         for tol in range(4):
             for prec, rec in zip(lg_rec[tol], lg_prec[tol]):
                 all_f1[lg_ind][tol].append(2 * prec * rec / (prec + rec) if prec + rec else 0)
@@ -433,7 +479,6 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
                                                                      [[], [], [], []], [[], [], [], []]
     cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = [[], [], [], []], [[], [], [], []], \
                                                              [[], [], [], []], [[], [], [], []]
-
 
     with open(folder + run + "{}_{}.log".format(folds[0], folds[1]), "rt") as f:
         lines = f.readlines()
@@ -497,13 +542,17 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
             cs_precs_arc[3].append(prec_res[15])
 
     # fix for logs that have f1 score written as "precision"...
-    if len(cs_precs_pos[0])  == 2* len(cs_recalls_pos[0]):
+    if len(cs_precs_pos[0]) == 2 * len(cs_recalls_pos[0]):
         len_cs_rec = len(cs_recalls_pos[0])
         for j in range(4):
-            cs_precs_euk[j], cs_precs_neg[j], cs_precs_pos[j], cs_precs_arc[j] = [cs_precs_euk[j][i*2] for i in range(len_cs_rec)], \
-                                                                                 [cs_precs_neg[j][i*2] for i in range(len_cs_rec)], \
-                                                                                 [cs_precs_pos[j][i*2] for i in range(len_cs_rec)], \
-                                                                                 [cs_precs_arc[j][i*2] for i in range(len_cs_rec)]
+            cs_precs_euk[j], cs_precs_neg[j], cs_precs_pos[j], cs_precs_arc[j] = [cs_precs_euk[j][i * 2] for i in
+                                                                                  range(len_cs_rec)], \
+                                                                                 [cs_precs_neg[j][i * 2] for i in
+                                                                                  range(len_cs_rec)], \
+                                                                                 [cs_precs_pos[j][i * 2] for i in
+                                                                                  range(len_cs_rec)], \
+                                                                                 [cs_precs_arc[j][i * 2] for i in
+                                                                                  range(len_cs_rec)]
 
     return euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, \
            cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc
@@ -518,6 +567,7 @@ def remove_from_dictionary(res_dict, test_fld):
         if seq not in tb_removed:
             trimmed_res_dict[seq] = res
     return trimmed_res_dict
+
 
 def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder="results_param_s_2/",
                               only_cs_position=False, remove_test_seqs=False):
@@ -535,30 +585,33 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
 
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
         res_dict = pickle.load(open(result_folder + run + "_{}_{}_best.bin".format(tr_folds[0], tr_folds[1]), "rb"))
-        test_fld = list({0,1,2} - set(tr_folds))
+        test_fld = list({0, 1, 2} - set(tr_folds))
         if remove_test_seqs:
             full_dict_results.update(remove_from_dictionary(res_dict, test_fld))
         else:
             full_dict_results.update(res_dict)
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin",
                                                                                    dict_=full_dict_results)
-    mccs, mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP")
+    mccs, mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+                                           sp_type="SP")
     # LIPO is SEC/SPII
-    mccs_lipo, mccs2_lipo = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="LIPO")
+    mccs_lipo, mccs2_lipo = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+                                                     sp_type="LIPO")
     # TAT is TAT/SPI
-    mccs_tat, mccs2_tat = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="TAT")
+    mccs_tat, mccs2_tat = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+                                                   sp_type="TAT")
     if "param_search_w_nl_nh_0.0_4096_1e-05_4_4" in run:
         v = False
     else:
         v = False
     all_recalls, all_precisions, _, _, _, f1_scores = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="SP")
-    all_recalls_lipo, all_precisions_lipo, _, _, _, f1_scores_lipo= \
+    all_recalls_lipo, all_precisions_lipo, _, _, _, f1_scores_lipo = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="LIPO")
     all_recalls_tat, all_precisions_tat, _, _, _, f1_scores_tat = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TAT")
     return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, \
-           all_precisions_lipo,all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat
+           all_precisions_lipo, all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat
 
 
 def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model="", metric="mcc"):
@@ -585,7 +638,7 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
                 ep = int(ep.split("epoch")[-1].split(" ")[1])
                 if "," in mccs:
                     mccs = float(mccs.replace(" ", "").split(",")[0].split("/")[1])
-                    ep2mcc[ep] = mccs/2
+                    ep2mcc[ep] = mccs / 2
                 else:
                     mccs = float(mccs.replace(" ", "").split("/")[1])
                     ep2mcc[ep] = mccs
@@ -593,7 +646,7 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
                 best_ep = int(l.split(":")[2].split("epoch")[-1].replace(" ", ""))
                 avg_last_5 = []
                 for i in range(5):
-                    best_mcc = ep2mcc[best_ep-i]
+                    best_mcc = ep2mcc[best_ep - i]
                     avg_last_5.append(best_mcc)
                 best_mcc = np.mean(avg_last_5)
         all_best_mccs.append(best_mcc)
@@ -601,11 +654,11 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
 
 
 def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type="prec-rec", tol=1):
-    avg_mcc, avg_mcc2, avg_mcc_lipo, avg_mcc2_lipo, avg_mccs_tat, avg_mccs2_tat, avg_prec, avg_recall, avg_prec_lipo,\
-    avg_recall_lipo, avg_prec_tat, avg_recall_tat, no_of_mdls = {}, {}, {}, {},{}, {}, {}, {},{}, {}, {}, {},{}
+    avg_mcc, avg_mcc2, avg_mcc_lipo, avg_mcc2_lipo, avg_mccs_tat, avg_mccs2_tat, avg_prec, avg_recall, avg_prec_lipo, \
+    avg_recall_lipo, avg_prec_tat, avg_recall_tat, no_of_mdls = {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
     for ind, results in mdl2results.items():
-        mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions,\
-            all_recalls_lipo, all_precisions_lipo,all_recalls_tat, all_precisions_tat, _ = results
+        mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, \
+        all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, _ = results
         mdl = mdlind2mdlparams[ind].split("run_no")[0]
         if "patience_30" in mdl:
             mdl = "patience_30"
@@ -630,21 +683,21 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
             avg_mcc[mdl] = [np.array(mccs)]
             avg_recall[mdl] = [np.array(all_recalls)]
             avg_prec[mdl] = [np.array(all_precisions)]
-            avg_mcc2[mdl]= [np.array(mccs2)]
+            avg_mcc2[mdl] = [np.array(mccs2)]
             avg_mcc_lipo[mdl] = [np.array(mccs_lipo)]
             avg_mcc2_lipo[mdl] = [np.array(mccs2_lipo)]
             avg_mccs_tat[mdl] = [np.array(avg_mccs_tat)]
-            avg_mccs2_tat[mdl]= [np.array(avg_mccs2_tat)]
+            avg_mccs2_tat[mdl] = [np.array(avg_mccs2_tat)]
             avg_recall_lipo[mdl] = [np.array(all_recalls_lipo)]
             avg_prec_lipo[mdl] = [np.array(all_precisions_lipo)]
             avg_prec_tat[mdl] = [np.array(all_precisions_tat)]
             avg_recall_tat[mdl] = [np.array(all_recalls_tat)]
-    fig, axs =  plt.subplots(2, 3, figsize=(12, 8)) if plot_type == "mcc" else plt.subplots(2, 4, figsize=(12, 8))
+    fig, axs = plt.subplots(2, 3, figsize=(12, 8)) if plot_type == "mcc" else plt.subplots(2, 4, figsize=(12, 8))
     plt.subplots_adjust(right=0.7)
     colors = ['red', 'green', 'orange', 'blue', 'brown', 'black']
 
     models = list(avg_mcc.keys())
-    mdl2colors = {models[i]:colors[i] for i in range(len(models))}
+    mdl2colors = {models[i]: colors[i] for i in range(len(models))}
 
     print(set(models))
     # TODO: Configure this for model names (usually full names are quite long and ugly)
@@ -681,7 +734,8 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
     #         mdl2mdlnames[mdl] = "version 1 weight 0.1"
     #     if "test_beam_search" in mdl:
     #         mdl2mdlnames[mdl] = "no glbl labels"
-    plot_lgs = ['NEGATIVE', 'POSITIVE', 'ARCHAEA'] if plot_type == "mcc" else ['EUKARYA', 'NEGATIVE', 'POSITIVE', 'ARCHAEA']
+    plot_lgs = ['NEGATIVE', 'POSITIVE', 'ARCHAEA'] if plot_type == "mcc" else ['EUKARYA', 'NEGATIVE', 'POSITIVE',
+                                                                               'ARCHAEA']
     for lg_ind, lg in enumerate(plot_lgs):
         if plot_type == "mcc":
             axs[0, 0].set_ylabel("MCC")
@@ -692,23 +746,25 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
         for mdl in avg_mccs_tat.keys():
             x = np.linspace(0, 1, 1000)
             if plot_type == "mcc":
-                kde = stats.gaussian_kde([avg_mcc[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl]) ])
+                kde = stats.gaussian_kde([avg_mcc[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl])])
             else:
-                kde = stats.gaussian_kde([avg_recall[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl]) ])
+                kde = stats.gaussian_kde([avg_recall[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
 
             if lg_ind == 0:
-                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="{}".format(mdl2mdlnames[mdl]))
+                axs[0, lg_ind].plot(x, kde(x), color=mdl2colors[mdl])  # , label="{}".format(mdl2mdlnames[mdl]))
             else:
-                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
-            axs[0, lg_ind].set_title(lg +" SEC/SPI")
+                axs[0, lg_ind].plot(x, kde(x), color=mdl2colors[
+                    mdl])  # , label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            axs[0, lg_ind].set_title(lg + " SEC/SPI")
         for mdl in avg_mccs_tat.keys():
             x = np.linspace(0, 1, 1000)
             if plot_type == "mcc":
-                kde = stats.gaussian_kde([avg_mcc2[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl]) ])
+                kde = stats.gaussian_kde([avg_mcc2[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl])])
             else:
                 kde = stats.gaussian_kde([avg_prec[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
-            axs[1, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
-            if lg_ind == len(plot_lgs) -1:
+            axs[1, lg_ind].plot(x, kde(x),
+                                color=mdl2colors[mdl])  # , label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            if lg_ind == len(plot_lgs) - 1:
                 axs[1, lg_ind].plot(x, kde(x), color=mdl2colors[
                     mdl], label="{}".format(mdl2mdlnames[mdl]))
 
@@ -716,7 +772,7 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
     plt.legend(loc=(1.04, 1))
     plt.show()
 
-    fig, axs =  plt.subplots(2, 3, figsize=(12, 8))
+    fig, axs = plt.subplots(2, 3, figsize=(12, 8))
     plt.subplots_adjust(right=0.7)
     for lg_ind, lg in enumerate(['NEGATIVE', 'POSITIVE', 'ARCHAEA']):
         if plot_type == "mcc":
@@ -728,21 +784,23 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
         for mdl in avg_mccs_tat.keys():
             x = np.linspace(0, 1, 1000)
             if plot_type == "mcc":
-                kde = stats.gaussian_kde([avg_mcc_lipo[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
+                kde = stats.gaussian_kde([avg_mcc_lipo[mdl][i][lg_ind] for i in range(no_of_mdls[mdl])])
             else:
                 kde = stats.gaussian_kde([avg_recall_lipo[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
             if lg_ind == 0:
-                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="{}".format(mdl2mdlnames[mdl]))
+                axs[0, lg_ind].plot(x, kde(x), color=mdl2colors[mdl])  # , label="{}".format(mdl2mdlnames[mdl]))
             else:
-                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
-            axs[0, lg_ind].set_title(lg +" SEC/SPII")
+                axs[0, lg_ind].plot(x, kde(x), color=mdl2colors[
+                    mdl])  # , label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            axs[0, lg_ind].set_title(lg + " SEC/SPII")
         for mdl in avg_mccs_tat.keys():
             x = np.linspace(0, 1, 1000)
             if plot_type == "mcc":
-                kde = stats.gaussian_kde([avg_mcc2_lipo[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
+                kde = stats.gaussian_kde([avg_mcc2_lipo[mdl][i][lg_ind] for i in range(no_of_mdls[mdl])])
             else:
                 kde = stats.gaussian_kde([avg_prec_lipo[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
-            axs[1, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            axs[1, lg_ind].plot(x, kde(x),
+                                color=mdl2colors[mdl])  # , label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
             if lg_ind == 2:
                 axs[1, lg_ind].plot(x, kde(x), color=mdl2colors[
                     mdl], label="{}".format(mdl2mdlnames[mdl]))
@@ -762,21 +820,23 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
         for mdl in avg_mccs_tat.keys():
             x = np.linspace(0, 1, 1000)
             if plot_type == "mcc":
-                kde = stats.gaussian_kde([avg_mccs_tat[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
+                kde = stats.gaussian_kde([avg_mccs_tat[mdl][i][lg_ind] for i in range(no_of_mdls[mdl])])
             else:
                 kde = stats.gaussian_kde([avg_recall_tat[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
             if lg_ind == 0:
-                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="{}".format(mdl2mdlnames[mdl]))
+                axs[0, lg_ind].plot(x, kde(x), color=mdl2colors[mdl])  # , label="{}".format(mdl2mdlnames[mdl]))
             else:
-                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
-            axs[0, lg_ind].set_title(lg +" TAT/SPI")
+                axs[0, lg_ind].plot(x, kde(x), color=mdl2colors[
+                    mdl])  # , label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            axs[0, lg_ind].set_title(lg + " TAT/SPI")
         for mdl in avg_mccs_tat.keys():
             x = np.linspace(0, 1, 1000)
             if plot_type == "mcc":
-                kde = stats.gaussian_kde([avg_mccs2_tat[mdl][i][lg_ind] for i in range(no_of_mdls[mdl]) ])
+                kde = stats.gaussian_kde([avg_mccs2_tat[mdl][i][lg_ind] for i in range(no_of_mdls[mdl])])
             else:
                 kde = stats.gaussian_kde([avg_prec_tat[mdl][i][lg_ind * 4 + tol] for i in range(no_of_mdls[mdl])])
-            axs[1, lg_ind].plot(x, kde(x), color = mdl2colors[mdl])#, label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
+            axs[1, lg_ind].plot(x, kde(x),
+                                color=mdl2colors[mdl])  # , label="Eukaryote {} param search".format(mdl2mdlnames[mdl]))
             if lg_ind == 2:
                 axs[1, lg_ind].plot(x, kde(x), color=mdl2colors[
                     mdl], label="{}".format(mdl2mdlnames[mdl]))
@@ -784,28 +844,32 @@ def get_mean_results_for_mulitple_runs(mdlind2mdlparams, mdl2results, plot_type=
     plt.legend(loc=(1.04, 1))
     plt.show()
     if plot_type == "mcc":
-        fig, axs =  plt.subplots(1, 1, figsize=(4, 8))
+        fig, axs = plt.subplots(1, 1, figsize=(4, 8))
         plt.subplots_adjust(right=0.7)
         for lg_ind, lg in enumerate(['EUKARYOTE']):
             axs[0, 0].set_ylabel("MCC")
             for mdl in avg_mccs_tat.keys():
                 x = np.linspace(0, 1, 1000)
-                kde = stats.gaussian_kde([avg_mcc[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl]) ])
-                axs[0, lg_ind].plot(x, kde(x), color = mdl2colors[mdl], label="{}".format(mdl2mdlnames[mdl]))
-                axs[0, lg_ind].set_title(lg +" SEC/SPI")
+                kde = stats.gaussian_kde([avg_mcc[mdl][i][lg_ind + 1] for i in range(no_of_mdls[mdl])])
+                axs[0, lg_ind].plot(x, kde(x), color=mdl2colors[mdl], label="{}".format(mdl2mdlnames[mdl]))
+                axs[0, lg_ind].set_title(lg + " SEC/SPI")
         plt.legend(loc=(1.04, 1))
         plt.show()
 
+
 def get_f1_scores(rec, prec):
-    return [2 * rec[i] * prec[i]/ (rec[i] + prec[i]) if rec[i] +prec[i] != 0 else 0 for i in range(len(rec))]
+    return [2 * rec[i] * prec[i] / (rec[i] + prec[i]) if rec[i] + prec[i] != 0 else 0 for i in range(len(rec))]
+
 
 def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False, compare_mdl_plots=False,
                               remove_test_seqs=False):
-    sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556, 0.556, 0.583]
+    sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
+                       0.556, 0.583]
     sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
-    sp6_recalls_tat = [0.706, 0.765, 0.784, 0.804, 0.556, 0.556, 0.667, 0.667, 0.333, 0.444, 0.444,0.444]
-    sp6_precs_sp1 = [0.661, 0.685, 0.715, 0.733, 0.534, 0.562, 0.575, 0.603, 0.632, 0.632, 0.632, 0.632, 0.643, 0.714,0.714 , 0.75]
-    sp6_precs_sp2 = [0.913, 0.913, 0.917, 0.925, 0.929, 0.938, 0.938,0.938, 0.583, 0.583, 0.583, 0.583]
+    sp6_recalls_tat = [0.706, 0.765, 0.784, 0.804, 0.556, 0.556, 0.667, 0.667, 0.333, 0.444, 0.444, 0.444]
+    sp6_precs_sp1 = [0.661, 0.685, 0.715, 0.733, 0.534, 0.562, 0.575, 0.603, 0.632, 0.632, 0.632, 0.632, 0.643, 0.714,
+                     0.714, 0.75]
+    sp6_precs_sp2 = [0.913, 0.913, 0.917, 0.925, 0.929, 0.938, 0.938, 0.938, 0.583, 0.583, 0.583, 0.583]
     sp6_precs_tat = [0.679, 0.736, 0.755, 0.774, 0.714, 0.714, 0.857, 0.857, 0.375, 0.5, 0.5, 0.5]
     sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
     sp6_f1_sp2 = get_f1_scores(sp6_precs_sp2, sp6_precs_sp2)
@@ -825,7 +889,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         if "log" in f:
             # check if all 3 folds have finished
             dont_add = False
-            for tr_f in [[0,1],[1,2],[0,2]]:
+            for tr_f in [[0, 1], [1, 2], [0, 2]]:
                 if "_".join(f.split("_")[:-2]) + "_{}_{}_best.bin".format(tr_f[0], tr_f[1]) not in files:
                     dont_add = True
             if not dont_add:
@@ -837,17 +901,20 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     eukaryote_mcc = []
     for ind, u_p in enumerate(unique_params):
         mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, \
-               all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo,\
-        all_recalls_tat, all_precisions_tat,avg_epoch,f1_scores, f1_scores_lipo, f1_scores_tat\
+        all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo, \
+        all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat \
             = extract_mean_test_results(run=u_p, result_folder=result_folder,
-                                                only_cs_position=only_cs_position,
-                                              remove_test_seqs=remove_test_seqs)
+                                        only_cs_position=only_cs_position,
+                                        remove_test_seqs=remove_test_seqs)
         all_recalls_lipo, all_precisions_lipo, \
-        all_recalls_tat, all_precisions_tat, = list(np.reshape(np.array(all_recalls_lipo), -1)), list(np.reshape(np.array(all_precisions_lipo), -1)), \
-                                               list(np.reshape(np.array(all_recalls_tat), -1)), list(np.reshape(np.array(all_precisions_tat), -1))
-        mdl2results[ind] = (mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, list(np.reshape(np.array(all_recalls), -1)),
-                            list(np.reshape(np.array(all_precisions), -1)),all_recalls_lipo, all_precisions_lipo,
-                            all_recalls_tat, all_precisions_tat, f1_scores, f1_scores_lipo, f1_scores_tat, avg_epoch)
+        all_recalls_tat, all_precisions_tat, = list(np.reshape(np.array(all_recalls_lipo), -1)), list(
+            np.reshape(np.array(all_precisions_lipo), -1)), \
+                                               list(np.reshape(np.array(all_recalls_tat), -1)), list(
+            np.reshape(np.array(all_precisions_tat), -1))
+        mdl2results[ind] = (
+        mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, list(np.reshape(np.array(all_recalls), -1)),
+        list(np.reshape(np.array(all_precisions), -1)), all_recalls_lipo, all_precisions_lipo,
+        all_recalls_tat, all_precisions_tat, f1_scores, f1_scores_lipo, f1_scores_tat, avg_epoch)
         mdlind2mdlparams[ind] = u_p
         eukaryote_mcc.append(get_best_corresponding_eval_mcc(result_folder, u_p))
     if compare_mdl_plots:
@@ -878,7 +945,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     for mdl_ind in best_to_worst_mdls:
         mdl_params = " & ".join(mdlind2mdlparams[mdl_ind].split("_"))
         print(mdl_params, " & ", " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][0]]), "&",
-              " & ".join([str(round(mcc,3)) for mcc in mdl2results[mdl_ind][1][1:]]), " & ",
+              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][1][1:]]), " & ",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nF1 table SEC/SPI\n\n")
@@ -949,14 +1016,14 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][2]]), "&",
-              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][3]]),  "&",
+              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][3]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     print("\n\nMCC TAT/SPI TABLE\n\n")
     for mdl_ind in best_to_worst_mdls:
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][4]]), "&",
-              " & ".join([str(round(mcc,3)) for mcc in mdl2results[mdl_ind][5]]),  "&",
+              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][5]]), "&",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     return mdl2results
@@ -1135,18 +1202,20 @@ def visualize_training_variance(mdl2results, mdl2results_hps=None):
                     [euk_hps_prec[i], neg_hps_prec[i], pos_hps_prec[i], arch_hps_prec[i]],
                     name='precision tol={}'.format(i), plot_hps=plot_hps)
 
-def extract_calibration_probs_for_mdl(model = "parameter_search_patience_60use_glbl_lbls_use_glbl_lbls_versio"
-                                              "n_1_weight_0.1_lr_1e-05_nlayers_3_nhead_16_lrsched_none_trFlds_", folder='huge_param_search/patience_60/'):
+
+def extract_calibration_probs_for_mdl(model="parameter_search_patience_60use_glbl_lbls_use_glbl_lbls_versio"
+                                            "n_1_weight_0.1_lr_1e-05_nlayers_3_nhead_16_lrsched_none_trFlds_",
+                                      folder='huge_param_search/patience_60/'):
     all_lg, all_seqs, all_tl, all_pred_lbls, sp2probs = [], [], [], [], {}
-    for tr_f in [[0,1],[0,2],[1,2]]:
+    for tr_f in [[0, 1], [0, 2], [1, 2]]:
         prob_file = "{}{}_{}_best_sp_probs.bin".format(model, tr_f[0], tr_f[1])
         preds_file = "{}{}_{}_best.bin".format(model, tr_f[0], tr_f[1])
-        life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename=folder+preds_file)
+        life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename=folder + preds_file)
         all_lg.extend(life_grp)
         all_seqs.extend(seqs)
         all_tl.extend(true_lbls)
         all_pred_lbls.extend(pred_lbls)
-        sp2probs.update(pickle.load(open(folder+prob_file, "rb")))
+        sp2probs.update(pickle.load(open(folder + prob_file, "rb")))
     get_prob_calibration_and_plot("", all_lg, all_seqs, all_tl, all_pred_lbls, sp2probs=sp2probs)
 
 
@@ -1157,7 +1226,7 @@ def duplicate_Some_logs():
     for f in files:
         if "log" in f:
             file = f.replace(".bin", "_best.bin")
-            cmd = ["cp", "beam_test/"+f, "beam_test/actual_beams/best_beam_"+file]
+            cmd = ["cp", "beam_test/" + f, "beam_test/actual_beams/best_beam_" + file]
             call(cmd)
     exit(1)
 
@@ -1170,46 +1239,42 @@ if __name__ == "__main__":
                                             result_folder="separate-glbl_large2_01drop_mdl/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
-    visualize_validation(run="input_drop_validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2],folder="separate-glbl_input_drop/")
+    visualize_validation(run="input_drop_validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2],
+                         folder="separate-glbl_input_drop/")
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_input_drop/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
 
-    visualize_validation(run="tune_cs_fromstart_v2_folds_", folds=[0, 1],folder="tune_cs_from_start/")
+    visualize_validation(run="tune_cs_fromstart_v2_folds_", folds=[0, 1], folder="tune_cs_from_start/")
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tune_cs_from_start/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
 
-
-    visualize_validation(run="validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2],folder="separate-glbl-mcc2-drop/")
-    visualize_validation(run="tune_cs_run_", folds=[0, 1],folder="tune_cs_test/")
-
+    visualize_validation(run="validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2], folder="separate-glbl-mcc2-drop/")
+    visualize_validation(run="tune_cs_run_", folds=[0, 1], folder="tune_cs_test/")
 
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl-mcc2/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
 
-
     # visualize_validation(run="separate_glbl_cs_", folds=[0, 1],folder="separate-glbl/")
-    visualize_validation(run="validate_on_mcc_separate_glbl_cs_", folds=[0, 1],folder="separate-glbl-mcc/")
-
+    visualize_validation(run="validate_on_mcc_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl-mcc/")
 
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="drop_large_crct_v2_max_glbl_lg_deailed_sp_v1/",
     #                                         compare_mdl_plots=False,
     #                                         remove_test_seqs=False)
 
-    visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1],folder="crct_simplified_glblv2_max/")
-    visualize_validation(run="parameter_search_patience_30lr_1e-05_nlayers_3_nhead_16_lrsched_step_trFlds_", folds=[0, 1],folder="huge_param_search/")
-    visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1],folder="crct_simplified_glblv2_max/")
-    visualize_validation(run="glbl_lg_deailed_sp_v1_", folds=[0, 1],folder="glbl_deailed_sp_v1/")
+    visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1], folder="crct_simplified_glblv2_max/")
+    visualize_validation(run="parameter_search_patience_30lr_1e-05_nlayers_3_nhead_16_lrsched_step_trFlds_",
+                         folds=[0, 1], folder="huge_param_search/")
+    visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1], folder="crct_simplified_glblv2_max/")
+    visualize_validation(run="glbl_lg_deailed_sp_v1_", folds=[0, 1], folder="glbl_deailed_sp_v1/")
 
-
-
-    visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[1, 2],folder="wlg10morepatience/")
-    visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0,2],folder="wlg10morepatience/")
+    visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[1, 2], folder="wlg10morepatience/")
+    visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0, 2], folder="wlg10morepatience/")
     # print("huh?")
     # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
     # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
