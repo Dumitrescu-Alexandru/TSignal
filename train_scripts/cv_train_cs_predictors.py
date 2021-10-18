@@ -622,7 +622,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     scheduler.step()
                 elif not use_swa:
                     scheduler.step()
-                if use_swa and e + 1>= swa_start + anneal_epochs:
+                if use_swa and e + 1>= swa_start:
                     swa_model.update_parameters(model)
 
         if validate_on_test:

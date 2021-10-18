@@ -120,8 +120,10 @@ def get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls):
             groups_tp_tn_fp_fn[grp2_ind[lg]][3] += 1
         elif tl[0] != "S" and pl[0] == "S":
             groups_tp_tn_fp_fn[grp2_ind[lg]][2] += 1
-    recs = [groups_tp_tn_fp_fn[i][0] / (groups_tp_tn_fp_fn[i][0] + groups_tp_tn_fp_fn[i][3]) for i in range(4)]
-    precs = [groups_tp_tn_fp_fn[i][0] / (groups_tp_tn_fp_fn[i][0] + groups_tp_tn_fp_fn[i][2]) for i in range(4)]
+    recs = [groups_tp_tn_fp_fn[i][0] / (groups_tp_tn_fp_fn[i][0] + groups_tp_tn_fp_fn[i][3]) if
+            groups_tp_tn_fp_fn[i][0] + groups_tp_tn_fp_fn[i][3] != 0 else 0 for i in range(4)]
+    precs = [groups_tp_tn_fp_fn[i][0] / (groups_tp_tn_fp_fn[i][0] + groups_tp_tn_fp_fn[i][2]) if
+             groups_tp_tn_fp_fn[i][0] + groups_tp_tn_fp_fn[i][2] != 0 else 0 for i in range(4)]
     return [ (2 * recs[i] * precs[i]) / (precs[i] + recs[i]) for i in range(4)]
 
 
