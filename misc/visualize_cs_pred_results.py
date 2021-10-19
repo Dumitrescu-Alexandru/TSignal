@@ -1275,12 +1275,12 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    visualize_validation(run="swa_model_", folds=[0, 1], folder="separate-glbl_swa_mdl/")
-    visualize_validation(run="large3_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_large3/")
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_large3/",
+                                            result_folder="separate-glbl_rerun_best/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
+    visualize_validation(run="rerun_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_rerun_best/")
+    visualize_validation(run="large3_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_large3/")
 
 
     mdl2results = extract_all_param_results(only_cs_position=False,

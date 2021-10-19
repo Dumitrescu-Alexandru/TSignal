@@ -8,7 +8,7 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer, Transformer
 from torch.utils.data import dataset
-from models.binary_sp_classifier import BinarySPClassifier
+from models.binary_sp_classifier import BinarySPClassifier, CNN3
 
 
 class TokenEmbedding(nn.Module):
@@ -204,7 +204,8 @@ class TransformerModel(nn.Module):
         elif use_glbl_lbls and self.glbl_lbl_version != 3:
             self.glbl_generator = nn.Linear(d_model, no_glbl_lbls).to(self.device)
         elif self.use_glbl_lbls and self.glbl_lbl_version == 3:
-            self.glbl_generator = BinarySPClassifier(input_size=1024, output_size=no_glbl_lbls).to(self.device)
+            self.glbl_generator = CNN3(input_size=1024, output_size=no_glbl_lbls).to(self.device)
+            # self.glbl_generator = BinarySPClassifier(input_size=1024, output_size=no_glbl_lbls).to(self.device)
 
     def encode(self, src):
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
