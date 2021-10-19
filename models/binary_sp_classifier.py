@@ -50,5 +50,4 @@ class BinarySPClassifier(nn.Module):
         x = nn.functional.dropout(x, self.dos[1])
 
         x = self.dense(x)
-        x = torch.sigmoid(x)
         return x

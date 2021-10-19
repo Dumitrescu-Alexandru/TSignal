@@ -433,25 +433,25 @@ def plot_mcc(mccs, name="param_search_0.2_2048_0.0001_"):
     plt.show()
 
 
-def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.2_2048_0.0001_", sp_type_f1=None):
+def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.2_2048_0.0001_", sp_type_f1=[[]]):
     cs_res_euk, cs_res_neg, cs_res_pos, cs_res_arc = results
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
     for i in range(4):
         axs[0, 0].plot(cs_res_euk[i], label="Eukaryote {} tol={}".format(metric, i))
-        if i == 0 and metric == "f1":
+        if i == 0 and metric == "f1"  and len(sp_type_f1[0]) != 0:
             axs[0, 0].plot(sp_type_f1[0], color='black', label="Eukaryote sp type F1")
         axs[0, 0].set_ylabel(metric)
         axs[0, 0].legend()
         axs[0, 0].set_ylim(-0.1, 1.1)
 
         axs[0, 1].plot(cs_res_neg[i], label="Negative {} tol={}".format(metric, i))
-        if i == 0 and metric == "f1":
+        if i == 0 and metric == "f1" and len(sp_type_f1[0]) != 0:
             axs[0, 1].plot(sp_type_f1[1], color='black' , label="Negative sp type F1")
         axs[0, 1].legend()
         axs[0, 1].set_ylim(-0.1, 1.1)
 
         axs[1, 0].plot(cs_res_pos[i], label="Positive {} tol={}".format(metric, i))
-        if i == 0  and metric == "f1":
+        if i == 0  and metric == "f1"  and len(sp_type_f1[0]) != 0:
             axs[1, 0].plot(sp_type_f1[2], color='black', label="Positive sp type F1")
         axs[1, 0].legend()
         axs[1, 0].set_xlabel("epochs")
@@ -459,7 +459,7 @@ def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.
         axs[1, 0].set_ylabel(metric)
 
         axs[1, 1].plot(cs_res_arc[i], label="Archaea {} tol={}".format(metric, i))
-        if i == 0  and metric == "f1":
+        if i == 0  and metric == "f1" and len(sp_type_f1[0]) != 0:
             axs[1, 1].plot(sp_type_f1[3], color='black', label="Archaea sp type F1")
         axs[1, 1].legend()
         axs[1, 1].set_xlabel("epochs")
@@ -1275,12 +1275,13 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
+    visualize_validation(run="swa_model_", folds=[0, 1], folder="separate-glbl_swa_mdl/")
     visualize_validation(run="large3_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_large3/")
-
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_swa_mdl/",
+                                            result_folder="separate-glbl_large3/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
+
 
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_large2_01drop_mdl/",
