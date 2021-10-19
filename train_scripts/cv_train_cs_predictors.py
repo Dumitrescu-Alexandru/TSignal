@@ -624,10 +624,13 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     scheduler.step()
                 if use_swa and e + 1>= swa_start:
                     swa_model.update_parameters(model)
+                    update_bn(dataset_loader, swa_model)
+                if use_swa and e+1 == swa_start:
+                    patience = 20
 
         if validate_on_test:
             validate_partitions = list(test_partition)
-            _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
+            _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model , sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
                          epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified,very_simplified=very_simplified)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
@@ -644,8 +647,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
                                              sets=valid_sets, form_sp_reg_data=form_sp_reg_data, simplified=simplified,
                                              very_simplified=very_simplified)
-            _ = evaluate(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=valid_sets,
-                         epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
+            _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model, sp_data.lbl2ind, run_name=run_name,
+                         partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
+                         simplified=simplified, very_simplified=very_simplified)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -683,7 +687,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             best_epoch = e
             best_valid_loss = valid_loss
             best_valid_mcc_and_recall = patiente_metric
-            save_model(model, run_name)
+            save_model(swa_model.module if use_swa and e + 1>= swa_start else model, run_name)
             if e == eps - 1:
                 patience = 0
         elif (e > 20 and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
@@ -699,7 +703,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             patience -= 1
     if use_swa:
         update_bn(dataset_loader, swa_model)
-        save_model(swa_model.module, run_name)
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
     if not deployment_model and not validate_partition is not None or (
