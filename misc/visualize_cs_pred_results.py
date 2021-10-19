@@ -433,26 +433,34 @@ def plot_mcc(mccs, name="param_search_0.2_2048_0.0001_"):
     plt.show()
 
 
-def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.2_2048_0.0001_"):
+def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.2_2048_0.0001_", sp_type_f1=None):
     cs_res_euk, cs_res_neg, cs_res_pos, cs_res_arc = results
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
     for i in range(4):
         axs[0, 0].plot(cs_res_euk[i], label="Eukaryote {} tol={}".format(metric, i))
+        if i == 0 and metric == "f1":
+            axs[0, 0].plot(sp_type_f1[0], color='black', label="Eukaryote sp type F1")
         axs[0, 0].set_ylabel(metric)
         axs[0, 0].legend()
         axs[0, 0].set_ylim(-0.1, 1.1)
 
         axs[0, 1].plot(cs_res_neg[i], label="Negative {} tol={}".format(metric, i))
+        if i == 0 and metric == "f1":
+            axs[0, 1].plot(sp_type_f1[1], color='black' , label="Negative sp type F1")
         axs[0, 1].legend()
         axs[0, 1].set_ylim(-0.1, 1.1)
 
         axs[1, 0].plot(cs_res_pos[i], label="Positive {} tol={}".format(metric, i))
+        if i == 0  and metric == "f1":
+            axs[1, 0].plot(sp_type_f1[2], color='black', label="Positive sp type F1")
         axs[1, 0].legend()
         axs[1, 0].set_xlabel("epochs")
         axs[1, 0].set_ylim(-0.1, 1.1)
         axs[1, 0].set_ylabel(metric)
 
         axs[1, 1].plot(cs_res_arc[i], label="Archaea {} tol={}".format(metric, i))
+        if i == 0  and metric == "f1":
+            axs[1, 1].plot(sp_type_f1[3], color='black', label="Archaea sp type F1")
         axs[1, 1].legend()
         axs[1, 1].set_xlabel("epochs")
 
@@ -465,8 +473,8 @@ def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.
 def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder=""):
     all_results = []
     euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, \
-    cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = extract_results(run, folds=folds,
-                                                                                             folder=folder)
+    cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc, sp_type_f1 = extract_results(run, folds=folds,
+                                                                                                folder=folder)
     all_f1 = [[[], [], [], []], [[], [], [], []], [[], [], [], []], [[], [], [], []]]
     for lg_ind, (lg_rec, lg_prec) in enumerate([(cs_recalls_euk, cs_precs_euk), (cs_recalls_neg, cs_precs_neg),
                                                 (cs_recalls_pos, cs_precs_pos), (cs_recalls_arc, cs_precs_arc)]):
@@ -476,7 +484,7 @@ def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0, 1], fold
     cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc = all_f1
     plot_mcc([euk_mcc, neg_mcc, pos_mcc, arc_mcc], name=run)
     plot_losses([train_loss, valid_loss], name=run)
-    extract_and_plot_prec_recall([cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc], metric="f1", name=run)
+    extract_and_plot_prec_recall([cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc], metric="f1", name=run, sp_type_f1=sp_type_f1)
     extract_and_plot_prec_recall([cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, cs_recalls_arc], metric="recall",
                                  name=run)
     extract_and_plot_prec_recall([cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc], metric="precision", name=run)
@@ -490,7 +498,7 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
                                                                      [[], [], [], []], [[], [], [], []]
     cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc = [[], [], [], []], [[], [], [], []], \
                                                              [[], [], [], []], [[], [], [], []]
-
+    class_preds = [[], [], [], []]
     with open(folder + run + "{}_{}.log".format(folds[0], folds[1]), "rt") as f:
         lines = f.readlines()
     for l in lines:
@@ -551,6 +559,15 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
             cs_precs_arc[1].append(prec_res[13])
             cs_precs_arc[2].append(prec_res[14])
             cs_precs_arc[3].append(prec_res[15])
+        elif "F1Score:" in l:
+            vals = l.split("F1Score:")[-1].replace(",","").split(" ")
+            vals = [v for v in vals if v != '']
+            vals = [float(v.replace("\n", "")) for v in vals]
+            class_preds[0].append(float(vals[0]))
+            class_preds[1].append(float(vals[1]))
+            class_preds[2].append(float(vals[2]))
+            class_preds[3].append(float(vals[3]))
+
 
     # fix for logs that have f1 score written as "precision"...
     if len(cs_precs_pos[0]) == 2 * len(cs_recalls_pos[0]):
@@ -566,7 +583,7 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
                                                                                   range(len_cs_rec)]
 
     return euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, \
-           cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc
+           cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc, class_preds
 
 
 def remove_from_dictionary(res_dict, test_fld):
@@ -944,12 +961,15 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         # patience_ind = mdl_params.find("patience_") + len("patience_")
         # patience = mdl_params[patience_ind:patience_ind+2]
         # params += "_{}".format(patience)
-        nlayers = mdl_params[mdl_params.find("nlayers") + len("nlayers"):].split("_")[1]
-        params += "_{}".format(nlayers)
-        nhead = mdl_params[mdl_params.find("nhead") + len("nhead"):].split("_")[1]
-        params += "_{}".format(nhead)
-        lr_sched = mdl_params[mdl_params.find("lrsched") + len("lrsched"):].split("_")[1]
-        params += "_{}".format(lr_sched)
+        if "nlayers" in mdl_params:
+            nlayers = mdl_params[mdl_params.find("nlayers") + len("nlayers"):].split("_")[1]
+            params += "_{}".format(nlayers)
+        if "nhead" in mdl_params:
+            nhead = mdl_params[mdl_params.find("nhead") + len("nhead"):].split("_")[1]
+            params += "_{}".format(nhead)
+        if "lrsched" in mdl_params:
+            lr_sched = mdl_params[mdl_params.find("lrsched") + len("lrsched"):].split("_")[1]
+            params += "_{}".format(lr_sched)
         if "dos" in mdl_params:
             dos = mdl_params[mdl_params.find("dos"):].split("_")[1]
             params += "_{}".format(dos)
@@ -1255,8 +1275,10 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
+    visualize_validation(run="large3_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_large3/")
+
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl-mcc2-drop/",
+                                            result_folder="separate-glbl_swa_mdl/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
 
