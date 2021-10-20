@@ -676,9 +676,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             patiente_metric = np.mean([all_f1_scores[i][1] for i in range(4)]) if not np.isnan(all_f1_scores[3][0]) \
                 else np.mean([all_f1_scores[i][1] for i in range(3)])
         # sp_pred_mccs
-        all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
-                                                       list(np.array(all_precisions).flatten()), list(
-            np.array(total_positives).flatten())
         if use_glbl_lbls or form_sp_reg_data:
             print("On epoch {} total train/validation loss and glbl loss: {}/{}, {}".format(e, losses / len(
                 dataset_loader),
@@ -711,6 +708,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
             log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e,
                                              all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
+        all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
+                                                       list(np.array(all_precisions).flatten()), list(
+            np.array(total_positives).flatten())
+
         print("VALIDATION: avg mcc on epoch {}: {}".format(e, np.mean(sp_pred_mccs2)))
         if current_sptype_f1 > bestf1_sp_type:
             bestf1_sp_type = current_sptype_f1
