@@ -559,7 +559,7 @@ def extract_results(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder='r
             cs_precs_arc[1].append(prec_res[13])
             cs_precs_arc[2].append(prec_res[14])
             cs_precs_arc[3].append(prec_res[15])
-        elif "F1Score:" in l:
+        elif "F1Score:" in l and "VALIDATION" in l:
             vals = l.split("F1Score:")[-1].replace(",","").split(" ")
             vals = [v for v in vals if v != '']
             vals = [float(v.replace("\n", "")) for v in vals]
@@ -1275,11 +1275,18 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
+    visualize_validation(run="cnn3_3_32_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_3_32_mdl/")
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_rerun_best/",
+                                            result_folder="separate-glbl_3_32_mdl/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
-    visualize_validation(run="rerun_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_rerun_best/")
+    visualize_validation(run="cnn3_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2], folder="separate-glbl_cnn3/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_patience_swa/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    visualize_validation(run="large3_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_large3/")
+    visualize_validation(run="patience_swa_model_", folds=[0, 1], folder="separate-glbl_patience_swa/")
     visualize_validation(run="large3_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_large3/")
 
 

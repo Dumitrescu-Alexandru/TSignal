@@ -425,12 +425,27 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
 
     return total_loss / len(dataset_loader)
 
+def load_sptype_model(model_path):
+    folder = get_data_folder()
+    model = torch.load(folder + model_path)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    return model.to(device)
+
+def load_model(model_path, dict_file=None):
+    folder = get_data_folder()
+    model = torch.load(folder + model_path)
+    model.input_encoder.update(emb_f_name=dict_file)
+    return model
 
 def save_model(model, model_name=""):
     folder = get_data_folder()
     model.input_encoder.seq2emb = {}
     torch.save(model, folder + model_name + "_best_eval.pth")
     model.input_encoder.update()
+
+def save_sptype_model(model, model_name="", best=False):
+    folder = get_data_folder()
+    torch.save(model, folder + model_name + "_best_sptye_eval.pth" if best else folder + model_name + "_current_sptype.pth")
 
 
 def other_fold_mdl_finished(model_name="", tr_f=0, val_f=1):
@@ -445,11 +460,6 @@ def other_fold_mdl_finished(model_name="", tr_f=0, val_f=1):
     return False
 
 
-def load_model(model_path, dict_file=None):
-    folder = get_data_folder()
-    model = torch.load(folder + model_path)
-    model.input_encoder.update(emb_f_name=dict_file)
-    return model
 
 
 def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1,
@@ -516,7 +526,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False,
                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
-                        validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False):
+                        validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
+                        separate_save_sptype_preds=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -556,6 +567,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     best_valid_loss = 5 ** 10
     best_valid_mcc_and_recall = -1
     best_epoch = 0
+    bestf1_sp_type = 0
+    current_sptype_f1 = 0
     e = -1
     while patience != 0:
         print("LR:", optimizer.param_groups[0]['lr'])
@@ -654,8 +667,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
                 get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
+
         if validate_on_mcc:
             patiente_metric = np.mean(sp_pred_mccs2)
+            if separate_save_sptype_preds:
+                current_sptype_f1 = sptype_f1[0] * 0.5 + sptype_f1[1] * 0.2 + sptype_f1[2] * 0.2  + sptype_f1[3]
         else:
             patiente_metric = np.mean([all_f1_scores[i][1] for i in range(4)]) if not np.isnan(all_f1_scores[3][0]) \
                 else np.mean([all_f1_scores[i][1] for i in range(3)])
@@ -678,10 +694,28 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             print("On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
             logging.info(
                 "On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
-        log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e,
-                                         all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
+        save_sptype_model(model.glbl_generator, run_name, best=False)
+        if current_sptype_f1 > bestf1_sp_type:
+            log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e,
+                                             all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
+        elif separate_save_sptype_preds:
+            if current_sptype_f1 < bestf1_sp_type:
+                model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
+            _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model, sp_data.lbl2ind, run_name=run_name,
+                         partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
+                         simplified=simplified, very_simplified=very_simplified)
+            sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
+            all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
+            all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
+                get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
 
+            log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e,
+                                             all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
         print("VALIDATION: avg mcc on epoch {}: {}".format(e, np.mean(sp_pred_mccs2)))
+        if current_sptype_f1 > bestf1_sp_type:
+            bestf1_sp_type = current_sptype_f1
+            save_sptype_model(model.glbl_generator, run_name, best=True)
+            print("Best SP type has been saved")
         if (valid_loss < best_valid_loss and eps == -1 and not validate_on_mcc) or (eps != -1 and e == eps - 1) or \
                 (patiente_metric > best_valid_mcc_and_recall and eps == -1 and validate_on_mcc):
             best_epoch = e
@@ -701,6 +735,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} from epoch {} compared to best {}.".
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
+        if patience != 0:
+            model.glbl_generator = load_sptype_model(run_name + "_current_sptype.pth")
+            print("Loaded current sptype_mdl to resume training")
     if use_swa:
         update_bn(dataset_loader, swa_model)
 
