@@ -69,7 +69,8 @@ class CNN3(nn.Module):
         self.cnn2 = nn.Conv1d(input_size,filters[1],kernel_size=lengths[1],padding=(lengths[1]-1)//2)
         self.cnn3 = nn.Conv1d(input_size,filters[2],kernel_size=lengths[2],padding=(lengths[2]-1)//2)
         self.cnn4 = nn.Conv1d(input_size,filters[3],kernel_size=lengths[3],padding=(lengths[3]-1)//2)
-
+        self.drop1 = nn.Dropout(dos[0])
+        self.drop2 = nn.Dropout(dos[1])
         self.bn= nn.BatchNorm1d(n_f)
         self.relu = nn.ReLU()
         if pool=='sum':
@@ -91,7 +92,7 @@ class CNN3(nn.Module):
         xc = torch.cat((self.cnn1(x),self.cnn2(x),self.cnn3(x),self.cnn4(x)),dim=1)
         xc = self.bn(xc)
         xc = self.relu(xc)
-        xc = F.dropout(xc,self.dos[0])
+        xc = self.drop1(xc)
         xc = self.cnn5(xc)
         xc = self.bn5(xc)
         xc = self.relu(xc)
@@ -110,7 +111,7 @@ class CNN3(nn.Module):
         x = torch.cat((xc,x),dim=1)
         #print('SHAPE x after cat (xc,x)',x.shape)
 
-        x = F.dropout(x,self.dos[1])
+        x = self.drop2(x)
         x = self.dense(x)
         #x = self.softmax(x)
         #return x

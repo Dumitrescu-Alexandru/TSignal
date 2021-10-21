@@ -111,7 +111,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         ordered_no_sp = [lbl2ind['O'], lbl2ind['M'], lbl2ind['I']]
         for bach_ind in range(len(src)):
             if ind2glbl_lbl[glbl_preds[bach_ind].item()] == "NO_SP" and ind2lbl[next_word[bach_ind]] == "S":
-                max_no_sp = np.argmax([prob[bach_ind][3].item(), prob[bach_ind][4].item(), prob[bach_ind][5].item()])
+                max_no_sp = np.argmax([prob[bach_ind][lbl2ind['O']].item(), prob[bach_ind][lbl2ind['M']].item(), prob[bach_ind][lbl2ind['I']].item()])
                 current_ys.append(ys[bach_ind])
                 current_ys[-1].append(ordered_no_sp[max_no_sp])
             elif ind2glbl_lbl[glbl_preds[bach_ind].item()] in ['SP', 'TATLIPO', 'LIPO', 'TAT', 'PILIN'] \
@@ -124,6 +124,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         ys = current_ys
         start_ind = 1
     model.eval()
+    model.glbl_generator.eval()
     all_probs = []
     for i in range(start_ind, max(seq_lens) + 1):
         with torch.no_grad():
@@ -376,6 +377,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
              very_simplified=False):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
+    sanity_check_dict = {}
     seqs2probs = {}
     model.eval()
     if second_model is not None:
@@ -411,6 +413,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         #     total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
         for s, t, pt, sp_type in zip(src, tgt, predicted_tokens, sp_type_probs):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
+            sanity_check_dict[s] = torch.argmax(sp_type).item()
             if form_sp_reg_data:
                 new_predicted_lbls = modify_sp_subregion_preds(predicted_lbls, sp_type)
                 predicted_lbls = new_predicted_lbls
@@ -423,7 +426,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         # retrieve the dictionary of calibration only for the test set (not for validation) - for now it doesn't
         # make sense to do prob calibration since like 98% of predictions have >0.99 and are correct. See with weight decay
         pickle.dump(seqs2probs, open(run_name + "_sp_probs.bin", "wb"))
-
+    pickle.dump(sanity_check_dict, open("check_2.bin", "wb"))
     return total_loss / len(dataset_loader)
 
 def load_sptype_model(model_path):
@@ -581,6 +584,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         losses_glbl = 0
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
             seqs, lbl_seqs, _, glbl_lbls = batch
+            continue
             if use_glbl_lbls:
                 logits, glbl_logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()
@@ -644,6 +648,38 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 if use_swa and e+1 == swa_start:
                     patience = 20
 
+        validate_partitions = [0, 1]
+        model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
+        _ = evaluate(swa_model.module if use_swa and e + 1 >= swa_start else model, sp_data.lbl2ind, run_name=run_name,
+                     partitions=validate_partitions, sets=["test"],
+                     epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
+        sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
+        all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
+        all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
+            get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True,
+                                       return_class_prec_rec=True)
+        print("After loading", sptype_f1)
+        _ = evaluate(swa_model.module if use_swa and e + 1 >= swa_start else model, sp_data.lbl2ind, run_name=run_name,
+                     partitions=validate_partitions, sets=["test"],
+                     epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
+        sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
+        all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
+        all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
+            get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True,
+                                       return_class_prec_rec=True)
+        print("Before loading", sptype_f1)
+        exit(1)
+        model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
+        _ = evaluate(swa_model.module if use_swa and e + 1 >= swa_start else model, sp_data.lbl2ind, run_name=run_name,
+                     partitions=validate_partitions, sets=["test"],
+                     epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
+        sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
+        all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
+        all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
+            get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True,
+                                       return_class_prec_rec=True)
+        print("After loading", sptype_f1)
+
         if validate_on_test:
             validate_partitions = list(test_partition)
             _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model , sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
@@ -694,7 +730,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             print("On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
             logging.info(
                 "On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
-        if current_sptype_f1 > bestf1_sp_type:
+        if current_sptype_f1 > bestf1_sp_type and 1== 2:
             bestf1_sp_type = current_sptype_f1
             save_sptype_model(model.glbl_generator, run_name, best=True, optimizer=optimizer)
             print("Best SP type has been saved with score {}".format(current_sptype_f1))
