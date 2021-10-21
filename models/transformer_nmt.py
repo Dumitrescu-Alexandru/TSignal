@@ -285,7 +285,7 @@ class PositionalEncoding(nn.Module):
 
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000, no_pos_enc=False):
         super().__init__()
-        self.no_pos_enc = False
+        self.no_pos_enc = no_pos_enc
         self.dropout = nn.Dropout(p=dropout)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
