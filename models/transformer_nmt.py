@@ -174,14 +174,15 @@ class TransformerModel(nn.Module):
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5,
                  data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
-                 version2_agregation="max", input_drop=False, no_pos_enc=False):
+                 version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False):
         super().__init__()
         self.add_lg_info = lg2ind is not None
         self.form_sp_reg_data = form_sp_reg_data
         self.model_type = 'Transformer'
         self.version2_agregation = "max"
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.pos_encoder = PositionalEncoding(d_model, dropout=dropout if input_drop else 0, no_pos_enc=no_pos_enc)
+        self.pos_encoder = PositionalEncoding(d_model, dropout=dropout if input_drop else 0, no_pos_enc=no_pos_enc,
+                                              linear_pos_enc=linear_pos_enc)
         self.transformer = Transformer(d_model=d_hid,
                                        nhead=nhead,
                                        num_encoder_layers=nlayers,
@@ -283,9 +284,10 @@ class TransformerModel(nn.Module):
 
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000, no_pos_enc=False):
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000, no_pos_enc=False, linear_pos_enc=False):
         super().__init__()
         self.no_pos_enc = no_pos_enc
+        self.linear_pos_enc = linear_pos_enc
         self.dropout = nn.Dropout(p=dropout)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -295,12 +297,18 @@ class PositionalEncoding(nn.Module):
         pe[:, 0, 0::2] = torch.sin(position * div_term)
         pe[:, 0, 1::2] = torch.cos(position * div_term)
         self.register_buffer('pe', pe)
+        if self.linear_pos_enc:
+            self.pos_enc = torch.nn.Embedding(100, 1024).to(self.device)
 
     def forward(self, x: Tensor) -> Tensor:
         """
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
+        if self.linear_pos_enc:
+            pos_enc = self.pos_enc(torch.tensor(list(range(x.shape[0]))).to(self.device))
+            pos_enc = pos_enc.repeat(1, x.shape[1]).reshape(x.shape[0], x.shape[1], x.shape[2])
+            return self.dropout(x + pos_enc)
         if self.no_pos_enc:
             return self.dropout(x)
         x = self.dropout(x + self.pe[:x.size(0)])

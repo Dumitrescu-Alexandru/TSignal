@@ -1275,11 +1275,16 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    visualize_validation(run="cnn3_3_32_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_3_32_mdl/")
+    visualize_validation(run="no_pos_enc_separate_saves_", folds=[0, 1], folder="separate-glbl_no_pos_enc/")
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_3_32_mdl/",
+                                            result_folder="separate_saves/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_no_pos_enc/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    visualize_validation(run="cnn3_3_32_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_3_32_mdl/")
     visualize_validation(run="cnn3_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2], folder="separate-glbl_cnn3/")
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_patience_swa/",
