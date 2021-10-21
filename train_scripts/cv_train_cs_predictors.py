@@ -446,6 +446,8 @@ def save_model(model, model_name=""):
 
 def save_sptype_model(model, model_name="", best=False, optimizer=None):
     folder = get_data_folder()
+    if os.path.exists(folder + model_name + "_best_sptye_eval.pth"):
+        os.remove(folder + model_name + "_best_sptye_eval.pth")
     torch.save(model, folder + model_name + "_best_sptye_eval.pth" if best else folder + model_name + "_current_sptype.pth")
 
 
