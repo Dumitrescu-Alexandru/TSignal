@@ -25,12 +25,12 @@ from models.transformer_nmt import TransformerModel
 
 def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
-               form_sp_reg_data=False, version2_agregation="max", input_drop=False):
+               form_sp_reg_data=False, version2_agregation="max", input_drop=False, no_pos_enc=False):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
                              glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
-                             version2_agregation=version2_agregation, input_drop=input_drop)
+                             version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -528,7 +528,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False,
                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
                         validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
-                        separate_save_sptype_preds=False):
+                        separate_save_sptype_preds=False, no_pos_enc=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -553,7 +553,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                        dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
                        ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
                        glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
-                       version2_agregation=version2_agregation, input_drop=input_drop)
+                       version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc)
 
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_tune = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
