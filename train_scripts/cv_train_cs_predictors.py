@@ -695,6 +695,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info(
                 "On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
         if current_sptype_f1 > bestf1_sp_type:
+            all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
+                                                           list(np.array(all_precisions).flatten()), list(
+                np.array(total_positives).flatten())
+
             log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e,
                                              all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
         elif separate_save_sptype_preds:
