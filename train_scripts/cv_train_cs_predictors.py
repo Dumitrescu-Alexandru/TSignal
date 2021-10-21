@@ -446,9 +446,7 @@ def save_model(model, model_name=""):
 
 def save_sptype_model(model, model_name="", best=False, optimizer=None):
     folder = get_data_folder()
-    # torch.save(model, folder + model_name + "_best_sptye_eval.pth" if best else folder + model_name + "_current_sptype.pth")
-    torch.save({'model_state_dict':model.state_dict(), 'optimizer_state_dict':optimizer.state_dict()},
-               folder + model_name + "_best_sptye_eval.pth" if best else folder + model_name + "_current_sptype.pth")
+    torch.save(model, folder + model_name + "_best_sptye_eval.pth" if best else folder + model_name + "_current_sptype.pth")
 
 
 def other_fold_mdl_finished(model_name="", tr_f=0, val_f=1):
