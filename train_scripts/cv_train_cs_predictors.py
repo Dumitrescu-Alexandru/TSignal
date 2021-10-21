@@ -426,7 +426,6 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         # retrieve the dictionary of calibration only for the test set (not for validation) - for now it doesn't
         # make sense to do prob calibration since like 98% of predictions have >0.99 and are correct. See with weight decay
         pickle.dump(seqs2probs, open(run_name + "_sp_probs.bin", "wb"))
-    pickle.dump(sanity_check_dict, open("check_2.bin", "wb"))
     return total_loss / len(dataset_loader)
 
 def load_sptype_model(model_path):
@@ -584,7 +583,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         losses_glbl = 0
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
             seqs, lbl_seqs, _, glbl_lbls = batch
-            continue
             if use_glbl_lbls:
                 logits, glbl_logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()
@@ -648,38 +646,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 if use_swa and e+1 == swa_start:
                     patience = 20
 
-        validate_partitions = [0, 1]
-        model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
-        _ = evaluate(swa_model.module if use_swa and e + 1 >= swa_start else model, sp_data.lbl2ind, run_name=run_name,
-                     partitions=validate_partitions, sets=["test"],
-                     epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
-        sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
-        all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
-        all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
-            get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True,
-                                       return_class_prec_rec=True)
-        print("After loading", sptype_f1)
-        _ = evaluate(swa_model.module if use_swa and e + 1 >= swa_start else model, sp_data.lbl2ind, run_name=run_name,
-                     partitions=validate_partitions, sets=["test"],
-                     epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
-        sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
-        all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
-        all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
-            get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True,
-                                       return_class_prec_rec=True)
-        print("Before loading", sptype_f1)
-        exit(1)
-        model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
-        _ = evaluate(swa_model.module if use_swa and e + 1 >= swa_start else model, sp_data.lbl2ind, run_name=run_name,
-                     partitions=validate_partitions, sets=["test"],
-                     epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
-        sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
-        all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
-        all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
-            get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True,
-                                       return_class_prec_rec=True)
-        print("After loading", sptype_f1)
-
         if validate_on_test:
             validate_partitions = list(test_partition)
             _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model , sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
@@ -730,7 +696,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             print("On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
             logging.info(
                 "On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
-        if current_sptype_f1 > bestf1_sp_type and 1== 2:
+        if current_sptype_f1 > bestf1_sp_type:
             bestf1_sp_type = current_sptype_f1
             save_sptype_model(model.glbl_generator, run_name, best=True, optimizer=optimizer)
             print("Best SP type has been saved with score {}".format(current_sptype_f1))
