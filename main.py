@@ -87,6 +87,7 @@ def parse_arguments():
     parser.add_argument("--separate_save_sptype_preds", default=False, action="store_true")
     parser.add_argument("--no_pos_enc", default=False, action="store_true")
     parser.add_argument("--linear_pos_enc", default=False, action="store_true")
+    parser.add_argument("--scale_input", default=False, action="store_true")
 
     return parser.parse_args()
 
@@ -208,7 +209,7 @@ if __name__ == "__main__":
                                 validate_partition=args.validate_partition,very_simplified=args.very_simplified,
                                 validate_on_mcc=args.validate_on_mcc, tune_cs=args.tune_cs, input_drop=args.input_drop,
                                 use_swa=args.use_swa, separate_save_sptype_preds=args.separate_save_sptype_preds,
-                                no_pos_enc=args.no_pos_enc, linear_pos_enc=args.linear_pos_enc)
+                                no_pos_enc=args.no_pos_enc, linear_pos_enc=args.linear_pos_enc, scale_input=args.scale_input)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):

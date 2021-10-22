@@ -174,12 +174,13 @@ class TransformerModel(nn.Module):
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5,
                  data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
-                 version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False):
+                 version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False):
         super().__init__()
         self.add_lg_info = lg2ind is not None
         self.form_sp_reg_data = form_sp_reg_data
         self.model_type = 'Transformer'
         self.version2_agregation = "max"
+        self.scale_input = scale_input
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.pos_encoder = PositionalEncoding(d_model, dropout=dropout if input_drop else 0, no_pos_enc=no_pos_enc,
                                               linear_pos_enc=linear_pos_enc)
@@ -215,7 +216,7 @@ class TransformerModel(nn.Module):
         else:
             src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True).transpose(0,1)
 
-        return self.transformer.encoder(self.pos_encoder(src), src_mask, padding_mask_src)
+        return self.transformer.encoder(self.pos_encoder(src, scale=self.scale_input), src_mask, padding_mask_src)
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
         tgt = self.pos_encoder(self.label_encoder(tgt).transpose(0,1))
@@ -224,7 +225,7 @@ class TransformerModel(nn.Module):
     def forward_glb_lbls(self, src, tgt):
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
-        padded_src = self.pos_encoder(padded_src.transpose(0,1))
+        padded_src = self.pos_encoder(padded_src.transpose(0,1), scale=self.scale_input)
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
         padded_tgt = self.pos_encoder(padded_tgt.transpose(0,1))
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
@@ -260,7 +261,7 @@ class TransformerModel(nn.Module):
                 trim_ind_l , trim_ind_r = 0, 0
             src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for  i in range(len(src))]
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
-        padded_src = self.pos_encoder(padded_src.transpose(0,1))
+        padded_src = self.pos_encoder(padded_src.transpose(0,1), scale=self.scale_input)
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
         padded_tgt = self.pos_encoder(padded_tgt.transpose(0,1))
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
@@ -300,7 +301,7 @@ class PositionalEncoding(nn.Module):
         if self.linear_pos_enc:
             self.pos_enc = torch.nn.Embedding(100, 1024).to(self.device)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, scale=False) -> Tensor:
         """
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
@@ -308,10 +309,17 @@ class PositionalEncoding(nn.Module):
         if self.linear_pos_enc:
             pos_enc = self.pos_enc(torch.tensor(list(range(x.shape[0]))).to(self.device))
             pos_enc = pos_enc.repeat(1, x.shape[1]).reshape(x.shape[0], x.shape[1], x.shape[2])
-            return self.dropout(x + pos_enc)
+            if scale:
+                x = self.dropout(x * np.sqrt(1024) + self.pe[:x.size(0)] + pos_enc)
+                return x
+            else:
+                return self.dropout(x + pos_enc + self.pe[:x.size(0)])
         if self.no_pos_enc:
             return self.dropout(x)
-        x = self.dropout(x + self.pe[:x.size(0)])
+        if scale:
+            x = self.dropout(x * np.sqrt(1024)+ self.pe[:x.size(0)])
+        else:
+            x = self.dropout(x + self.pe[:x.size(0)])
         return x
 
 

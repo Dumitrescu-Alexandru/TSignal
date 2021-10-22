@@ -1275,11 +1275,11 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    visualize_validation(run="no_pos_enc_separate_saves_", folds=[0, 1], folder="separate-glbl_no_pos_enc/")
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate_saves/",
+                                            result_folder="separate-glbl_linear_pos_enc/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
+    visualize_validation(run="linear_pos_enc_separate_saves_", folds=[0, 1], folder="separate-glbl_linear_pos_enc/")
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_no_pos_enc/",
                                             compare_mdl_plots=False,
