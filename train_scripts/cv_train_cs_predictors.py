@@ -578,6 +578,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     bestf1_sp_type = 0
     current_sptype_f1 = 0
     e = -1
+    tune_cs_trigger=False
     while patience != 0:
         print("LR:", optimizer.param_groups[0]['lr'])
         model.train()
@@ -590,7 +591,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 logits, glbl_logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
-                if tune_cs > 0:
+                if tune_cs > 0 and e > 35:
                     seq_indices = []
                     seq_dim = logits.shape[0]
                     for ind_, (gl, t) in enumerate(zip(glbl_lbls, targets)):

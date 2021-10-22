@@ -313,7 +313,7 @@ class PositionalEncoding(nn.Module):
                 x = self.dropout(x * np.sqrt(1024) + self.pe[:x.size(0)] + pos_enc)
                 return x
             else:
-                return self.dropout(x + pos_enc + self.pe[:x.size(0)])
+                return self.dropout(x + pos_enc)# + self.pe[:x.size(0)])
         if self.no_pos_enc:
             return self.dropout(x)
         if scale:
