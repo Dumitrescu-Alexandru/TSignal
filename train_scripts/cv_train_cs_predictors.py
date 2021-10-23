@@ -632,7 +632,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
                     weighted_loss = torch.tensor([glbl_lbl_2weights[ind2glbl_lbl[gl]] for gl in glbl_lbls], device=device).reshape(-1, 1)
                     weighted_loss = weighted_loss.repeat(1, seq_dim).reshape(-1)
-                    loss = torch.mean(loss * weighted_loss)
+                    loss = torch.mean(loss)
                     loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
                     losses_glbl += loss_glbl.item()
                     loss += loss_glbl * glbl_lbl_weight
