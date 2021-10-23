@@ -21,10 +21,11 @@ class SPCSpredictionData:
         self.form_sp_reg_data = form_sp_reg_data
         if form_sp_reg_data:
             self.set_dicts(form_sp_reg_data)
-            self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts_subregion_lbls.bin", "rb"))
+            self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(
+                open("sp6_dicts_subregion_lbls.bin", "rb"))
         else:
             self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
-        if not os.path.exists(self.get_data_folder()+"sp6_partitioned_data_sublbls_test_0.bin"):
+        if not os.path.exists(self.get_data_folder() + "sp6_partitioned_data_sublbls_test_0.bin"):
             self.form_subregion_sp_data()
         # if os.path.exists("sp6_dicts.bin"):
         #     self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
@@ -53,13 +54,14 @@ class SPCSpredictionData:
                           'I': 13, 'C': 14, 'Q': 15, 'S': 16, 'P': 17, 'N': 18, 'T': 19, 'PD': 20, 'BS': 21,
                           'ES': 22}]
             else:
-                dicts = [{'P': 0, 'n': 1, 'h': 2, 'c': 3, 'N': 4, 'H': 5, 'R': 6, 'C': 7, 'B': 8, 'O': 9, 'M': 10, 'I': 11,
-                          'PD': 12, 'BS': 13, 'ES': 14},
-                         {'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
-                         {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5},
-                         {'V': 0, 'R': 1, 'D': 2, 'E': 3, 'H': 4, 'A': 5, 'G': 6, 'Y': 7, 'W': 8, 'F': 9, 'M': 10, 'K': 11,
-                          'L': 12,
-                          'I': 13, 'C': 14, 'Q': 15, 'S': 16, 'P': 17, 'N': 18, 'T': 19, 'PD': 20, 'BS': 21, 'ES': 22}]
+                dicts = [
+                    {'P': 0, 'n': 1, 'h': 2, 'c': 3, 'N': 4, 'H': 5, 'R': 6, 'C': 7, 'B': 8, 'O': 9, 'M': 10, 'I': 11,
+                     'PD': 12, 'BS': 13, 'ES': 14},
+                    {'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
+                    {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5},
+                    {'V': 0, 'R': 1, 'D': 2, 'E': 3, 'H': 4, 'A': 5, 'G': 6, 'Y': 7, 'W': 8, 'F': 9, 'M': 10, 'K': 11,
+                     'L': 12,
+                     'I': 13, 'C': 14, 'Q': 15, 'S': 16, 'P': 17, 'N': 18, 'T': 19, 'PD': 20, 'BS': 21, 'ES': 22}]
         else:
             dicts = [{'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7, 'BS': 8, 'ES': 9},
                      {'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
@@ -72,26 +74,27 @@ class SPCSpredictionData:
         else:
             pickle.dump(dicts, open("sp6_dicts.bin", "wb"))
 
-    def get_subregions_labels(self, seq, lbls, glbl_lbl = "SP"):
+    def get_subregions_labels(self, seq, lbls, glbl_lbl="SP"):
         kyte_doolittle_hydrophobicity = {"A": 1.8, "C": 2.5, "D": -3.5, "E": -3.5, "F": 2.8, "G": -0.4, "H": -3.2,
                                          "I": 4.5, "K": -3.9,
                                          "L": 3.8, "M": 1.9, "N": -3.5, "P": -1.6, "Q": -3.5, "R": -4.5, "S": -0.8,
                                          "T": -0.7, "V": 4.2, "W": -0.9, "Y": -1.3}
 
         def get_pos_rr_motif_v2(s, l):
-            if "SRR" in s[:l.rfind("T")-3] or "TRR" in s[:l.rfind("T") -3]:
+            if "SRR" in s[:l.rfind("T") - 3] or "TRR" in s[:l.rfind("T") - 3]:
                 return re.findall("[ST]RR", s[:l.rfind("T")])[0]
-            elif len(re.findall("RR.F", s[:l.rfind("T")-3])) != 0:
+            elif len(re.findall("RR.F", s[:l.rfind("T") - 3])) != 0:
                 return re.findall("RR.F", s)[0]
-            elif len(re.findall("[R][RNKQ][DERKHNQSTYGAV]", s[:l.rfind("T")-3])) != 0:
+            elif len(re.findall("[R][RNKQ][DERKHNQSTYGAV]", s[:l.rfind("T") - 3])) != 0:
                 # print(re.findall("[R][RNKQ][DERKHNQSTYGAV]", s[:l.rfind("T")]))
-                return re.findall("[R][RNKQ][DERKHNQSTYGAV]", s[:l.rfind("T")-3])[0]
+                return re.findall("[R][RNKQ][DERKHNQSTYGAV]", s[:l.rfind("T") - 3])[0]
             elif len(re.findall("[RK][R][DERKHNQSTYGAV]", s)) != 0:
-                return re.findall("[RK][R][DERKHNQSTYGAV]", s[:l.rfind("T")-3])[0]
+                return re.findall("[RK][R][DERKHNQSTYGAV]", s[:l.rfind("T") - 3])[0]
             elif "RR" in s:
                 return "RR"
             elif "MNDAAPQNPGQDEAKGTGEKDNGGSMSPRSALRTTAGVAGAGLGLSALGTGTASASVPEAAQTAVPAAES" == s:
                 return "RS"
+
         def get_pos_of_rr_motif(seq_, lbls_, l_g=None):
             seq_ = seq_[:lbls_.rfind("T")]
             mtfs_found = []
@@ -157,7 +160,7 @@ class SPCSpredictionData:
             if still_needs_filtering:
                 mtfs_found = get_first_RR_occ(seq_, mtfs_found)
             if type(mtfs_found) == list:
-                return  mtfs_found[0]
+                return mtfs_found[0]
             return mtfs_found
 
             # R/K; R/N/K/Q
@@ -173,9 +176,10 @@ class SPCSpredictionData:
             for i in range(start_ind, last_ind - 2):
                 # window of 7 is used for the hydro values, determining the h region
                 # compute these for all SP labels, except last 3 which are
-                hydro_vals.append(sum([kyte_doolittle_hydrophobicity[seq_[j]] for j in range(i-3,i+4)]))
-            h_ind = np.argmax(hydro_vals)+ start_ind
+                hydro_vals.append(sum([kyte_doolittle_hydrophobicity[seq_[j]] for j in range(i - 3, i + 4)]))
+            h_ind = np.argmax(hydro_vals) + start_ind
             return h_ind, last_ind
+
         possible_sp_letters = ["S", "T", "L", "P"]
         #    sptype2letter = {'TAT':'T', 'LIPO':'L', 'PILIN':'P', 'TATLIPO':'T', 'SP':'S'}
         sp_letter = lbls[0]
@@ -186,22 +190,22 @@ class SPCSpredictionData:
         if sp_letter in possible_sp_letters:
             if glbl_lbl == "SP":
                 h_ind, last_ind = get_hydro_values(seq, lbls, sp_aa_lbl=sp_letter)
-                modified_lbls += "S"* 2 if self.simplified else "n" * 2
-                modified_lbls += "S" * (h_ind-2) if self.simplified else "N" * (h_ind-2)
+                modified_lbls += "S" * 2 if self.simplified else "n" * 2
+                modified_lbls += "S" * (h_ind - 2) if self.simplified else "N" * (h_ind - 2)
                 modified_lbls += "S" if self.simplified else "h"
                 modified_lbls += "S" * (last_ind - h_ind - 3) if self.simplified else "H" * (last_ind - h_ind - 3)
                 modified_lbls += "S" * 3 if self.simplified else "c" * 3
-                modified_lbls += lbls[last_ind+1:]
+                modified_lbls += lbls[last_ind + 1:]
             elif glbl_lbl == "LIPO":
                 h_ind, last_ind = get_hydro_values(seq, lbls, sp_aa_lbl=sp_letter)
                 modified_lbls += "S" * 2 if self.simplified else "n" * 2
-                modified_lbls += "S" * (h_ind -2) if self.simplified else "N" * (h_ind-2)
+                modified_lbls += "S" * (h_ind - 2) if self.simplified else "N" * (h_ind - 2)
                 modified_lbls += "S" if self.simplified else "h"
                 modified_lbls += "S" * (last_ind - h_ind - 3) if self.simplified else "h" * (last_ind - h_ind - 3)
                 modified_lbls += "S" * 3 if self.simplified else "B" * 3
                 # in LIPO/TATLIPO, there is always a cysteine aa after CS
-                modified_lbls += "C" if not self.very_simplified else lbls[last_ind+1]
-                modified_lbls += lbls[last_ind+2:]
+                modified_lbls += "C" if not self.very_simplified else lbls[last_ind + 1]
+                modified_lbls += lbls[last_ind + 2:]
             elif glbl_lbl == "TAT":
                 # motif = get_pos_of_rr_motif(seq, lbls)
                 motif = get_pos_rr_motif_v2(seq, lbls)
@@ -214,14 +218,14 @@ class SPCSpredictionData:
                 modified_lbls += "S" if self.simplified else "n"
                 current_len = len(modified_lbls)
                 # add nh <- N (uncertain n or h label) until the most hydrophobic aa at h_ind
-                modified_lbls += "S" * (h_ind - current_len) if self.simplified  else "h" * (h_ind - current_len)
+                modified_lbls += "S" * (h_ind - current_len) if self.simplified else "h" * (h_ind - current_len)
                 # certain h subregion label at the most hydrophobic aa
                 modified_lbls += "S" if self.simplified else "h"
                 # uncertain hc <- H label until the last 3 aa in the signal peptide
                 modified_lbls += "S" * (last_ind - h_ind - 3) if self.simplified else "H" * (last_ind - h_ind - 3)
                 # certain c label subregion for the last 3 aa
                 modified_lbls += "S" * 3 if self.simplified else "c" * 3
-                modified_lbls += lbls[last_ind +1:]
+                modified_lbls += lbls[last_ind + 1:]
             elif glbl_lbl == "TATLIPO":
                 # motif = get_pos_of_rr_motif(seq, lbls)
                 motif = get_pos_rr_motif_v2(seq, lbls)
@@ -232,7 +236,7 @@ class SPCSpredictionData:
                 modified_lbls += "S" if self.simplified else "n"
                 current_len = len(modified_lbls)
                 # add nh <- N (uncertain n or h label) until the most hydrophobic aa at h_ind
-                modified_lbls += "S" * (h_ind- current_len) if self.simplified else "h" * (h_ind - current_len)
+                modified_lbls += "S" * (h_ind - current_len) if self.simplified else "h" * (h_ind - current_len)
                 # certain h subregion label at the most hydrophobic aa
                 modified_lbls += "S" if self.simplified else "h"
                 # uncertain hc <- H label until the last 3 aa in the signal peptide
@@ -248,7 +252,6 @@ class SPCSpredictionData:
         else:
             return lbls
 
-
     def retrieve_raw_lbls(self):
         raw_data_file = self.get_data_folder() + "train_set.fasta"
         seq2lbls = {}
@@ -261,14 +264,17 @@ class SPCSpredictionData:
     def form_subregion_sp_data(self):
         """ This function modifies the existing binaries containign the embeddings, with aa level labels corresponding
          to sp-subregions (n ,h, c) and others"""
-        for tr_f in [0,1,2]:
+        for tr_f in [0, 1, 2]:
             for t_set in ["train", "test"]:
                 sp_subregion_data = {}
-                data = pickle.load(open(self.get_data_folder()+"sp6_partitioned_data_{}_{}.bin".format(t_set, tr_f), "rb"))
+                data = pickle.load(
+                    open(self.get_data_folder() + "sp6_partitioned_data_{}_{}.bin".format(t_set, tr_f), "rb"))
                 for seq, (emb, lbls, l_grp, sp_type) in data.items():
-                    sp_subregion_data[seq] = [emb, self.get_subregions_labels(seq, lbls, glbl_lbl=sp_type), l_grp, sp_type]
-                pickle.dump(sp_subregion_data, open(self.get_data_folder()+"sp6_partitioned_data_sublbls_{}_{}.bin".format(t_set, tr_f), "wb"))
-
+                    sp_subregion_data[seq] = [emb, self.get_subregions_labels(seq, lbls, glbl_lbl=sp_type), l_grp,
+                                              sp_type]
+                pickle.dump(sp_subregion_data,
+                            open(self.get_data_folder() + "sp6_partitioned_data_sublbls_{}_{}.bin".format(t_set, tr_f),
+                                 "wb"))
 
     def form_lbl_inds(self):
         parts = [0, 1, 2]
@@ -303,7 +309,7 @@ class SPCSpredictionData:
                     all_unique_lgs.add(lg)
                     all_unique_global_inds.add(glb_ind)
         self.lg2ind = {l: ind for ind, l in enumerate(all_unique_lgs)}
-        self.glbl_lbl_2ind = {l:ind for ind,l in enumerate(all_unique_global_inds)}
+        self.glbl_lbl_2ind = {l: ind for ind, l in enumerate(all_unique_global_inds)}
         pickle.dump([self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind], open("sp6_dicts.bin", "wb"))
 
     def get_data_folder(self):
@@ -316,14 +322,15 @@ class SPCSpredictionData:
 
 
 class CSPredsDataset(Dataset):
-    def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True, sets=["train", "test"], test_f_name="",
+    def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True, sets=["train", "test"],
+                 test_f_name="",
                  form_sp_reg_data=False):
         self.life_grp, self.seqs, self.lbls, self.glbl_lbl = [], [], [], []
         if partitions is not None:
             # when using partitions, the sp6 data partition files will be used in train/testing
             for p in partitions:
                 for s in sets:
-                    d_file = "sp6_partitioned_data_sublbls_{}_{}.bin".format(s,p) if form_sp_reg_data else\
+                    d_file = "sp6_partitioned_data_sublbls_{}_{}.bin".format(s, p) if form_sp_reg_data else \
                         "sp6_partitioned_data_{}_{}.bin".format(s, p)
 
                     data_dict = pickle.load(open(data_folder + d_file, "rb"))
@@ -343,7 +350,8 @@ class CSPredsDataset(Dataset):
         return len(self.seqs)
 
     def __getitem__(self, item):
-        return {"seq": self.seqs[item], "lbl": self.lbls[item], "lg":self.life_grp[item], "glbl_lbl":self.glbl_lbl[item]}
+        return {"seq": self.seqs[item], "lbl": self.lbls[item], "lg": self.life_grp[item],
+                "glbl_lbl": self.glbl_lbl[item]}
 
 
 class SPbinaryData:
@@ -556,3 +564,25 @@ class BinarySPDataset(Dataset):
         lbl = self.data.iloc[idx, 2]
         sample = {'seq': seq, 'emb': emb, 'lbl': lbl}
         return sample
+
+
+def get_data_folder():
+    if os.path.exists("/scratch/work/dumitra1"):
+        return "/scratch/work/dumitra1/sp_data/"
+    elif os.path.exists("/home/alex"):
+        return "sp_data/"
+    else:
+        return "/scratch/project2003818/dumitra1/sp_data/"
+
+
+def get_sp_type_loss_weights():
+    data_folder = get_data_folder()
+    sptye2count = {'NO_SP': 0, 'SP': 0, 'TATLIPO': 0, 'LIPO': 0, 'TAT': 0, 'PILIN': 0}
+
+    for tr_f in [0, 1, 2]:
+        for set in ["train", "test"]:
+            data = pickle.load(open(data_folder+"sp6_partitioned_data_sublbls_{}_{}.bin".format(set, tr_f), "rb"))
+            for sp_t in data.values():
+                sptye2count[sp_t[3]] += 1
+    min_count = min(sptye2count.values())
+    return {k:min_count/v for k,v in sptye2count.items()}

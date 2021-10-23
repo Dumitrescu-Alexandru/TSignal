@@ -8,7 +8,7 @@ from Bio import SeqIO
 import numpy as np
 
 
-def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP"):
+def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=None):
     def get_acc_for_tolerence(ind, t_lbl, sp_letter):
         true_cs = 0
         while t_lbl[true_cs] == sp_letter and true_cs < len(t_lbl):
@@ -31,6 +31,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             # tp/(tp+fp). It means this a fn
             return np.array([0, 0, 0, 0, 1, 0, 0, 0, 0, 0])
 
+    ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     sptype2letter = {'TAT': 'T', 'LIPO': 'L', 'PILIN': 'P', 'TATLIPO': 'T', 'SP': 'S'}
     sp_types = ["S", "T", "L", "P"]
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
@@ -62,14 +63,17 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             #     # sample is considered as no CS predicted).
 
             # SO ONLY CONSIDER IT AS A FALSE NEGATIVE FOR THE APPROPRIATE correct-SP class?
-            while (p[ind] == sp_letter or (p[ind] == predicted_sp and is_sp and only_cs_position)) and ind < len(p) - 1:
-                # when only_cs_position=True, the cleavage site positions will be taken into account irrespective of
-                # whether the predicted SP is the correct kind
-                ind += 1
+            if (sptype_preds is not None and ind2glbl_lbl[sptype_preds[s]] == sp_type) or (sptype_preds is None and sp_letter == p[ind]):
+                while (p[ind] == sp_letter or (p[ind] == predicted_sp and is_sp and only_cs_position)) and ind < len(p) - 1:
+                    # when only_cs_position=True, the cleavage site positions will be taken into account irrespective of
+                    # whether the predicted SP is the correct kind
+                    ind += 1
+            else:
+                ind = 0
             predictions[grp2_ind[lg]] += get_acc_for_tolerence(ind, t, sp_letter)
 
-        elif sp_info != sp_type and p[ind] == sp_letter:
-
+        # elif sp_info != sp_type and   p[ind] == sp_letter:
+        elif (sptype_preds is not None and sp_info != sp_type and ind2glbl_lbl[sptype_preds[s]] == sp_type) or (sptype_preds is None and p[ind] == sp_letter):
             predictions[grp2_ind[lg]] += np.array([0, 0, 0, 0, 0, 0, 1, 1, 1, 1])
     if v:
         print(" count_tol_fn, count_complete_fn, count_otherSPpred", count_tol_fn, count_complete_fn, count_otherSPpred)
@@ -127,7 +131,7 @@ def get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls):
     return [ (2 * recs[i] * precs[i]) / (precs[i] + recs[i]) if precs[i] + recs[i] != 0 else 0 for i in range(4)]
 
 
-def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="SP"):
+def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="SP", sptype_preds=None):
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
     # order of elemnts in below list:
     # (eukaria_tp, eukaria_tn, eukaria_fp, eukaria_fn)
@@ -345,29 +349,34 @@ def get_data_folder():
 
 
 def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabilities_file=None, return_everything=False,
-                               return_class_prec_rec=False):
+                               return_class_prec_rec=False,):
+    sptype_filename = filename.replace(".bin", "")  + "_sptype.bin"
+    if os.path.exists(sptype_filename):
+        sptype_preds = pickle.load(open(sptype_filename, "rb"))
+    else:
+        sptype_preds = None
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename=filename)
     if probabilities_file is not None:
         get_prob_calibration_and_plot(probabilities_file, life_grp, seqs, true_lbls, pred_lbls)
     sp_pred_mccs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v)
     all_recalls, all_precisions, total_positives, \
-    false_positives, predictions, all_f1_scores = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v)
+    false_positives, predictions, all_f1_scores = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, sptype_preds=sptype_preds)
     if return_everything:
         sp_pred_mccs, sp_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v,
-                                                               return_mcc2=True, sp_type="SP")
+                                                               return_mcc2=True, sp_type="SP", sptype_preds=sptype_preds)
         lipo_pred_mccs, lipo_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v,
-                                                                   return_mcc2=True, sp_type="LIPO")
+                                                                   return_mcc2=True, sp_type="LIPO", sptype_preds=sptype_preds)
         tat_pred_mccs, tat_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v,
-                                                                 return_mcc2=True, sp_type="TAT")
+                                                                 return_mcc2=True, sp_type="TAT", sptype_preds=sptype_preds)
 
         all_recalls_lipo, all_precisions_lipo, _, _, _, all_f1_scores_lipo = get_cs_acc(life_grp, seqs, true_lbls,
                                                                                         pred_lbls, v=False,
                                                                                         only_cs_position=False,
-                                                                                        sp_type="LIPO")
+                                                                                        sp_type="LIPO", sptype_preds=sptype_preds)
         all_recalls_tat, all_precisions_tat, _, _, _, all_f1_scores_tat = get_cs_acc(life_grp, seqs, true_lbls,
                                                                                      pred_lbls, v=False,
                                                                                      only_cs_position=False,
-                                                                                     sp_type="TAT")
+                                                                                     sp_type="TAT", sptype_preds=sptype_preds)
         if return_class_prec_rec:
             return sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
                    all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
@@ -1275,8 +1284,19 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_save_long_run/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    visualize_validation(run="rerun_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2], folder="separate-glbl_rerun_best/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_large_separate_save_long/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    visualize_validation(run="large_separate_save_long_run_", folds=[1, 2], folder="separate-glbl_large_separate_save_long/")
     visualize_validation(run="scale_input_linear_pos_enc_separate_saves_", folds=[1, 2], folder="separate-glbl_scale_input_linear/")
-    visualize_validation(run="linear_pos_enc_separate_saves_", folds=[1, 2], folder="separate-glbl_linear_pos_enc/")
+    visualize_validation(run="cnn3_3_32_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_3_32_mdl/")
+    visualize_validation(run="linear_pos_enc_separate_saves_", folds=[0, 1], folder="separate-glbl_linear_pos_enc/")
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_linear_pos_enc/",
                                             compare_mdl_plots=False,
@@ -1285,7 +1305,6 @@ if __name__ == "__main__":
                                             result_folder="separate-glbl_no_pos_enc/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
-    visualize_validation(run="cnn3_3_32_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_3_32_mdl/")
     visualize_validation(run="cnn3_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2], folder="separate-glbl_cnn3/")
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_patience_swa/",

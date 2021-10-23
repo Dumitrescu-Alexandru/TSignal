@@ -19,7 +19,7 @@ import torch
 
 sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
-from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn
+from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights
 from models.transformer_nmt import TransformerModel
 
 
@@ -66,8 +66,8 @@ def generate_square_subsequent_mask(sz):
     mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
     return mask
 
-
-def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None):
+def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
+                  test_only_cs=False, glbl_lbls=None):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -88,8 +88,14 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         else:
             memory_2nd_mdl = None
         if model.glbl_lbl_version == 3:
-            glbl_labels = model.get_v3_glbl_lbls(src)
-            _, glbl_preds = torch.max(glbl_labels, dim=1)
+            if test_only_cs:
+                batch_size = len(src)
+                glbl_labels = torch.zeros(batch_size, 6)
+                glbl_labels[list(range(batch_size)), glbl_lbls] = 1
+                _, glbl_preds = torch.max(glbl_labels, dim=1)
+            else:
+                glbl_labels = model.get_v3_glbl_lbls(src)
+                _, glbl_preds = torch.max(glbl_labels, dim=1)
 
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
     ys = []
@@ -306,14 +312,14 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=3):
 
 
 def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False,
-              form_sp_reg_data=False,
-              second_model=None):
+              form_sp_reg_data=False, second_model=None, test_only_cs=False, glbl_lbls=None):
     model.eval()
     if form_sp_reg_data:
         tgt_tokens, probs, sp_probs, \
         all_sp_probs, all_seq_sp_logits, sp_type_probs = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind,
                                                                        tgt=tgt, form_sp_reg_data=form_sp_reg_data,
-                                                                       second_model=second_model)
+                                                                       second_model=second_model, test_only_cs=test_only_cs,
+                                                                       glbl_lbls=glbl_lbls)
         return tgt_tokens, probs, sp_probs, \
                all_sp_probs, all_seq_sp_logits, sp_type_probs
     if use_beams_search:
@@ -376,10 +382,10 @@ def modify_sp_subregion_preds(pred_tokens, sp_type):
 
 def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1,
              dataset_loader=None,use_beams_search=False, form_sp_reg_data=False, simplified=False, second_model=None,
-             very_simplified=False):
+             very_simplified=False, test_only_cs=False):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
-    sanity_check_dict = {}
+    sp_type_dict = {}
     seqs2probs = {}
     model.eval()
     if second_model is not None:
@@ -396,15 +402,16 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
 
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     total_loss = 0
-    for ind, (src, tgt, _, _) in tqdm(enumerate(dataset_loader), "Epoch {} {}".format(epoch, val_or_test),
-                                      total=len(dataset_loader)):
+    for ind, (src, tgt, _, glbl_lbls) in tqdm(enumerate(dataset_loader), "Epoch {} {}".format(epoch, val_or_test),
+                                              total=len(dataset_loader)):
         # print("Number of sequences tested: {}".format(ind * test_batch_size))
         src = src
         tgt = tgt
         if form_sp_reg_data:
             predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
-                          form_sp_reg_data=form_sp_reg_data, second_model=second_model)
+                          form_sp_reg_data=form_sp_reg_data, second_model=second_model, test_only_cs=test_only_cs,
+                          glbl_lbls=glbl_lbls)
         else:
             predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
@@ -415,7 +422,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         #     total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
         for s, t, pt, sp_type in zip(src, tgt, predicted_tokens, sp_type_probs):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
-            sanity_check_dict[s] = torch.argmax(sp_type).item()
+            sp_type_dict[s] = torch.argmax(sp_type).item()
             if form_sp_reg_data:
                 new_predicted_lbls = modify_sp_subregion_preds(predicted_lbls, sp_type)
                 predicted_lbls = new_predicted_lbls
@@ -424,6 +431,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
             for s, sp_prob, all_sp_probs, all_sp_logits in zip(src, sp_probs, all_sp_probs, all_seq_sp_logits):
                 seqs2probs[s] = (sp_prob, all_sp_probs, all_sp_logits)
     pickle.dump(eval_dict, open(run_name + ".bin", "wb"))
+    pickle.dump(sp_type_dict, open(run_name + "_sptype.bin", "wb"))
     if sp_probs is not None and len(sets) > 1:
         # retrieve the dictionary of calibration only for the test set (not for validation) - for now it doesn't
         # make sense to do prob calibration since like 98% of predictions have >0.99 and are correct. See with weight decay
@@ -470,35 +478,35 @@ def other_fold_mdl_finished(model_name="", tr_f=0, val_f=1):
 
 
 def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1,
-                                     beam_txt="Greedy", all_f1_scores=None,sptype_f1=None):
+                                     beam_txt="Greedy", all_f1_scores=None,sptype_f1=None, only_cs=False):
     print(
-        "{}_{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on, ep, *sp_pred_mccs))
+        "{}_{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on + "_ONLY_CS" if only_cs else "", ep, *sp_pred_mccs))
     print("{}_{}, epoch {} Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         beam_txt,
-        test_on, ep, *all_recalls))
+        test_on + "_ONLY_CS" if only_cs else "", ep, *all_recalls))
     print("{}_{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         beam_txt,
-        test_on, ep, *all_precisions))
+        test_on + "_ONLY_CS" if only_cs else "", ep, *all_precisions))
     print("{}_{}, epoch {} Mean cs f1-score: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         beam_txt,
-        test_on, ep, *np.concatenate(all_f1_scores)))
+        test_on + "_ONLY_CS" if only_cs else "", ep, *np.concatenate(all_f1_scores)))
     print("{}_{}, epoch {} Mean class preds F1Score: {}, {}, {}, {}".format(
         beam_txt,
-        test_on, ep, *sptype_f1))
-    logging.info("{}_{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on, ep,
+        test_on + "_ONLY_CS" if only_cs else "", ep, *sptype_f1))
+    logging.info("{}_{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on + "_ONLY_CS" if only_cs else "", ep,
                                                                                             *sp_pred_mccs))
     logging.info(
         "{}_{}, epoch {}: Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-            beam_txt, test_on, ep, *all_recalls))
+            beam_txt, test_on + "_ONLY_CS" if only_cs else "", ep, *all_recalls))
     logging.info(
         "{}_{}, epoch {}: Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-            beam_txt, test_on, ep, *all_precisions))
+            beam_txt, test_on + "_ONLY_CS" if only_cs else "", ep, *all_precisions))
     logging.info(
         "{}_{}, epoch {}: Mean cs f1: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-            beam_txt, test_on, ep, *np.concatenate(all_f1_scores)))
+            beam_txt, test_on + "_ONLY_CS" if only_cs else "", ep, *np.concatenate(all_f1_scores)))
     logging.info("{}_{}, epoch {} Mean class preds F1Score: {}, {}, {}, {}".format(
         beam_txt,
-        test_on, ep, *sptype_f1))
+        test_on + "_ONLY_CS" if only_cs else "", ep, *sptype_f1))
 
 
 def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0, use_swa=False):
@@ -534,7 +542,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False,
                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
                         validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
-                        separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False):
+                        separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
+                        test_only_cs=False, weight_class_loss=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -561,10 +570,18 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                        glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
                        version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
                        linear_pos_enc=linear_pos_enc, scale_input=scale_input)
+    if weight_class_loss:
+        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
+        glbl_lbl_2weights = get_sp_type_loss_weights()
+        ind2glbl_lbl = {v:k for k,v in sp_data.glbl_lbl_2ind.items()}
+        glbl_lbl_weights = [glbl_lbl_2weights[ind2glbl_lbl[i]] for i in range(6)]
+        loss_fn_glbl = torch.nn.CrossEntropyLoss(weight=torch.tensor(glbl_lbl_weights, device=device))
+    else:
+        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
+        loss_fn_glbl = torch.nn.CrossEntropyLoss()
 
-    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
     loss_fn_tune = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
-    loss_fn_glbl = torch.nn.CrossEntropyLoss()
+
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
     if use_swa:
         warmup_scheduler = None
@@ -578,7 +595,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     bestf1_sp_type = 0
     current_sptype_f1 = 0
     e = -1
-    tune_cs_trigger=False
     while patience != 0:
         print("LR:", optimizer.param_groups[0]['lr'])
         model.train()
@@ -608,6 +624,15 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     loss = torch.mean(loss)
                     losses += loss.item()
 
+                    loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
+                    losses_glbl += loss_glbl.item()
+                    loss += loss_glbl * glbl_lbl_weight
+                elif weight_class_loss:
+                    seq_dim = logits.shape[0]
+                    loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
+                    weighted_loss = torch.tensor([glbl_lbl_2weights[ind2glbl_lbl[gl]] for gl in glbl_lbls], device=device).reshape(-1, 1)
+                    weighted_loss = weighted_loss.repeat(1, seq_dim).reshape(-1)
+                    loss = torch.mean(loss * weighted_loss)
                     loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
                     losses_glbl += loss_glbl.item()
                     loss += loss_glbl * glbl_lbl_weight
@@ -758,8 +783,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         model = load_model(run_name + "_best_eval.pth")
         model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
         second_model = load_model(other_mdl_name) if other_mdl_name else None
-        evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
-                 form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified)
+        # evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
+        #          form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified)
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False, return_class_prec_rec=True)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
@@ -768,6 +793,20 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                          all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
         pos_fp_info = total_positives
         pos_fp_info.extend(false_positives)
+        exit(1)
+        if test_only_cs:
+            evaluate(model, sp_data.lbl2ind, run_name=run_name + "_onlycs_best", partitions=test_partition,
+                     sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
+                     second_model=second_model,
+                     very_simplified=very_simplified, test_only_cs=test_only_cs)
+            sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
+                get_cs_and_sp_pred_results(filename=run_name + "_onlycs_best.bin".format(e), v=False,
+                                           return_class_prec_rec=True)
+            all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
+                np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
+            log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch,
+                                             all_f1_scores=all_f1_scores, sptype_f1=sptype_f1, only_cs=True)
+
         if test_beam:
             model = load_model(run_name + "_best_eval.pth")
             evaluate(model, sp_data.lbl2ind, run_name="best_beam_" + run_name, partitions=test_partition,
@@ -780,7 +819,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                              beam_txt="using_bm_search", all_f1_scores=all_f1_scores)
             pos_fp_info = total_positives
             pos_fp_info.extend(false_positives)
-
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True):
     # model = load_model(model_f_name, dict_file=None)
