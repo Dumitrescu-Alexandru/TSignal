@@ -480,33 +480,33 @@ def other_fold_mdl_finished(model_name="", tr_f=0, val_f=1):
 def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1,
                                      beam_txt="Greedy", all_f1_scores=None,sptype_f1=None, only_cs=False):
     print(
-        "{}_{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on + "_ONLY_CS" if only_cs else "", ep, *sp_pred_mccs))
+        "{}_{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on + "_ONLY_CS" if only_cs else test_on, ep, *sp_pred_mccs))
     print("{}_{}, epoch {} Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         beam_txt,
-        test_on + "_ONLY_CS" if only_cs else "", ep, *all_recalls))
+        test_on + "_ONLY_CS" if only_cs else test_on, ep, *all_recalls))
     print("{}_{}, epoch {} Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         beam_txt,
-        test_on + "_ONLY_CS" if only_cs else "", ep, *all_precisions))
+        test_on + "_ONLY_CS" if only_cs else test_on, ep, *all_precisions))
     print("{}_{}, epoch {} Mean cs f1-score: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         beam_txt,
-        test_on + "_ONLY_CS" if only_cs else "", ep, *np.concatenate(all_f1_scores)))
+        test_on + "_ONLY_CS" if only_cs else test_on, ep, *np.concatenate(all_f1_scores)))
     print("{}_{}, epoch {} Mean class preds F1Score: {}, {}, {}, {}".format(
         beam_txt,
-        test_on + "_ONLY_CS" if only_cs else "", ep, *sptype_f1))
-    logging.info("{}_{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on + "_ONLY_CS" if only_cs else "", ep,
+        test_on + "_ONLY_CS" if only_cs else test_on, ep, *sptype_f1))
+    logging.info("{}_{}, epoch {}: Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on + "_ONLY_CS" if only_cs else test_on, ep,
                                                                                             *sp_pred_mccs))
     logging.info(
         "{}_{}, epoch {}: Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-            beam_txt, test_on + "_ONLY_CS" if only_cs else "", ep, *all_recalls))
+            beam_txt, test_on + "_ONLY_CS" if only_cs else test_on, ep, *all_recalls))
     logging.info(
         "{}_{}, epoch {}: Mean cs precision: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-            beam_txt, test_on + "_ONLY_CS" if only_cs else "", ep, *all_precisions))
+            beam_txt, test_on + "_ONLY_CS" if only_cs else test_on, ep, *all_precisions))
     logging.info(
         "{}_{}, epoch {}: Mean cs f1: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-            beam_txt, test_on + "_ONLY_CS" if only_cs else "", ep, *np.concatenate(all_f1_scores)))
+            beam_txt, test_on + "_ONLY_CS" if only_cs else test_on, ep, *np.concatenate(all_f1_scores)))
     logging.info("{}_{}, epoch {} Mean class preds F1Score: {}, {}, {}, {}".format(
         beam_txt,
-        test_on + "_ONLY_CS" if only_cs else "", ep, *sptype_f1))
+        test_on + "_ONLY_CS" if only_cs else test_on, ep, *sptype_f1))
 
 
 def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0, use_swa=False):
