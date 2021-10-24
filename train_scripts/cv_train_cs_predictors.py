@@ -783,8 +783,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         model = load_model(run_name + "_best_eval.pth")
         model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
         second_model = load_model(other_mdl_name) if other_mdl_name else None
-        # evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
-        #          form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified)
+        evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
+                 form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified)
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False, return_class_prec_rec=True)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
@@ -793,7 +793,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                          all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
         pos_fp_info = total_positives
         pos_fp_info.extend(false_positives)
-        exit(1)
         if test_only_cs:
             evaluate(model, sp_data.lbl2ind, run_name=run_name + "_onlycs_best", partitions=test_partition,
                      sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
