@@ -586,3 +586,20 @@ def get_sp_type_loss_weights():
                 sptye2count[sp_t[3]] += 1
     min_count = min(sptye2count.values())
     return {k:min_count/v for k,v in sptye2count.items()}
+
+def get_residue_label_loss_weights():
+    data_folder = get_data_folder()
+    aalbl2count = {'S': 0, 'O': 0, 'M': 0, 'I': 0} #,
+
+    for tr_f in [0, 1, 2]:
+        for set in ["train", "test"]:
+            data = pickle.load(open(data_folder + "sp6_partitioned_data_sublbls_{}_{}.bin".format(set, tr_f), "rb"))
+            for seq in data.values():
+                seq_ = seq[1]
+                for r in seq_:
+                    aalbl2count[r] += 1
+    min_count = min(aalbl2count.values())
+    #'PD': 4, 'BS': 5, 'ES': 6}
+    lbl2weights = {k:min_count/v for k,v in aalbl2count.items()}
+    lbl2weights.update({'PD':1, 'BS':1, 'ES':1})
+    return lbl2weights

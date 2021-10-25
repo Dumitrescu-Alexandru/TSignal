@@ -71,7 +71,6 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             else:
                 ind = 0
             predictions[grp2_ind[lg]] += get_acc_for_tolerence(ind, t, sp_letter)
-
         # elif sp_info != sp_type and   p[ind] == sp_letter:
         elif (sptype_preds is not None and sp_info != sp_type and ind2glbl_lbl[sptype_preds[s]] == sp_type) or (sptype_preds is None and p[ind] == sp_letter):
             predictions[grp2_ind[lg]] += np.array([0, 0, 0, 0, 0, 0, 1, 1, 1, 1])
@@ -609,6 +608,7 @@ def remove_from_dictionary(res_dict, test_fld):
 def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder="results_param_s_2/",
                               only_cs_position=False, remove_test_seqs=False, return_sptype_f1=False):
     full_dict_results = {}
+    full_sptype_dict = {}
     epochs = []
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
         with open(result_folder + run + "_{}_{}.log".format(tr_folds[0], tr_folds[1]), "rt") as f:
@@ -622,6 +622,11 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
 
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
         res_dict = pickle.load(open(result_folder + run + "_{}_{}_best.bin".format(tr_folds[0], tr_folds[1]), "rb"))
+        if os.path.exists(result_folder + run + "_{}_{}_best_sptype.bin".format(tr_folds[0], tr_folds[1])):
+            sptype_dict = pickle.load(open(result_folder + run + "_{}_{}_best_sptype.bin".format(tr_folds[0], tr_folds[1]), "rb"))
+            full_sptype_dict.update(sptype_dict)
+        else:
+            full_sptype_dict = None
         test_fld = list({0, 1, 2} - set(tr_folds))
         if remove_test_seqs:
             full_dict_results.update(remove_from_dictionary(res_dict, test_fld))
@@ -642,11 +647,11 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
     else:
         v = False
     all_recalls, all_precisions, _, _, _, f1_scores = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="SP")
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="SP", sptype_preds=full_sptype_dict)
     all_recalls_lipo, all_precisions_lipo, _, _, _, f1_scores_lipo = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="LIPO")
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="LIPO", sptype_preds=full_sptype_dict )
     all_recalls_tat, all_precisions_tat, _, _, _, f1_scores_tat = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TAT")
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TAT", sptype_preds=full_sptype_dict)
     if return_sptype_f1:
         return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, \
                all_precisions_lipo, all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat, get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls)
@@ -934,7 +939,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
                     dont_add = True
             if not dont_add:
                 unique_params.add("_".join(f.split("_")[:-2]))
-
+    print(unique_params)
     mdl2results = {}
     mdlind2mdlparams = {}
     # order results by the eukaryote mcc
@@ -1284,6 +1289,25 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_large_separate_save_long/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_rerun_separate_save_long_run/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_weighted_loss_separat/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    visualize_validation(run="rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_rerun_separate_save_long_run/")
+    visualize_validation(run="weighted_loss_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_weighted_loss_separat/")
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_rerun_separate_save_long_run/only_cs/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_save_long_run/",
                                             compare_mdl_plots=False,

@@ -19,7 +19,7 @@ import torch
 
 sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
-from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights
+from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights
 from models.transformer_nmt import TransformerModel
 
 
@@ -543,7 +543,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
                         validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
-                        test_only_cs=False, weight_class_loss=False):
+                        test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -571,14 +571,20 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                        version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
                        linear_pos_enc=linear_pos_enc, scale_input=scale_input)
     if weight_class_loss:
-        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
         glbl_lbl_2weights = get_sp_type_loss_weights()
         ind2glbl_lbl = {v:k for k,v in sp_data.glbl_lbl_2ind.items()}
         glbl_lbl_weights = [glbl_lbl_2weights[ind2glbl_lbl[i]] for i in range(6)]
         loss_fn_glbl = torch.nn.CrossEntropyLoss(weight=torch.tensor(glbl_lbl_weights, device=device))
     else:
-        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
         loss_fn_glbl = torch.nn.CrossEntropyLoss()
+
+    if weight_lbl_loss:
+        ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
+        lbl2weights = get_residue_label_loss_weights()
+        label_weights = [lbl2weights[ind2lbl[i]] for i in range(len(sp_data.lbl2ind.values()))]
+        loss_fn = torch.nn.CrossEntropyLoss(weight=torch.tensor(label_weights, device=device), ignore_index=sp_data.lbl2ind["PD"])
+    else:
+        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
 
     loss_fn_tune = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
 
@@ -624,15 +630,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     loss = torch.mean(loss)
                     losses += loss.item()
 
-                    loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
-                    losses_glbl += loss_glbl.item()
-                    loss += loss_glbl * glbl_lbl_weight
-                elif weight_class_loss:
-                    seq_dim = logits.shape[0]
-                    loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
-                    weighted_loss = torch.tensor([glbl_lbl_2weights[ind2glbl_lbl[gl]] for gl in glbl_lbls], device=device).reshape(-1, 1)
-                    weighted_loss = weighted_loss.repeat(1, seq_dim).reshape(-1)
-                    loss = torch.mean(loss)
                     loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
                     losses_glbl += loss_glbl.item()
                     loss += loss_glbl * glbl_lbl_weight
