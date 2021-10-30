@@ -380,9 +380,39 @@ def modify_sp_subregion_preds(pred_tokens, sp_type):
     return new_pred_tokens_string
 
 
+def clean_sec_sp2_preds(seq, preds, sp_type, ind2glbl_lbl):
+    glbl_lbl2inds = {v:k for k,v in ind2glbl_lbl.items()}
+    if ind2glbl_lbl[torch.argmax(sp_type).item()] in ["LIPO", "TATLIPO"]:
+        last_l_ind = preds.replace("ES", "W").rfind("S")
+        if last_l_ind < len(seq) and seq[last_l_ind + 1] == "C":
+            return preds, sp_type
+        else:
+            min_i = 10
+            for i in range(-2, 3):
+                if seq[last_l_ind + i + 1] == "C":
+                    if np.abs(i) < np.abs(min_i):
+                        best_ind = i
+                        min_i = i
+            if min_i == 10:
+                new_probs = torch.zeros(sp_type.shape[0])
+                non_secSP2_inds = [glbl_lbl2inds['SP'], glbl_lbl2inds['TAT'], glbl_lbl2inds['PILIN']]
+                non_secSP2_probs = [sp_type[i] for i in [glbl_lbl2inds['SP'], glbl_lbl2inds['TAT'], glbl_lbl2inds['PILIN']]]
+                # if the cleavage site of a predicted LIPO/TATLIPO is not found within 3 aas of a cystein amino acid,
+                # replace that LIPO/TATLIPO prediction with the highest non-*/SPII SP
+                new_probs[non_secSP2_inds[np.argmax(non_secSP2_probs)]] = 1
+                return preds, new_probs
+            elif min_i > 0:
+                return preds[:last_l_ind] + min_i * "S" + preds[last_l_ind + min_i:], sp_type
+            elif min_i < 0:
+                return preds[:last_l_ind + min_i] + np.abs(min_i) * preds[last_l_ind + 1] + preds[last_l_ind + np.abs(min_i):], sp_type
+
+    return preds, sp_type
+
 def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1,
              dataset_loader=None,use_beams_search=False, form_sp_reg_data=False, simplified=False, second_model=None,
-             very_simplified=False, test_only_cs=False):
+             very_simplified=False, test_only_cs=False, glbl_lbl_2ind=None, account_lipos=False):
+    if glbl_lbl_2ind is not None:
+        ind2glbl_lbl = {v:k for k,v in glbl_lbl_2ind.items()}
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
     sp_type_dict = {}
@@ -422,6 +452,8 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         #     total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
         for s, t, pt, sp_type in zip(src, tgt, predicted_tokens, sp_type_probs):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
+            if account_lipos:
+                predicted_lbls, sp_type = clean_sec_sp2_preds(s, predicted_lbls, sp_type, ind2glbl_lbl)
             sp_type_dict[s] = torch.argmax(sp_type).item()
             if form_sp_reg_data:
                 new_predicted_lbls = modify_sp_subregion_preds(predicted_lbls, sp_type)
@@ -543,7 +575,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
                         validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
-                        test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False):
+                        test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -675,7 +707,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if validate_on_test:
             validate_partitions = list(test_partition)
             _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model , sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
-                         epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified,very_simplified=very_simplified)
+                         epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified,very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -693,7 +725,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                              very_simplified=very_simplified)
             _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model, sp_data.lbl2ind, run_name=run_name,
                          partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
-                         simplified=simplified, very_simplified=very_simplified)
+                         simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -738,12 +770,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             eval_model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
             _ = evaluate(eval_model, sp_data.lbl2ind, run_name=run_name,
                          partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
-                         simplified=simplified, very_simplified=very_simplified)
+                         simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
                 get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
-
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                                                            list(np.array(all_precisions).flatten()), list(
                 np.array(total_positives).flatten())
@@ -781,7 +812,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
         second_model = load_model(other_mdl_name) if other_mdl_name else None
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
-                 form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified)
+                 form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified,
+                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False, return_class_prec_rec=True)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
@@ -790,11 +822,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                          all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
         pos_fp_info = total_positives
         pos_fp_info.extend(false_positives)
+        if account_lipos:
+            evaluate(model, sp_data.lbl2ind, run_name=run_name + "lippos_best", partitions=test_partition,
+                     sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model,
+                     very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind, account_lipos=account_lipos)
         if test_only_cs:
             evaluate(model, sp_data.lbl2ind, run_name=run_name + "_onlycs_best", partitions=test_partition,
                      sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
-                     second_model=second_model,
-                     very_simplified=very_simplified, test_only_cs=test_only_cs)
+                     second_model=second_model, very_simplified=very_simplified, test_only_cs=test_only_cs, glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
                 get_cs_and_sp_pred_results(filename=run_name + "_onlycs_best.bin".format(e), v=False,
                                            return_class_prec_rec=True)

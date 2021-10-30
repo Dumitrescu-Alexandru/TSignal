@@ -7,6 +7,23 @@ import pickle
 from Bio import SeqIO
 import numpy as np
 
+def clean_sec_sp2_preds(seq, preds):
+    last_l_ind = preds.rfind("L")
+    min_i = 10
+    for i in range(-2,3):
+        if seq[last_l_ind + i + 1] == "C":
+            if np.abs(i) < np.abs(min_i):
+                best_ind = i
+                min_i = i
+    if min_i == 0:
+        return preds
+    elif min_i == 10:
+        return preds.replace("L", "T")
+    elif min_i > 0:
+        return preds[:last_l_ind] + min_i * "L" + preds[last_l_ind + min_i:]
+    elif min_i < 0:
+        return preds[:last_l_ind + min_i] + np.abs(min_i) * preds[last_l_ind+1] + preds[last_l_ind+np.abs(min_i):]
+
 
 def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=None):
     def get_acc_for_tolerence(ind, t_lbl, sp_letter):
@@ -32,6 +49,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             return np.array([0, 0, 0, 0, 1, 0, 0, 0, 0, 0])
 
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
+    glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
     sptype2letter = {'TAT': 'T', 'LIPO': 'L', 'PILIN': 'P', 'TATLIPO': 'T', 'SP': 'S'}
     sp_types = ["S", "T", "L", "P"]
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
@@ -54,6 +72,11 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
         ind = 0
         predicted_sp = p[0]
         is_sp = predicted_sp in sp_types
+        if sp_info == "LIPO":
+            p = clean_sec_sp2_preds(s, p)
+            if "T" in p:
+                sptype_preds[s] = glbllbl2_ind["TAT"]
+
         if sp_info == sp_type:
 
             #     # the precision was defined as the fraction of correct CS predictions over the number of predicted
@@ -917,7 +940,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     sp6_precs_sp2 = [0.913, 0.913, 0.917, 0.925, 0.929, 0.938, 0.938, 0.938, 0.583, 0.583, 0.583, 0.583]
     sp6_precs_tat = [0.679, 0.736, 0.755, 0.774, 0.714, 0.714, 0.857, 0.857, 0.375, 0.5, 0.5, 0.5]
     sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
-    sp6_f1_sp2 = get_f1_scores(sp6_precs_sp2, sp6_precs_sp2)
+    sp6_f1_sp2 = get_f1_scores(sp6_recalls_sp2, sp6_precs_sp2)
     sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
     sp6_recalls_sp1 = [str(round(sp6_r_sp1, 2)) for sp6_r_sp1 in sp6_recalls_sp1]
     sp6_recalls_sp2 = [str(round(sp6_r_sp2, 2)) for sp6_r_sp2 in sp6_recalls_sp2]
@@ -1290,18 +1313,39 @@ if __name__ == "__main__":
     # duplicate_Some_logs()
     # exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_large_separate_save_long/",
+                                            result_folder="separate-glbl_rerun_separate_save_long_run/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    visualize_validation(run="weight_lbl_loss_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_weight_lbl_loss_separ/")
+
+
+
+    visualize_validation(run="re_rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_re_rerun_separate_save_long_run/")
+    visualize_validation(run="weighted_loss_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_weighted_loss_separat/")
+    visualize_validation(run="rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_rerun_separate_save_long_run/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_rerun_separate_save_long_run/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_rerun_separate_save_long_run/",
+                                            result_folder="separate-glbl_re_rerun_separate_save_long_run/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_weight_lbl_loss_separ/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_weighted_loss_separat/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
-    visualize_validation(run="rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_rerun_separate_save_long_run/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_re_rerun_separate_save_long_run/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    visualize_validation(run="weight_lbl_loss_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_weight_lbl_loss_separ/")
+    visualize_validation(run="rerun_separate_save_long_run_", folds=[0, 2], folder="separate-glbl_rerun_separate_save_long_run/")
+    visualize_validation(run="large_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_large_separate_save_long/")
     visualize_validation(run="weighted_loss_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_weighted_loss_separat/")
 
     mdl2results = extract_all_param_results(only_cs_position=False,
