@@ -72,10 +72,6 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
         ind = 0
         predicted_sp = p[0]
         is_sp = predicted_sp in sp_types
-        if sp_info == "LIPO":
-            p = clean_sec_sp2_preds(s, p)
-            if "T" in p:
-                sptype_preds[s] = glbllbl2_ind["TAT"]
 
         if sp_info == sp_type:
 
