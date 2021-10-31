@@ -935,7 +935,10 @@ def setup_testube_logger(save_dir="experiments") -> TestTubeLogger:
     """ Function that sets the TestTubeLogger to be used. """
     now = datetime.now()
     dt_string = now.strftime("%d-%m-%Y--%H-%M-%S")
-    save_dir = "experiments/"
+    if os.path.exists("/scratch/work/dumitra1/"):
+        save_dir = "/scratch/work/dumitra1/sp_data/experiments_sp6tuning/"
+    else:
+        save_dir = "experiments/"
     return TestTubeLogger(
         save_dir=save_dir,
         version=dt_string,
