@@ -386,7 +386,7 @@ def clean_sec_sp2_preds(seq, preds, sp_type, ind2glbl_lbl):
         last_l_ind = preds.replace("ES", "W").rfind("S")
         if last_l_ind < len(seq) and seq[last_l_ind + 1] == "C":
             return preds, sp_type
-        else:
+        elif last_l_ind < len(seq) - 3:
             min_i = 10
             for i in range(-2, 3):
                 if seq[last_l_ind + i + 1] == "C":
