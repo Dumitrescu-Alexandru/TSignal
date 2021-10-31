@@ -312,7 +312,7 @@ class ProtBertClassifier(pl.LightningModule):
         if self.hparams.tune_sp6_labels:
             self.lbl2ind_dict= {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7}
         if os.path.exists('/scratch/work/dumitra1'):
-            self.modelFolderPath = "../../../covid_tcr_protein_embeddings/"
+            self.modelFolderPath = "../../../covid_tcr_protein_embeddings/models/ProtBert/"
         else:
             self.modelFolderPath = './models/ProtBert/'
         self.vocabFilePath = os.path.join(self.modelFolderPath, 'vocab.txt')
