@@ -26,13 +26,13 @@ from models.transformer_nmt import TransformerModel
 def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
                form_sp_reg_data=False, version2_agregation="max", input_drop=False, no_pos_enc=False,
-               linear_pos_enc=False, scale_input=False):
+               linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix=""):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
                              glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
                              version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
-                             linear_pos_enc=linear_pos_enc, scale_input=scale_input)
+                             linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -332,12 +332,13 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_b
 
 
 def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"],
-                        form_sp_reg_data=False, simplified=False, very_simplified=False):
+                        form_sp_reg_data=False, simplified=False, very_simplified=False, tuned_bert_embs_prefix=""):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     model.eval()
     sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data)
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data,
+                                tuned_bert_embs_prefix=tuned_bert_embs_prefix)
 
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=test_batch_size, shuffle=False,
@@ -410,7 +411,8 @@ def clean_sec_sp2_preds(seq, preds, sp_type, ind2glbl_lbl):
 
 def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1,
              dataset_loader=None,use_beams_search=False, form_sp_reg_data=False, simplified=False, second_model=None,
-             very_simplified=False, test_only_cs=False, glbl_lbl_2ind=None, account_lipos=False):
+             very_simplified=False, test_only_cs=False, glbl_lbl_2ind=None, account_lipos=False,
+             tuned_bert_embs_prefix=""):
     if glbl_lbl_2ind is not None:
         ind2glbl_lbl = {v:k for k,v in glbl_lbl_2ind.items()}
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
@@ -424,7 +426,8 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
     if dataset_loader is None:
         sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
         sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                    glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data)
+                                    glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data,
+                                    tuned_bert_embs_prefix=tuned_bert_embs_prefix)
 
         dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                      batch_size=test_batch_size, shuffle=False,
@@ -476,10 +479,10 @@ def load_sptype_model(model_path):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     return model.to(device)
 
-def load_model(model_path, dict_file=None):
+def load_model(model_path, dict_file=None, tuned_bert_embs_prefix=""):
     folder = get_data_folder()
     model = torch.load(folder + model_path)
-    model.input_encoder.update(emb_f_name=dict_file)
+    model.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix="")
     return model
 
 def save_model(model, model_name=""):
@@ -575,7 +578,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
                         validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
-                        test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False):
+                        test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
+                        tuned_bert_embs=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -584,8 +588,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
     train_sets = ['test', 'train'] if validate_on_test or validate_partition is not None else ['train']
+    tuned_bert_embs_prefix = "bert_tuned_{}_{}_".format(partitions[0], partitions[1]) if tuned_bert_embs else ""
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=form_sp_reg_data)
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=form_sp_reg_data,
+                                tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
@@ -601,7 +607,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                        ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
                        glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
                        version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
-                       linear_pos_enc=linear_pos_enc, scale_input=scale_input)
+                       linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     if weight_class_loss:
         glbl_lbl_2weights = get_sp_type_loss_weights()
         ind2glbl_lbl = {v:k for k,v in sp_data.glbl_lbl_2ind.items()}
@@ -707,7 +713,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if validate_on_test:
             validate_partitions = list(test_partition)
             _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model , sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
-                         epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified,very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
+                         epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified,very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
+                         tuned_bert_embs_prefix=tuned_bert_embs_prefix)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -725,7 +732,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                              very_simplified=very_simplified)
             _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model, sp_data.lbl2ind, run_name=run_name,
                          partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
-                         simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
+                         simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
+                         tuned_bert_embs_prefix=tuned_bert_embs_prefix)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -770,7 +778,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             eval_model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
             _ = evaluate(eval_model, sp_data.lbl2ind, run_name=run_name,
                          partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
-                         simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
+                         simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
+                         tuned_bert_embs_prefix=tuned_bert_embs_prefix)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -808,12 +817,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
     if not deployment_model and not validate_partition is not None or (
             validate_partition is not None and other_mdl_name):
-        model = load_model(run_name + "_best_eval.pth")
+        model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix)
         model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
-        second_model = load_model(other_mdl_name) if other_mdl_name else None
+        second_model = load_model(other_mdl_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix) if other_mdl_name else None
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
                  form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified,
-                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
+                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False, return_class_prec_rec=True)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
@@ -823,13 +832,15 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         pos_fp_info = total_positives
         pos_fp_info.extend(false_positives)
         if account_lipos:
-            evaluate(model, sp_data.lbl2ind, run_name=run_name + "lippos_best", partitions=test_partition,
+            evaluate(model, sp_data.lbl2ind, run_name=run_name + "_lippos_best", partitions=test_partition,
                      sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model,
-                     very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind, account_lipos=account_lipos)
+                     very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind, account_lipos=account_lipos,
+                     tuned_bert_embs_prefix=tuned_bert_embs_prefix)
         if test_only_cs:
             evaluate(model, sp_data.lbl2ind, run_name=run_name + "_onlycs_best", partitions=test_partition,
                      sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
-                     second_model=second_model, very_simplified=very_simplified, test_only_cs=test_only_cs, glbl_lbl_2ind=sp_data.glbl_lbl_2ind)
+                     second_model=second_model, very_simplified=very_simplified, test_only_cs=test_only_cs, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
+                     tuned_bert_embs_prefix=tuned_bert_embs_prefix)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
                 get_cs_and_sp_pred_results(filename=run_name + "_onlycs_best.bin".format(e), v=False,
                                            return_class_prec_rec=True)
@@ -839,9 +850,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                              all_f1_scores=all_f1_scores, sptype_f1=sptype_f1, only_cs=True)
 
         if test_beam:
-            model = load_model(run_name + "_best_eval.pth")
+            model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix)
             evaluate(model, sp_data.lbl2ind, run_name="best_beam_" + run_name, partitions=test_partition,
-                     sets=["train", "test"], use_beams_search=True)
+                     sets=["train", "test"], use_beams_search=True, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
                 get_cs_and_sp_pred_results(filename="best_beam_" + run_name + ".bin".format(e), v=False)
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(

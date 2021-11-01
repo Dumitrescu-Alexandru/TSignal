@@ -323,8 +323,7 @@ class SPCSpredictionData:
 
 class CSPredsDataset(Dataset):
     def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True, sets=["train", "test"],
-                 test_f_name="",
-                 form_sp_reg_data=False):
+                 test_f_name="", form_sp_reg_data=False, tuned_bert_embs_prefix=""):
         self.life_grp, self.seqs, self.lbls, self.glbl_lbl = [], [], [], []
         if partitions is not None:
             # when using partitions, the sp6 data partition files will be used in train/testing

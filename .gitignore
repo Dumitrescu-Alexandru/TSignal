@@ -12,3 +12,4 @@ sp_data/results/*
 *.log
 *.pth
 sp_data/*.pth
+sp_data/experiments_sp6tuning/

@@ -38,7 +38,7 @@ class TokenEmbedding(nn.Module):
 
 class InputEmbeddingEncoder(nn.Module):
     def __init__(self, partitions=[0, 1, 2], data_folder="sp_data/", lg2ind=None, use_glbl_lbls=False, aa2ind=None,
-                 glbl_lbl_version=1, form_sp_reg_data=False):
+                 glbl_lbl_version=1, form_sp_reg_data=False, tuned_bert_embs_prefix=""):
         # only create dictionaries from sequences to embeddings (as sequence embeddings are already computed by a bert
         # model
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -54,7 +54,8 @@ class InputEmbeddingEncoder(nn.Module):
             # CLS, LG) embs should be good
             for p in partitions:
                 for t in ["test", "train"]:
-                    part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
+                    part_dict = pickle.load(open(self.data_folder + tuned_bert_embs_prefix +
+                                                 "sp6_partitioned_data_sublbls_{}_{}.bin".format(t, p), "rb"))
                     seq2emb.update({seq: emb for seq, (emb, _, _, _) in part_dict.items()})
                     if lg2ind is not None:
                         seq2lg.update({seq: lg2ind[lg] for seq, (_, _, lg, _) in part_dict.items()})
@@ -152,7 +153,7 @@ class InputEmbeddingEncoder(nn.Module):
         return src_mask, tgt_mask, ~padding_mask_src.to(self.device), ~padding_mask_tgt.to(self.device), \
                tensor_inputs
 
-    def update(self, partitions=[0,1,2], emb_f_name=None):
+    def update(self, partitions=[0,1,2], emb_f_name=None, tuned_bert_embs_prefix=""):
         self.data_folder = get_data_folder()
         seq2emb = {}
         if emb_f_name is not None:
@@ -163,7 +164,8 @@ class InputEmbeddingEncoder(nn.Module):
         else:
             for p in partitions:
                 for t in ["test", "train"]:
-                    part_dict = pickle.load(open(self.data_folder + "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
+                    part_dict = pickle.load(open(self.data_folder + tuned_bert_embs_prefix +
+                                             "sp6_partitioned_data_sublbls_{}_{}.bin".format(t, p), "rb"))
                     seq2emb.update({seq: emb for seq, (emb, _, _, _) in part_dict.items()})
         self.seq2emb = seq2emb
 
@@ -174,7 +176,8 @@ class TransformerModel(nn.Module):
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5,
                  data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
-                 version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False):
+                 version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False,
+                 tuned_bert_embs_prefix=""):
         super().__init__()
         self.add_lg_info = lg2ind is not None
         self.form_sp_reg_data = form_sp_reg_data
@@ -194,7 +197,8 @@ class TransformerModel(nn.Module):
         aa2ind = None if not train_oh else aa2ind
         self.input_encoder = InputEmbeddingEncoder(partitions=[0, 1, 2], data_folder=data_folder, lg2ind=lg2ind, 
                                                    use_glbl_lbls=use_glbl_lbls, aa2ind=aa2ind, glbl_lbl_version=glbl_lbl_version,
-                                                   form_sp_reg_data=form_sp_reg_data)
+                                                   form_sp_reg_data=form_sp_reg_data,
+                                                   tuned_bert_embs_prefix=tuned_bert_embs_prefix)
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
         self.label_encoder = TokenEmbedding(ntoken, d_hid, lbl2ind=lbl2ind)
         self.d_model = d_model

@@ -1309,6 +1309,18 @@ if __name__ == "__main__":
     # duplicate_Some_logs()
     # exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/lipo_acc/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/only_cs/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_rerun_separate_save_long_run/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
