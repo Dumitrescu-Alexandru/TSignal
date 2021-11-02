@@ -329,8 +329,8 @@ class CSPredsDataset(Dataset):
             # when using partitions, the sp6 data partition files will be used in train/testing
             for p in partitions:
                 for s in sets:
-                    d_file = "sp6_partitioned_data_sublbls_{}_{}.bin".format(s, p) if form_sp_reg_data else \
-                        "sp6_partitioned_data_{}_{}.bin".format(s, p)
+                    d_file = tuned_bert_embs_prefix + "sp6_partitioned_data_sublbls_{}_{}.bin".format(s, p) if form_sp_reg_data else \
+                        tuned_bert_embs_prefix + "sp6_partitioned_data_{}_{}.bin".format(s, p)
 
                     data_dict = pickle.load(open(data_folder + d_file, "rb"))
                     self.seqs.extend(list(data_dict.keys()))
