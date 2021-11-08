@@ -938,6 +938,14 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
     sp6_f1_sp2 = get_f1_scores(sp6_recalls_sp2, sp6_precs_sp2)
     sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
+
+    no_of_seqs_sp1 = list(np.array([2040, 44, 142, 356]).repeat(4))
+    no_of_seqs_sp2 = list(np.array([1087, 516, 12]).repeat(4))
+    no_of_seqs_tat = list(np.array([313 ,39, 13]).repeat(4))
+    no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313 ,39, 13])
+    sp6_summarized = np.sum((np.array(sp6_f1_sp1) * np.array(no_of_seqs_sp1))) / no_of_tested_sp_seqs + \
+                        np.sum((np.array(sp6_f1_sp2) * np.array(no_of_seqs_sp2))) / no_of_tested_sp_seqs + \
+                        np.sum((np.array(sp6_f1_tat) * np.array(no_of_seqs_tat))) / no_of_tested_sp_seqs
     sp6_recalls_sp1 = [str(round(sp6_r_sp1, 2)) for sp6_r_sp1 in sp6_recalls_sp1]
     sp6_recalls_sp2 = [str(round(sp6_r_sp2, 2)) for sp6_r_sp2 in sp6_recalls_sp2]
     sp6_recalls_tat = [str(round(sp6_r_tat, 2)) for sp6_r_tat in sp6_recalls_tat]
@@ -960,6 +968,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
                 unique_params.add("_".join(f.split("_")[:-2]))
     print(unique_params)
     mdl2results = {}
+    mdl2summarized_results = {}
     mdlind2mdlparams = {}
     # order results by the eukaryote mcc
     eukaryote_mcc = []
@@ -979,6 +988,9 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, list(np.reshape(np.array(all_recalls), -1)),
         list(np.reshape(np.array(all_precisions), -1)), all_recalls_lipo, all_precisions_lipo,
         all_recalls_tat, all_precisions_tat, f1_scores, f1_scores_lipo, f1_scores_tat, f1_scores_sptype, avg_epoch)
+        mdl2summarized_results[ind] = np.sum((np.array(f1_scores).reshape(-1) * np.array(no_of_seqs_sp1)))/no_of_tested_sp_seqs + \
+                                      np.sum((np.array(f1_scores_lipo).reshape(-1) * np.array(no_of_seqs_sp2)))/no_of_tested_sp_seqs + \
+                                      np.sum((np.array(f1_scores_tat).reshape(-1) * np.array(no_of_seqs_tat)))/no_of_tested_sp_seqs
         mdlind2mdlparams[ind] = u_p
         eukaryote_mcc.append(get_best_corresponding_eval_mcc(result_folder, u_p))
     if compare_mdl_plots:
@@ -1019,6 +1031,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     no_of_params = len(mdlind2mdlparams[best_to_worst_mdls[0]].split("_"))
     print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_sp1), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
+        print("total f1 for {}: {} compared to sp6: {}".format(mdl_ind, mdl2summarized_results[mdl_ind]/4, sp6_summarized/4))
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-5])]), " & ",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
@@ -1308,25 +1321,66 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[0, 1],
-                         folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
-    visualize_validation(run="tuned_bert_embs_", folds=[0, 1],
-                         folder="separate-glbl_tuned_bert_embs/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/lipo_acc/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/lipo_acc/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tunedbert2/only_cs/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_large/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_large/only_cs/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
 
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/",
+                                            result_folder="separate-glbl_tuned_bert_large/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_embs/",
+                                            result_folder="separate-glbl_tunedbert2/acc_lipos/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_embs/only_cs/",
+                                            result_folder="separate-glbl_tunedbert2/only_cs/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tunedbert2/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/lipo_acc/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_tuned_bert_embs/account_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    visualize_validation(run="tuned_bert_embs_", folds=[1, 2],
+                         folder="separate-glbl_tuned_bert_embs/")
+    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[1, 2],
+                         folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
+
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_embs/account_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_embs/only_cs/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False)
     mdl2results = extract_all_param_results(only_cs_position=False,
