@@ -50,6 +50,13 @@ def create_sp6_tuning_dataset(relative_data_path, folds=[0, 1]):
     seqs.extend(keys_2nd_data)
     lbls.extend(data[s][1] for s in keys_2nd_data)
     sp_types.extend([data[s][-1] for s in keys_2nd_data])
+    if len(folds) == 3:
+        data = pickle.load(open(relative_data_path + "sp6_partitioned_data_train_{}.bin".format(folds[2]), "rb"))
+        keys_3rd_data = list(data.keys())
+        seqs.extend(keys_3rd_data)
+        lbls.extend(data[s][1] for s in keys_3rd_data)
+        sp_types.extend([data[s][-1] for s in keys_3rd_data])
+
     sp_types_2inds = {s:[] for s in set(sp_types)}
     train_seqs, train_lbls, test_seqs, test_lbls = [], [], [], []
     for ind, s_t in enumerate(sp_types):
@@ -63,9 +70,14 @@ def create_sp6_tuning_dataset(relative_data_path, folds=[0, 1]):
     train_df = pd.DataFrame({'seqs':train_seqs, 'lbls':train_lbls})
     test_df = pd.DataFrame({'seqs':test_seqs, 'lbls':test_lbls})
     valid_df = pd.DataFrame({'seqs':test_seqs, 'lbls':test_lbls})
-    train_df.to_csv(relative_data_path + "sp6_fine_tuning_train_{}_{}.csv".format(folds[0], folds[1]))
-    test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_{}_{}.csv".format(folds[0], folds[1]))
-    valid_df.to_csv(relative_data_path + "sp6_fine_tuning_valid_{}_{}.csv".format(folds[0], folds[1]))
+    if len(folds) == 3:
+        train_df.to_csv(relative_data_path + "sp6_fine_tuning_train_{}_{}_{}.csv".format(*folds))
+        test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_{}_{}_{}.csv".format(*folds))
+        valid_df.to_csv(relative_data_path + "sp6_fine_tuning_valid_{}_{}_{}.csv".format(*folds))
+    else:
+        train_df.to_csv(relative_data_path + "sp6_fine_tuning_train_{}_{}.csv".format(*folds))
+        test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_{}_{}.csv".format(*folds))
+        valid_df.to_csv(relative_data_path + "sp6_fine_tuning_valid_{}_{}.csv".format(*folds))
 
 def create_epitope_tuning_files(relative_data_path):
     """
@@ -1077,10 +1089,16 @@ def create_tuning_data(hparams):
               "the special_tokens parameter. Setting it to true atuomatically...")
         hparams.special_tokens = True
     if hparams.tune_sp6_labels:
-        hparams.test_csv, hparams.train_csv, hparams.dev_csv = \
-            "sp6_fine_tuning_test_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
-            "sp6_fine_tuning_train_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
-            "sp6_fine_tuning_valid_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1])
+        if len(hparams.train_folds) == 3:
+            hparams.test_csv, hparams.train_csv, hparams.dev_csv = \
+                "sp6_fine_tuning_test_{}_{}_{}.csv".format(*hparams.train_folds), \
+                "sp6_fine_tuning_train_{}_{}_{}.csv".format(*hparams.train_folds), \
+                "sp6_fine_tuning_valid_{}_{}_{}.csv".format(*hparams.train_folds)
+        else:
+            hparams.test_csv, hparams.train_csv, hparams.dev_csv = \
+                        "sp6_fine_tuning_test_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
+                        "sp6_fine_tuning_train_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
+                        "sp6_fine_tuning_valid_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1])
 
     if hparams.create_data:
         if hparams.tune_epitope_specificity:
