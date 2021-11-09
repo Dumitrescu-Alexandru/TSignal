@@ -482,7 +482,7 @@ def load_sptype_model(model_path):
 def load_model(model_path, dict_file=None, tuned_bert_embs_prefix=""):
     folder = get_data_folder()
     model = torch.load(folder + model_path)
-    model.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix="")
+    model.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     return model
 
 def save_model(model, model_name=""):
@@ -822,6 +822,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             validate_partition is not None and other_mdl_name):
         model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix)
         model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
+        # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
         second_model = load_model(other_mdl_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix) if other_mdl_name else None
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
                  form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified,
