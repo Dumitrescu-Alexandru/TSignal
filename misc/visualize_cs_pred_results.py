@@ -1321,6 +1321,9 @@ if __name__ == "__main__":
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
+    visualize_validation(run="tuned_bert_embs_", folds=[0, 1], folder="separate-glbl_tunedbert2/")
+    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
+
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/lipo_acc/",
                                             compare_mdl_plots=False,

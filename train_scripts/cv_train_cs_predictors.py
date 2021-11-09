@@ -485,11 +485,11 @@ def load_model(model_path, dict_file=None, tuned_bert_embs_prefix=""):
     model.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     return model
 
-def save_model(model, model_name=""):
+def save_model(model, model_name="", tuned_bert_embs_prefix=""):
     folder = get_data_folder()
     model.input_encoder.seq2emb = {}
     torch.save(model, folder + model_name + "_best_eval.pth")
-    model.input_encoder.update()
+    model.input_encoder.update(tuned_bert_embs_prefix=tuned_bert_embs_prefix)
 
 def save_sptype_model(model, model_name="", best=False, optimizer=None):
     folder = get_data_folder()
@@ -800,7 +800,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             best_epoch = e
             best_valid_loss = valid_loss
             best_valid_mcc_and_recall = patiente_metric
-            save_model(swa_model.module if use_swa and e + 1>= swa_start else model, run_name)
+            save_model(swa_model.module if use_swa and e + 1>= swa_start else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
             if e == eps - 1:
                 patience = 0
         elif (e > 20 and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
@@ -876,6 +876,15 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True):
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=50, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
+    for batch in dataset_loader:
+        seqs, lbl_seqs, _, glbl_lbls = batch
+        print(seqs, lbl_seqs, glbl_lbls)
+        some_output = greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None, form_sp_reg_data=True, second_model=None,
+                      test_only_cs=False, glbl_lbls=None)
+        print(some_output[1][:, 0, :])
+        print(torch.softmax(some_output[1][:, 0, :], dim=-1))
+        print(torch.softmax(some_output[-1], dim=-1))
+    exit(1)
     # sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
     #     get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False,
     #                                probabilities_file=test_file.replace(".bin", "") + "_results_sp_probs.bin")
