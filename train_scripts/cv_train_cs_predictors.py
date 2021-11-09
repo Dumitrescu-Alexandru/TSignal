@@ -588,7 +588,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
     train_sets = ['test', 'train'] if validate_on_test or validate_partition is not None else ['train']
-    tuned_bert_embs_prefix = "bert_tuned_{}_{}_".format(partitions[0], partitions[1]) if tuned_bert_embs else ""
+    if len(partitions) == 3:
+        tuned_bert_embs_prefix = "bert_tuned_{}_{}_{}_".format(*partitions) if tuned_bert_embs else ""
+    else:
+        tuned_bert_embs_prefix = "bert_tuned_{}_{}_".format(*partitions) if tuned_bert_embs else ""
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=form_sp_reg_data,
                                 tuned_bert_embs_prefix=tuned_bert_embs_prefix)
