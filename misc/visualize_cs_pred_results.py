@@ -1,3 +1,6 @@
+from io import StringIO
+import requests as r
+
 import torch.nn
 from scipy import stats
 import matplotlib.pyplot as plt
@@ -74,7 +77,10 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
         is_sp = predicted_sp in sp_types
 
         if sp_info == sp_type:
-
+            if p[0] == t[0]:
+                count += 1
+            else:
+                count2 += 1
             #     # the precision was defined as the fraction of correct CS predictions over the number of predicted
             #     # CS, recall as the fraction of correct CS predictions over the number of true CS. In both cases,
             #     # a CS was only considered correct if it was predicted in the correct SP class (e.g. when the
@@ -95,6 +101,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             predictions[grp2_ind[lg]] += np.array([0, 0, 0, 0, 0, 0, 1, 1, 1, 1])
     if v:
         print(" count_tol_fn, count_complete_fn, count_otherSPpred", count_tol_fn, count_complete_fn, count_otherSPpred)
+    print(sp_type, "count, count2", count, count2 )
     all_recalls = []
     all_precisions = []
     all_f1_scores = []
@@ -498,10 +505,21 @@ def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.
 
 
 def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0, 1], folder=""):
+
     all_results = []
     euk_mcc, neg_mcc, pos_mcc, arc_mcc, train_loss, valid_loss, cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, \
     cs_recalls_arc, cs_precs_euk, cs_precs_neg, cs_precs_pos, cs_precs_arc, sp_type_f1 = extract_results(run, folds=folds,
                                                                                                 folder=folder)
+    best_vl = 20
+    patience = 0
+    best_patience = 0
+    for v_l in valid_loss:
+        if v_l < best_vl:
+            best_patience = patience
+            best_vl = v_l
+        else:
+            patience -= 1
+    print(best_vl, best_patience)
     all_f1 = [[[], [], [], []], [[], [], [], []], [[], [], [], []], [[], [], [], []]]
     for lg_ind, (lg_rec, lg_prec) in enumerate([(cs_recalls_euk, cs_precs_euk), (cs_recalls_neg, cs_precs_neg),
                                                 (cs_recalls_pos, cs_precs_pos), (cs_recalls_arc, cs_precs_arc)]):
@@ -510,6 +528,7 @@ def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0, 1], fold
                 all_f1[lg_ind][tol].append(2 * prec * rec / (prec + rec) if prec + rec else 0)
     cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc = all_f1
     plot_mcc([euk_mcc, neg_mcc, pos_mcc, arc_mcc], name=run)
+    print(np.argmin(valid_loss))
     plot_losses([train_loss, valid_loss], name=run)
     extract_and_plot_prec_recall([cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc], metric="f1", name=run, sp_type_f1=sp_type_f1)
     extract_and_plot_prec_recall([cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, cs_recalls_arc], metric="recall",
@@ -625,7 +644,7 @@ def remove_from_dictionary(res_dict, test_fld):
 
 
 def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder="results_param_s_2/",
-                              only_cs_position=False, remove_test_seqs=False, return_sptype_f1=False):
+                              only_cs_position=False, remove_test_seqs=False, return_sptype_f1=False, benchmark=True):
     full_dict_results = {}
     full_sptype_dict = {}
     epochs = []
@@ -638,9 +657,12 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
                 epochs.append(int(lines[-2].split(":")[-3].split(" ")[-1]))
     avg_epoch = np.mean(epochs)
     print("Results found on epochs: {}, {}, {}".format(*epochs))
-
+    id2seq, _, _, _ = extract_id2seq_dict()
+    unique_bench_seqs = set(id2seq.values())
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
         res_dict = pickle.load(open(result_folder + run + "_{}_{}_best.bin".format(tr_folds[0], tr_folds[1]), "rb"))
+        if benchmark:
+            res_dict = {k:v for k,v in res_dict.items() if k in unique_bench_seqs}
         if os.path.exists(result_folder + run + "_{}_{}_best_sptype.bin".format(tr_folds[0], tr_folds[1])):
             sptype_dict = pickle.load(open(result_folder + run + "_{}_{}_best_sptype.bin".format(tr_folds[0], tr_folds[1]), "rb"))
             full_sptype_dict.update(sptype_dict)
@@ -651,6 +673,7 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
             full_dict_results.update(remove_from_dictionary(res_dict, test_fld))
         else:
             full_dict_results.update(res_dict)
+    print(len(full_dict_results.keys()), len(set(full_dict_results.keys())), len(unique_bench_seqs))
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin",
                                                                                    dict_=full_dict_results)
     mccs, mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
@@ -926,7 +949,7 @@ def get_f1_scores(rec, prec):
 
 
 def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False, compare_mdl_plots=False,
-                              remove_test_seqs=False):
+                              remove_test_seqs=False, benchmark=True):
     sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
                        0.556, 0.583]
     sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
@@ -978,7 +1001,7 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat, f1_scores_sptype \
             = extract_mean_test_results(run=u_p, result_folder=result_folder,
                                         only_cs_position=only_cs_position,
-                                        remove_test_seqs=remove_test_seqs, return_sptype_f1=True)
+                                        remove_test_seqs=remove_test_seqs, return_sptype_f1=True, benchmark=benchmark)
         all_recalls_lipo, all_precisions_lipo, \
         all_recalls_tat, all_precisions_tat, = list(np.reshape(np.array(all_recalls_lipo), -1)), list(
             np.reshape(np.array(all_precisions_lipo), -1)), \
@@ -1316,13 +1339,377 @@ def duplicate_Some_logs():
             call(cmd)
     exit(1)
 
+def prep_sp1_sp2():
+
+    file = "../sp_data/sp6_data/benchmark_set_sp5.fasta"
+    file_new = "../sp_data/sp6_data/train_set.fasta"
+    ids_benchmark_sp5 = []
+    for seq_record in SeqIO.parse(file, "fasta"):
+        ids_benchmark_sp5.append(seq_record.id.split("|")[0])
+    seqs, ids = [], []
+    lines = []
+    for seq_record in SeqIO.parse(file_new, "fasta"):
+        if seq_record.id.split("|")[0] in ids_benchmark_sp5 and "ARCHAEA" in seq_record.id:
+            seqs.append(seq_record.seq[:len(seq_record.seq) // 2])
+            ids.append(seq_record.id)
+            lines.append(">"+ids[-1]+"\n")
+            lines.append(str(seqs[-1])+"\n")
+    for i in range(len(lines) // 50000 + 1) :
+        with open("sp1_sp2_fastas/deepsig_arch.fasta".format(i), "wt") as f:
+            f.writelines(lines[i * 50000:(i+1) * 50000])
+
+def ask_uniprot():
+    cID='P0AAK7'
+
+    baseUrl="http://www.uniprot.org/uniprot/"
+    currentUrl=baseUrl+cID+".fasta"
+    response = r.post(currentUrl)
+    cData=''.join(response.text)
+    return int(cData.split("PE=")[1].split(" ")[0])
+
+def extract_id2seq_dict(file="train_set.fasta"):
+    # ids_benchmark_sp5 = []
+    # for seq_record in SeqIO.parse("../sp_data/sp6_data/benchmark_set_sp5.fasta", "fasta"):
+    #     ids_benchmark_sp5.append(seq_record.id.split("|")[0])
+    # file_new = "../sp_data/sp6_data/train_set.fasta"
+    # unique_seqs = set()
+    # str2info = {}
+    # count, count2 = 0, 0
+    # count_found_in_sp5 = 0
+    # count_total = 0
+    # for seq_record in SeqIO.parse(file_new, "fasta"):
+    #     if str(seq_record.seq[:len(seq_record.seq) // 2]) in unique_seqs:
+    #         count_total +=1
+    #         # print("DUPLICATE FOUND", "\n\n", seq_record, "\n\n", str2info[str(seq_record.seq[:len(seq_record.seq) // 2])])
+    #         if seq_record.id.split("|")[0] in ids_benchmark_sp5 or str2info[str(seq_record.seq[:len(seq_record.seq) // 2])].id.split("|")[0] in ids_benchmark_sp5:
+    #             count_found_in_sp5 +=1
+    #         # if str(seq_record.seq[len(seq_record.seq) // 2:]) != str(str2info[str(seq_record.seq[:len(seq_record.seq) // 2])].seq[len(seq_record.seq) // 2:]):
+    #         print(str(seq_record.seq[len(seq_record.seq) // 2:]))
+    #         print(str(str2info[str(seq_record.seq[:len(seq_record.seq) // 2])].seq[len(seq_record.seq) // 2:]))
+    #         print(seq_record.id, str2info[str(seq_record.seq[:len(seq_record.seq) // 2])].id)
+    #             # if seq_record.id.split("|")[0] in ids_benchmark_sp5 or str2info[str(seq_record.seq[:len(seq_record.seq) // 2])].id.split("|")[0] in ids_benchmark_sp5:
+    #             #     print("Also in benchmark")
+    #             #     count2 += 1
+    #             # print("\n")
+    #         count += 1
+    #     else:
+    #         unique_seqs.add(str(seq_record.seq[:len(seq_record.seq) // 2]))
+    #         str2info[str(seq_record.seq[:len(seq_record.seq) // 2])] = seq_record
+    # print(count, count2, count_total, count_found_in_sp5)
+    # exit(1)
+            # id2seq[seq_record.id.split("|")[0]] = str(seq_record.seq[:len(seq_record.seq) // 2])
+            # id2truelbls[seq_record.id.split("|")[0]] = str(seq_record.seq[len(seq_record.seq) // 2:])
+            # id2lg[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[1])
+            # id2type[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[2])
+
+    file = "../sp_data/sp6_data/benchmark_set_sp5.fasta"
+    file_new = "../sp_data/sp6_data/train_set.fasta"
+    id2seq = {}
+    id2lg = {}
+    id2type = {}
+    id2truelbls = {}
+    ids_benchmark_sp5 = []
+    for seq_record in SeqIO.parse(file, "fasta"):
+        ids_benchmark_sp5.append(seq_record.id.split("|")[0])
+    for seq_record in SeqIO.parse(file_new, "fasta"):
+        if seq_record.id.split("|")[0] in ids_benchmark_sp5:
+            id2seq[seq_record.id.split("|")[0]] = str(seq_record.seq[:len(seq_record.seq) // 2])
+            id2truelbls[seq_record.id.split("|")[0]] = str(seq_record.seq[len(seq_record.seq) // 2:])
+            id2lg[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[1])
+            id2type[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[2])
+    lg_sptype2count = {}
+    for k, v in id2lg.items():
+        if v + "_" + id2type[k] not in lg_sptype2count:
+            lg_sptype2count[v + "_" + id2type[k]] = 1
+        else:
+            lg_sptype2count[v + "_" + id2type[k]] += 1
+    return id2seq, id2lg, id2type, id2truelbls
+
+
+def extract_compatible_binaries_lipop():
+    ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
+    glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
+    id2seq, id2truelbls, id2lg, id2type = extract_id2seq_dict(file="train_set.fasta")
+
+    id2seq_b5, id2truelbls_b5, id2lg_b5, id2type_b5 = extract_id2seq_dict(file="benchmark_set_sp5.fasta")
+    for k in id2seq_b5.keys():
+        if k not in id2seq:
+            id2seq[k] = id2seq_b5[k]
+            id2truelbls[k] = id2truelbls_b5[k]
+            id2lg[k] = id2lg_b5[k]
+            id2type[k] = id2type_b5[k]
+
+    with open("sp1_sp2_fastas/results.txt", "rt") as f:
+        lines = f.readlines()
+    seq2sptype = {}
+    seq2aalbls = {}
+    sp_letter = ""
+    life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
+    for l in lines:
+        line = l.replace("#", "")
+        id = line.split("_")[0].replace(" ", "")
+        life_grp.append(id2lg[id] + "|" + id2type[id])
+        seqs.append(id2seq[id])
+        true_lbls.append(id2truelbls[id])
+
+        if "SpI" in line and not "SpII" in line:
+            seq2sptype[id2seq[id]] = glbllbl2_ind['SP']
+            sp_letter = "S"
+        elif "SpII" in line:
+            seq2sptype[id2seq[id]] = glbllbl2_ind['LIPO']
+            sp_letter = "L"
+        else:
+            seq2sptype[id2seq[id]] = glbllbl2_ind['NO_SP']
+        if "cleavage" in line:
+            cs_point = int(line.split("cleavage=")[1].split("-")[0])
+            lblseq = cs_point * sp_letter + (len(id2seq[id]) -cs_point) * "O"
+            seq2aalbls[id2seq[id]] = lblseq
+        else:
+            seq2aalbls[id2seq[id]] = "O" * len(id2seq[id])
+        pred_lbls.append(seq2aalbls[id2seq[id]])
+    all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO", sptype_preds=seq2sptype)
+    print(all_recalls)
+    print(all_precisions)
+    tp, fn, fp = 0, 0, 0
+    different_types = 0
+    crct =0
+    for s, pl, tl, lg in zip(seqs, pred_lbls, true_lbls, life_grp):
+        if "EUKARYA" in lg and "SP" in lg and "NO_SP" not in lg:
+            if -1 <= pl.rfind("S") - tl.rfind("S") <= 1:
+                tp += 1
+            else:
+                fn += 1
+        if "LIPO" in lg and "NO_SP" not in lg and pl[0] != tl[0]:
+            different_types+=1
+        elif "LIPO" in lg and "NO_SP" not in lg:
+            crct +=1
+    print(different_types, crct)
+    print(tp/(tp+fn), tp, fn)
+    # pickle.dump(seq2sptype, open("lipoP_0_1_best_sptype.bin", "wb"))
+    # pickle.dump(seq2aalbls, open("lipoP_0_1.bin", "wb"))
+    # for l in lines:
+
+def extract_compatible_binaries_deepsig():
+    ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
+    glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
+    id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict(file="train_set.fasta")
+
+    # with open("sp1_sp2_fastas/results_deepsig_fullds.txt", "rt") as f:
+    with open("sp1_sp2_fastas/results_deepsig_v2.txt", "rt") as f:
+        lines = f.readlines()
+    seq2sptype = {}
+    seq2aalbls = {}
+    sp_letter = ""
+    life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
+    added_seqs = set()
+    for l in lines:
+        id = l.split("|")[0]
+        if id in id2seq and id2seq[id] not in added_seqs:
+            life_grp.append(id2lg[id] + "|" + id2type[id])
+            seqs.append(id2seq[id])
+            added_seqs.add(id2seq[id])
+            true_lbls.append(id2truelbls[id])
+
+            if "Signal peptide" in l:
+                seq2sptype[id2seq[id]] = glbllbl2_ind['SP']
+                sp_letter = "S"
+                cs_point = int(l.split("Signal peptide")[1].split("\t")[2])
+                lblseq = cs_point * sp_letter + (len(id2seq[id]) -cs_point) * "O"
+                seq2aalbls[id2seq[id]] = lblseq
+            elif id2seq[id] not in seq2sptype:
+                seq2sptype[id2seq[id]] = glbllbl2_ind['NO_SP']
+                seq2aalbls[id2seq[id]] = "O" * len(id2seq[id])
+
+            pred_lbls.append(seq2aalbls[id2seq[id]])
+    print(len(seqs), len(set(seqs)))
+    all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
+    print(all_recalls, all_precisions)
+    tp, fn, fp = 0, 0, 0
+    different_types = 0
+    crct =0
+    for s, pl, tl, lg in zip(seqs, pred_lbls, true_lbls, life_grp):
+        if "EUKARYA" in lg and "SP" in lg and "NO_SP" not in lg:
+            if -1 <= pl.rfind("S") - tl.rfind("S") <= 1:
+                tp += 1
+            else:
+                fn += 1
+        # if "LIPO" in lg and "NO_SP" not in lg and pl[0] != tl[0]:
+        #     different_types+=1
+        # elif "LIPO" in lg and "NO_SP" not in lg:
+        #     crct +=1
+    print(different_types, crct)
+    print(tp/(tp+fn), tp, fn)
+    # pickle.dump(seq2sptype, open("lipoP_0_1_best_sptype.bin", "wb"))
+    # pickle.dump(seq2aalbls, open("lipoP_0_1.bin", "wb"))
+    # for l in lines:
+
+def extract_compatible_phobius_binaries():
+    ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
+    glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
+    file = "sp1_sp2_fastas/phobius_results.txt"
+    life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
+    seq2sptype = {}
+    seq2aalbls = {}
+    with open(file, "rt") as f:
+        lines = f.readlines()
+    count = 0
+    retain_nextl_flag = False
+    id2seq, id2truelbls, id2lg, id2type = extract_id2seq_dict(file="train_set.fasta")
+    sp_start, sp_end = -1, -1
+    first_seq = True
+    for l in lines:
+        if retain_nextl_flag:
+            id_, lg, sp_t = l.split(" ")[-1].split("|")[:3]
+            retain_id = id_
+            life_grp.append(lg + "|" + sp_t)
+            true_lbls.append(id2truelbls[id_])
+            seqs.append(id2seq[id_])
+            retain_nextl_flag = False
+
+        if "//" in l or l == len(lines) - 1:
+            retain_nextl_flag = True
+            if first_seq:
+                first_seq = False
+            else:
+                if sp_end != -1:
+                    seq2sptype[id2seq[retain_id]] = glbllbl2_ind[id2type[retain_id]] if id2type[retain_id] != "NO_SP" else glbllbl2_ind["SP"]
+                    predicted_sequence = id2truelbls[retain_id][0] * sp_end if id2type[retain_id] != "NO_SP" else "S" * sp_end
+                    predicted_sequence = predicted_sequence + "O" * (len(id2seq[retain_id]) - sp_end)
+                    pred_lbls.append(predicted_sequence)
+                    sp_end = -1
+                else:
+                    seq2sptype[id2seq[retain_id]] = glbllbl2_ind['NO_SP']
+                    predicted_sequence = "O" * len(id2seq[retain_id])
+                    pred_lbls.append(predicted_sequence)
+
+        if "SIGNAL" in l:
+            sp_end = int(' '.join(l.split()).split(" ")[3])
+    common_sp6_phob_seqs = extract_phobius_trained_data()
+    remove_inds = [i for i in range(len(seqs)) if seqs[i] in common_sp6_phob_seqs]
+    remove_inds = []
+    len_ = len(seqs)
+    life_grp = [life_grp[i] for i in range(len(seqs)) if i not in remove_inds]
+    true_lbls = [true_lbls[i] for i in range(len(seqs)) if i not in remove_inds]
+    pred_lbls = [pred_lbls[i] for i in range(len(seqs)) if i not in remove_inds]
+    seqs = [seqs[i] for i in range(len_) if i not in remove_inds]
+    all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
+    print(all_recalls, all_precisions)
+
+def extract_phobius_trained_data():
+    folder = "/home/alex/Desktop/work/phobius_data"
+    files = os.listdir(folder)
+    ids = []
+    seqs = []
+    for f in files:
+        for seq_record in SeqIO.parse(os.path.join(folder,f), "fasta"):
+            ids.append(seq_record.description.split(" ")[1])
+            seq = seq_record.seq[:len(seq_record.seq) // 2]
+            seq_70aa = seq[:70]
+            seqs.append(seq_70aa)
+            # print(str(seq_record.seq(:len(seq_record) //2)))
+    id2seq, id2truelbls, id2lg, id2type = extract_id2seq_dict()
+    return set(seqs).intersection(id2seq.values())
 
 if __name__ == "__main__":
+    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
+    exit(1)
+    extract_compatible_binaries_deepsig()
+    extract_compatible_binaries_deepsig()
+    exit(1)
+    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[0, 2], folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
+
+
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    prep_sp1_sp2()
+    exit(1)
+    # visualize_validation(run="tuned_bert_correct_test_embs_", folds=[1, 2], folder="separate-glbl_tuned_bert_correct/")
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    extract_compatible_binaries_deepsig()
+    exit(1)
+    # extract_compatible_binaries_deepsig()
+    # exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    extract_compatible_binaries_deepsig()
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/only_cs/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    exit(1)
+    exit(1)
+    extract_compatible_binaries_deepsig()
+    exit(1)
+    prep_sp1_sp2()
+    exit(1)
+    # extract_phobius_trained_data()
+    # exit(1)
+    extract_compatible_phobius_binaries()
+    exit(1)
+    # extract_phobius_test_data()
+    # exit(1)
+
+
+    # exit(1)
+    # extract_compatible_binaries_lipop()
+    # exit(1)
+
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_correct_inp_drop/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    prep_sp1_sp2()
+    # exit(1)
+    exit(1)
+    prep_sp1_sp2()
+    exit(1)
     # extract_calibration_probs_for_mdl()
     # duplicate_Some_logs()
     # exit(1)
-    visualize_validation(run="tuned_bert_embs_", folds=[0, 1], folder="separate-glbl_tunedbert2/")
-    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
+    # tuned_bert_correct_test_embs_0_1.bin
+    sanity_checks(run="tuned_bert_correct_test_embs_", folder="separate-glbl_tuned_bert_correct/")
+    exit(1)
+    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[0, 2], folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
+    visualize_validation(run="tuned_bert_correct_test_embs_", folds=[0, 2], folder="separate-glbl_tuned_bert_correct/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_correct/only_cs/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_correct/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    # visualize_validation(run="tuned_bert_embs_", folds=[0, 1], folder="separate-glbl_tunedbert2/")
 
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/lipo_acc/",

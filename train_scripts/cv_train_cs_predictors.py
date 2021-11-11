@@ -579,7 +579,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
-                        tuned_bert_embs=False):
+                        tuned_bert_embs=False, warmup_epochs=20):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -641,6 +641,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     best_epoch = 0
     bestf1_sp_type = 0
     current_sptype_f1 = 0
+    warmup_epochs = warmup_epochs if validate_on_mcc else 0
     e = -1
     while patience != 0:
         print("LR:", optimizer.param_groups[0]['lr'])
@@ -747,8 +748,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             if separate_save_sptype_preds:
                 current_sptype_f1 = sptype_f1[0] * 0.5 + sptype_f1[1] * 0.2 + sptype_f1[2] * 0.2  + sptype_f1[3] * 0.1
         else:
-            patiente_metric = np.mean([all_f1_scores[i][1] for i in range(4)]) if not np.isnan(all_f1_scores[3][0]) \
-                else np.mean([all_f1_scores[i][1] for i in range(3)])
+            patiente_metric = valid_loss
+            if separate_save_sptype_preds:
+                current_sptype_f1 = sptype_f1[0] * 0.5 + sptype_f1[1] * 0.2 + sptype_f1[2] * 0.2  + sptype_f1[3] * 0.1
         # sp_pred_mccs
         if use_glbl_lbls or form_sp_reg_data:
             print("On epoch {} total train/validation loss and glbl loss: {}/{}, {}".format(e, losses / len(
@@ -803,8 +805,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             save_model(swa_model.module if use_swa and e + 1>= swa_start else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
             if e == eps - 1:
                 patience = 0
-        elif (e > 20 and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
-                (e > 20 and best_valid_mcc_and_recall > patiente_metric and eps == -1 and validate_on_mcc):
+        elif (e > warmup_epochs and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
+                (e > warmup_epochs and best_valid_mcc_and_recall > patiente_metric and eps == -1 and validate_on_mcc):
             if validate_on_mcc:
                 best_val_metrics, val_metric = best_valid_mcc_and_recall, patiente_metric
             else:
@@ -869,21 +871,28 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True):
     # model = load_model(model_f_name, dict_file=None)
     model = load_model(model_f_name, dict_file=test_file)
-    sp_data = SPCSpredictionData()
+    sp_data = SPCSpredictionData(form_sp_reg_data=True)
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file)
 
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=50, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
+    seqs, some_output = [], []
     for batch in dataset_loader:
         seqs, lbl_seqs, _, glbl_lbls = batch
         print(seqs, lbl_seqs, glbl_lbls)
         some_output = greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None, form_sp_reg_data=True, second_model=None,
                       test_only_cs=False, glbl_lbls=None)
-        print(some_output[1][:, 0, :])
+        print("here", some_output[1][:, 0, :])
         print(torch.softmax(some_output[1][:, 0, :], dim=-1))
         print(torch.softmax(some_output[-1], dim=-1))
+        print(some_output[1].shape)
+    ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
+    for seq, pred in zip(seqs, some_output[1]):
+        print(seq)
+        print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
+        print()
     exit(1)
     # sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
     #     get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False,
