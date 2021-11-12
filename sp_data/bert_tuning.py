@@ -322,7 +322,7 @@ class ProtBertClassifier(pl.LightningModule):
         self.batch_size = self.hparams.batch_size
 
         if self.hparams.tune_sp6_labels:
-            self.lbl2ind_dict= {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7}
+            self.lbl2ind_dict= {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'W':7, 'PD': 8}
         if os.path.exists('/scratch/work/dumitra1'):
             self.modelFolderPath = "../../../covid_tcr_protein_embeddings/models/ProtBert/"
         else:

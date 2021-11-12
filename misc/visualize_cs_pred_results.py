@@ -1367,40 +1367,65 @@ def ask_uniprot():
     cData=''.join(response.text)
     return int(cData.split("PE=")[1].split(" ")[0])
 
+def correct_duplicates_training_data():
+    file_new = "../sp_data/sp6_data/train_set.fasta"
+    decided_ids = ['B3GZ85', 'B0R5Y3', 'Q0T616', 'Q7CI09', 'P33937', 'P63883', 'P33937', 'Q9P121', 'C1CTN0', 'Q8FAX0',
+                   'P9WK51', 'Q5GZP1', 'P0AD45', 'P0DC88', 'Q8E6W4', 'Q5HMD1', 'Q2FWG4', 'Q5HLG6', 'Q8Y7A9', 'P65631',
+                   'B1AIC4', 'Q2FZJ9', ' P0ABJ2', 'P0AD46', 'P0ABJ2', 'Q99V36', 'Q7A698', 'Q5HH23', 'Q6GI23', 'Q7A181',
+                   'Q2YX14', 'Q6GAF2', 'P65628', 'P65629', 'P65630', 'Q5HEA9', 'P0DC86', 'Q2YUI9', 'Q5XDY9', 'Q2FF36',
+                   'Q1R3H8', 'P0DC87', 'A5IUN6', 'A6QIT4', 'A7X4S6', 'Q6G7M0', 'Q1CHD5']
+    #
+    decided_ids_2_info = {}
+    decided_str_2_info = {}
+    processed_seqs = []
+    for seq_record in SeqIO.parse(file_new, "fasta"):
+        if str(seq_record.seq[: len(seq_record.seq) // 2]) in processed_seqs:
+            if seq_record.id.split("|")[0] in decided_ids:
+                decided_str_2_info[str(seq_record.seq[: len(seq_record.seq) // 2])] = (seq_record.id.split("|")[1],
+                                                                                  seq_record.id.split("|")[2],
+                                                                                  seq_record.id.split("|")[3],
+                                                                                  str(seq_record.seq[len(seq_record.seq)//2:]))
+        else:
+            decided_str_2_info[str(seq_record.seq[: len(seq_record.seq) // 2])] = (seq_record.id.split("|")[1],
+                                                                                  seq_record.id.split("|")[2],
+                                                                                  seq_record.id.split("|")[3],
+                                                                                  str(seq_record.seq[len(seq_record.seq)//2:]))
+    # POSITIVE', 'TAT', '0', 'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO'
+    # (emb, , 'IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII', 'EUKARYA', 'NO_SP')
+    # sp6_partitioned_data_test_2.bin
+    remove_count, remove_count2 = 0, 0
+    total_count = 0
+    seen_seqs = []
+    removed_lbls = []
+    for tr_f in [0, 1, 2]:
+        for t_s in ["train"]:
+            new_seqs_2_info = {}
+            seqs = pickle.load(open("../sp_data/sp6_partitioned_data_{}_{}.bin".format(t_s, tr_f), "rb"))
+            for k, info in seqs.items():
+                total_count += 1
+                if info[1] != decided_str_2_info[k][-1] or info[2] != decided_str_2_info[k][0] or  info[3] != decided_str_2_info[k][1] :
+                    remove_count += 1
+                    removed_lbls.append((info[1], decided_str_2_info[k][-1]))
+                    newlbls = info[1] if decided_str_2_info[k][1] != "TATLIPO" else info[1].replace("T", "W")
+                    new_seqs_2_info[k] = (newlbls, decided_str_2_info[k][-1], decided_str_2_info[k][0], decided_str_2_info[k][1])
+                elif k in seen_seqs:
+                    removed_lbls.append((info[1], decided_str_2_info[k][-1]))
+                    remove_count2+=1
+
+                elif k not in seen_seqs:
+                    seen_seqs.append(k)
+                    newlbls = info[1].replace("T", "W") if info[-1] == "TATLIPO" else info[1]
+                    new_seqs_2_info[k] = (info[0], newlbls, info[2], info[3])
+            key = list(new_seqs_2_info.keys())[0]
+            pickle.dump(new_seqs_2_info, open("../sp_data/sp6_partitioned_data_{}_{}.bin".format(t_s, tr_f), "wb"))
+
 def extract_id2seq_dict(file="train_set.fasta"):
-    # ids_benchmark_sp5 = []
-    # for seq_record in SeqIO.parse("../sp_data/sp6_data/benchmark_set_sp5.fasta", "fasta"):
-    #     ids_benchmark_sp5.append(seq_record.id.split("|")[0])
-    # file_new = "../sp_data/sp6_data/train_set.fasta"
-    # unique_seqs = set()
-    # str2info = {}
-    # count, count2 = 0, 0
-    # count_found_in_sp5 = 0
-    # count_total = 0
+
     # for seq_record in SeqIO.parse(file_new, "fasta"):
-    #     if str(seq_record.seq[:len(seq_record.seq) // 2]) in unique_seqs:
-    #         count_total +=1
-    #         # print("DUPLICATE FOUND", "\n\n", seq_record, "\n\n", str2info[str(seq_record.seq[:len(seq_record.seq) // 2])])
-    #         if seq_record.id.split("|")[0] in ids_benchmark_sp5 or str2info[str(seq_record.seq[:len(seq_record.seq) // 2])].id.split("|")[0] in ids_benchmark_sp5:
-    #             count_found_in_sp5 +=1
-    #         # if str(seq_record.seq[len(seq_record.seq) // 2:]) != str(str2info[str(seq_record.seq[:len(seq_record.seq) // 2])].seq[len(seq_record.seq) // 2:]):
-    #         print(str(seq_record.seq[len(seq_record.seq) // 2:]))
-    #         print(str(str2info[str(seq_record.seq[:len(seq_record.seq) // 2])].seq[len(seq_record.seq) // 2:]))
-    #         print(seq_record.id, str2info[str(seq_record.seq[:len(seq_record.seq) // 2])].id)
-    #             # if seq_record.id.split("|")[0] in ids_benchmark_sp5 or str2info[str(seq_record.seq[:len(seq_record.seq) // 2])].id.split("|")[0] in ids_benchmark_sp5:
-    #             #     print("Also in benchmark")
-    #             #     count2 += 1
-    #             # print("\n")
-    #         count += 1
-    #     else:
-    #         unique_seqs.add(str(seq_record.seq[:len(seq_record.seq) // 2]))
-    #         str2info[str(seq_record.seq[:len(seq_record.seq) // 2])] = seq_record
-    # print(count, count2, count_total, count_found_in_sp5)
-    # exit(1)
-            # id2seq[seq_record.id.split("|")[0]] = str(seq_record.seq[:len(seq_record.seq) // 2])
-            # id2truelbls[seq_record.id.split("|")[0]] = str(seq_record.seq[len(seq_record.seq) // 2:])
-            # id2lg[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[1])
-            # id2type[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[2])
+    # id2seq[seq_record.id.split("|")[0]] = str(seq_record.seq[:len(seq_record.seq) // 2])
+    # id2truelbls[seq_record.id.split("|")[0]] = str(seq_record.seq[len(seq_record.seq) // 2:])
+    # id2lg[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[1])
+    # id2type[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[2])
 
     file = "../sp_data/sp6_data/benchmark_set_sp5.fasta"
     file_new = "../sp_data/sp6_data/train_set.fasta"
@@ -1613,7 +1638,93 @@ def extract_phobius_trained_data():
     id2seq, id2truelbls, id2lg, id2type = extract_id2seq_dict()
     return set(seqs).intersection(id2seq.values())
 
+def remove_non_unique():
+    file = "../sp_data/sp6_data/train_set.fasta"
+    unqiue_seqs_2_info = {}
+    count = 0
+    for seq_record in SeqIO.parse(file, "fasta"):
+        if str(seq_record.seq[:len(seq_record.seq) // 2]) in unqiue_seqs_2_info:
+            count += 1
+            already_added_id = unqiue_seqs_2_info[str(seq_record.seq[:len(seq_record.seq) // 2])][0]
+            already_added_lbl  = unqiue_seqs_2_info[str(seq_record.seq[:len(seq_record.seq) // 2])][1]
+            # print("_".join(already_added_id.split("|")[1:]), "_".join(seq_record.id.split("|")[1:]))
+            # if "_".join(already_added_id.split("|")[1:]) != "_".join(seq_record.id.split("|")[1:]):
+            #     print(already_added_id, seq_record.id)
+            if (already_added_id.split("|")[2] == "NO_SP" or  seq_record.id.split("|")[2] == "NO_SP") and \
+                already_added_lbl != seq_record.seq[len(seq_record.seq) // 2:]:
+                #"_".join(already_added_id.split("|")[1:]) != "_".join(seq_record.id.split("|")[1:]):
+                print("\n")
+                print(already_added_id , seq_record.id )
+                print(already_added_lbl)
+                print(seq_record.seq[len(seq_record.seq) //2 :])
+                print("\n")
+        #     print(unqiue_seqs_2_info[str(seq_record.seq[:len(seq_record.seq) // 2])], seq_record.id)
+        unqiue_seqs_2_info[str(seq_record.seq[:len(seq_record.seq) // 2])] = (seq_record.id, seq_record.seq[len(seq_record.seq)//2:])
+    print(count)
+    # import glob
+    # unique_seq2info = {}
+    # files = glob.glob("../sp_data/sp6_partitioned_data_sublbls*")
+    # for f in files:
+    #     items = pickle.load(open(f, "rb"))
+    #     for k, v in items.items():
+    #         if k in unique_seq2info:
+    #             print(unique_seq2info[k])
+    #             print((v[1:], f), "\n\n",)
+    #         else:
+    #             unique_seq2info[k] = (v[1:], f)
+
+
+
 if __name__ == "__main__":
+    correct_duplicates_training_data()
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False)
+    exit(1)
+    correct_duplicates_training_data()
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_lrgdrp/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_val_on_loss/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_nodrop_val_on_loss/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+
+    extract_compatible_binaries_deepsig()
+    exit(1)
+    extract_compatible_binaries_deepsig()
+    exit(1)
+    extract_compatible_binaries_deepsig()
+    exit(1)
+    extract_id2seq_dict()
+    remove_non_unique()
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_val_on_loss/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
     visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
     exit(1)
     extract_compatible_binaries_deepsig()
