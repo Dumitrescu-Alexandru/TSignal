@@ -69,9 +69,9 @@ def create_sp6_training_ds(relative_data_path, folds=[0, 1]):
     train_seqs, train_lbls = extract_seq_lbls(folds, "train", relative_data_path)
     test_seqs, test_lbls = extract_seq_lbls(folds, "test", relative_data_path)
 
-    train_df = pd.DataFrame({'seqs': train_seqs, 'lbls': train_lbls})
-    test_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls})
-    valid_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls})
+    train_df = pd.DataFrame({'seqs': train_seqs[:10], 'lbls': train_lbls[:10]})
+    test_df = pd.DataFrame({'seqs': test_seqs[:10], 'lbls': test_lbls[:10]})
+    valid_df = pd.DataFrame({'seqs': test_seqs[:10], 'lbls': test_lbls[:10]})
     if len(folds) == 3:
         train_df.to_csv(relative_data_path + "sp6_fine_tuning_train_{}_{}_{}.csv".format(*folds))
         test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_{}_{}_{}.csv".format(*folds))
@@ -616,10 +616,13 @@ class ProtBertClassifier(pl.LightningModule):
             padding_mask_tgt = ~padding_mask_tgt
             # print(padding_mask_tgt)
             padding_mask_tgt = padding_mask_tgt.to(self.device)
+            word_embeddings = word_embeddings.transpose(0, 1)
+            word_embeddings = self.pos_encoder(word_embeddings)
+
             tgt = self.pos_encoder(self.label_encoder_t_dec(targets).transpose(0, 1))
             # print(tgt.shape, word_embeddings.shape, tgt_mask.shape, padding_mask_tgt.shape)
             return self.generator(
-                self.classification_head(tgt, word_embeddings.permute(1,0,2), tgt_mask, tgt_key_padding_mask=padding_mask_tgt))
+                self.classification_head(tgt, word_embeddings, tgt_mask, tgt_key_padding_mask=padding_mask_tgt))
         word_embeddings = word_embeddings.reshape(-1, 1024)
         seq_delim = torch.tensor(list(range(batch_size)), device=self.device) * seq_dim
         seq_delim = seq_delim.reshape(-1, 1)
@@ -810,7 +813,6 @@ class ProtBertClassifier(pl.LightningModule):
             return output
         elif self.hparams.train_enc_dec_sp6:
             inputs, targets, seq_lengths = batch
-            max_sl = max(seq_lengths)
             inputs['targets'] = targets
             inputs['seq_lengths'] = seq_lengths
             model_out = self.forward(**inputs)
@@ -875,7 +877,8 @@ class ProtBertClassifier(pl.LightningModule):
         seq_lengths = inputs[-1]
         input_ids = torch.tensor(input_ids, device=self.device)
         attention_mask = torch.tensor(attention_mask, device=self.device)
-        memory = self.ProtBertBFD(input_ids, attention_mask)[0].permute(1, 0, 2)
+        memory = self.ProtBertBFD(input_ids, attention_mask)[0].transpose(0,1)
+        memory = self.pos_encoder(memory)
         src = inputs[0]['input_ids']
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         seq_lens = [len(src_) for src_ in src]
@@ -927,8 +930,16 @@ class ProtBertClassifier(pl.LightningModule):
         all_probs = []
         for i in range(start_ind, max(seq_lens) + 1):
             with torch.no_grad():
+                tgt_mask = (self.generate_square_subsequent_mask(len(ys[0]) + 1))
                 tgt = self.pos_encoder(self.label_encoder_t_dec(ys).transpose(0, 1))
-                prob = self.generator( self.classification_head(tgt, memory))
+                prob = self.generator( self.classification_head(tgt, memory, tgt_mask))
+                # tgt_mask = self.generate_square_subsequent_mask(len(ys[0]) + 1).to(self.device)
+                # print(tgt, memory.to(device), tgt_mask.to(device))
+                # self.classification_head(tgt, memory, tgt_mask)
+                # out = self.classification_head(ys, memory.to(device), tgt_mask.to(device))
+                # out = out.transpose(0, 1)
+                # all_outs.append(out[:, -1])
+
 
             if i == 0 and not form_sp_reg_data:
                 # extract the sp-presence probabilities
