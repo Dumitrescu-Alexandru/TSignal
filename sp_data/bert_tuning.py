@@ -2,6 +2,7 @@
 # 4. function that takes in the model and some sequences and gives embeddings
 
 # 3. give file and columns (for cdr3/TCR seqs, and delimiter)
+import logging
 import datetime
 # from transformers import AutoTokenizer, AutoModel, pipeline
 import pickle
@@ -9,6 +10,8 @@ import random
 import sys
 import os
 sys.path.append(os.path.abspath(".."))
+from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
+from train_scripts.cv_train_cs_predictors import log_and_print_mcc_and_cs_results
 import torch
 import torch.nn as nn
 from torch import optim
@@ -43,7 +46,8 @@ def gpu_acc_metric(y_hat, labels):
         acc = sum(y_hat == torch.tensor(labels, device=y_hat.device)).to(dtype=torch.float) / y_hat.shape[0]
     return acc
 
-def extract_seq_lbls(folds=[0,1], t_set="train", relative_data_path=""):
+
+def extract_seq_lbls(folds=[0, 1], t_set="train", relative_data_path=""):
     data = pickle.load(open(relative_data_path + "sp6_partitioned_data_{}_{}.bin".format(t_set, folds[0]), "rb"))
     seqs = list(data.keys())
     lbls = [data[s][1] for s in seqs]
@@ -62,8 +66,6 @@ def extract_seq_lbls(folds=[0,1], t_set="train", relative_data_path=""):
     return seqs, lbls
 
 def create_sp6_training_ds(relative_data_path, folds=[0, 1]):
-
-
     train_seqs, train_lbls = extract_seq_lbls(folds, "train", relative_data_path)
     test_seqs, test_lbls = extract_seq_lbls(folds, "test", relative_data_path)
 
@@ -97,7 +99,7 @@ def create_sp6_tuning_dataset(relative_data_path, folds=[0, 1]):
         lbls.extend(data[s][1] for s in keys_3rd_data)
         sp_types.extend([data[s][-1] for s in keys_3rd_data])
 
-    sp_types_2inds = {s:[] for s in set(sp_types)}
+    sp_types_2inds = {s: [] for s in set(sp_types)}
     train_seqs, train_lbls, test_seqs, test_lbls = [], [], [], []
     for ind, s_t in enumerate(sp_types):
         sp_types_2inds[s_t].append(ind)
@@ -107,9 +109,9 @@ def create_sp6_tuning_dataset(relative_data_path, folds=[0, 1]):
         test_lbls.extend([lbls[i] for i in test_inds_])
         train_seqs.extend([seqs[i] for i in set(inds) - set(test_inds_)])
         train_lbls.extend([lbls[i] for i in set(inds) - set(test_inds_)])
-    train_df = pd.DataFrame({'seqs':train_seqs, 'lbls':train_lbls})
-    test_df = pd.DataFrame({'seqs':test_seqs, 'lbls':test_lbls})
-    valid_df = pd.DataFrame({'seqs':test_seqs, 'lbls':test_lbls})
+    train_df = pd.DataFrame({'seqs': train_seqs, 'lbls': train_lbls})
+    test_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls})
+    valid_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls})
     if len(folds) == 3:
         train_df.to_csv(relative_data_path + "sp6_fine_tuning_train_{}_{}_{}.csv".format(*folds))
         test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_{}_{}_{}.csv".format(*folds))
@@ -119,6 +121,7 @@ def create_sp6_tuning_dataset(relative_data_path, folds=[0, 1]):
         test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_{}_{}.csv".format(*folds))
         valid_df.to_csv(relative_data_path + "sp6_fine_tuning_valid_{}_{}.csv".format(*folds))
 
+
 def create_epitope_tuning_files(relative_data_path):
     """
         Creates input sequences and epitope specificity label dataset for task fine-tuning and saves the files in the
@@ -126,6 +129,7 @@ def create_epitope_tuning_files(relative_data_path):
             Inputs:
                 relative_data_path: path from the main script to the data folder
     """
+
     def split_data(eps):
         ep2id = {}
         for ind, e in enumerate(eps):
@@ -143,7 +147,7 @@ def create_epitope_tuning_files(relative_data_path):
             all_val_inds.extend(val_inds_)
         return all_train_inds, all_val_inds, all_test_inds
 
-    epitope_dataset = pd.read_csv(relative_data_path+'vdj_human_unique_longs.csv')
+    epitope_dataset = pd.read_csv(relative_data_path + 'vdj_human_unique_longs.csv')
     epitope, sequences = epitope_dataset['epitope'].values, epitope_dataset['long'].values
     all_train_inds, all_val_inds, all_test_inds = split_data(epitope)
     train_seq, train_ep, test_seq, test_ep = sequences[all_train_inds], epitope[all_train_inds], \
@@ -169,15 +173,16 @@ def create_bert_further_tuning_files(relative_data_path="."):
     for s in seqs:
         train_format_seqs.append(" ".join([s_ for s_ in s]))
     test_inds = random.sample(list(range(len(train_format_seqs))), int(0.2 * len(train_format_seqs)))
-    valid_seqs, test_seqs = test_inds[:len(test_inds)//2], test_inds[len(test_inds)//2:]
+    valid_seqs, test_seqs = test_inds[:len(test_inds) // 2], test_inds[len(test_inds) // 2:]
     train_seqs = list(set(list(range(len(train_format_seqs)))) - set(test_inds))
     valid_data, test_data, train_data = [train_format_seqs[i] for i in valid_seqs], \
                                         [train_format_seqs[i] for i in test_seqs], \
                                         [train_format_seqs[i] for i in train_seqs]
     valid_data, test_data, train_data = pd.DataFrame(valid_data), pd.DataFrame(test_data), pd.DataFrame(train_data)
-    train_data.to_csv(os.path.join(relative_data_path,"tcr_seqs_train_df.csv"))
-    valid_data.to_csv(os.path.join(relative_data_path,"tcr_seqs_dev_df.csv"))
+    train_data.to_csv(os.path.join(relative_data_path, "tcr_seqs_train_df.csv"))
+    valid_data.to_csv(os.path.join(relative_data_path, "tcr_seqs_dev_df.csv"))
     test_data.to_csv(os.path.join(relative_data_path, "tcr_seqs_test_df.csv"))
+
 
 class EpitopeClassifierDataset(Dataset):
     """
@@ -185,10 +190,11 @@ class EpitopeClassifierDataset(Dataset):
         of the sequences will be used as a representation of the whole sequence, and the classification will be based
         on the hidden representation of that token.
     """
+
     def __init__(self, raw_path, file) -> None:
         self.data = []
         vocab = pickle.load(open(raw_path + "lbl2vocab.bin", "rb"))
-        path = raw_path+file
+        path = raw_path + file
         self.init_dataset(path, vocab)
 
     def __len__(self):
@@ -226,16 +232,18 @@ class EpitopeClassifierDataset(Dataset):
         assert len(sequences) == len(label)
         self.data = pd.DataFrame({"seq": sequences, "label": label})
 
+
 class SP6TuningDataset(Dataset):
     """
         Dataset class for BERT tuning with the epitope specificity classification. A <CLS> token added at the beginning
         of the sequences will be used as a representation of the whole sequence, and the classification will be based
         on the hidden representation of that token.
     """
+
     def __init__(self, raw_path, file) -> None:
         self.data = []
         vocab = pickle.load(open(raw_path + "sp6_dicts.bin", "rb"))[0]
-        path = raw_path+file
+        path = raw_path + file
         self.init_dataset(path, vocab)
 
     def __len__(self):
@@ -287,7 +295,7 @@ class BertDataset(Dataset):
 
     def __init__(self, file, special_tokens, relative_data_path) -> None:
         self.data = []
-        self.init_dataset(os.path.join(relative_data_path,file), special_tokens)
+        self.init_dataset(os.path.join(relative_data_path, file), special_tokens)
 
     def __len__(self):
         return len(self.data)
@@ -337,6 +345,7 @@ class BertDataset(Dataset):
                     all_pos.append(lbl_pos)
                     masked_s.append(" ".join(current_s))
             return all_lbls, all_pos, masked_s
+
         df = pd.read_csv(path, names=['sequences'], skiprows=1)
 
         seq = list(df['sequences'])
@@ -360,9 +369,11 @@ class ProtBertClassifier(pl.LightningModule):
         super(ProtBertClassifier, self).__init__()
         self.hparams = hparams
         self.batch_size = self.hparams.batch_size
+        self.e = 0
 
         if self.hparams.tune_sp6_labels or hparams.train_enc_dec_sp6:
-            self.lbl2ind_dict= {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'W': 7, 'PD': 8, 'BS': 9, 'ES': 10}
+            self.lbl2ind_dict = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'W': 7, 'PD': 8, 'BS': 9,
+                                 'ES': 10}
         if os.path.exists('/scratch/work/dumitra1'):
             self.modelFolderPath = "../../../covid_tcr_protein_embeddings/models/ProtBert/"
         else:
@@ -455,7 +466,7 @@ class ProtBertClassifier(pl.LightningModule):
     @staticmethod
     def get_epitope_weights(relative_data_path):
         vdj_long_data = pd.read_csv(os.path.join(relative_data_path, "vdj_human_unique_longs.csv"))
-        epitope2ind = pickle.load(open(os.path.join(relative_data_path ,"lbl2vocab.bin"), "rb"))
+        epitope2ind = pickle.load(open(os.path.join(relative_data_path, "lbl2vocab.bin"), "rb"))
         epitope2count = {}
         for ep in vdj_long_data['epitope'].values:
             if ep in epitope2count:
@@ -572,7 +583,8 @@ class ProtBertClassifier(pl.LightningModule):
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
-    def forward(self, input_ids, token_type_ids, attention_mask, target_positions=None, return_embeddings=False, seq_lengths=None, targets=None):
+    def forward(self, input_ids, token_type_ids, attention_mask, target_positions=None, return_embeddings=False,
+                seq_lengths=None, targets=None):
         """ Usual pytorch forward function.
         :param tokens: text sequences [batch_size x src_seq_len]
         :param lengths: source lengths [batch_size]
@@ -600,14 +612,11 @@ class ProtBertClassifier(pl.LightningModule):
         elif self.hparams.train_enc_dec_sp6:
             max_len_out = max(seq_lengths)
             tgt_mask = self.generate_square_subsequent_mask(max_len_out + 1)
-            padding_mask_tgt = torch.arange(max_len_out+ 1)[None, :] < torch.tensor(seq_lengths)[:, None] + 1
+            padding_mask_tgt = torch.arange(max_len_out + 1)[None, :] < torch.tensor(seq_lengths)[:, None] + 1
             padding_mask_tgt = ~padding_mask_tgt
             # print(padding_mask_tgt)
             padding_mask_tgt = padding_mask_tgt.to(self.device)
             tgt = self.pos_encoder(self.label_encoder_t_dec(targets).transpose(0, 1))
-            # def forward(self, tgt: Tensor, memory: Tensor, tgt_mask: Optional[Tensor] = None,
-            #             memory_mask: Optional[Tensor] = None, tgt_key_padding_mask: Optional[Tensor] = None,
-            #             memory_key_padding_mask: Optional[Tensor] = None) -> Tensor:
             return self.generator(
                 self.classification_head(tgt, word_embeddings, tgt_mask, tgt_key_padding_mask=padding_mask_tgt))
         word_embeddings = word_embeddings.reshape(-1, 1024)
@@ -724,7 +733,7 @@ class ProtBertClassifier(pl.LightningModule):
             inputs, targets = batch
             model_out = self.forward(**inputs)
             loss_val = self.loss(model_out.reshape(-1, len(self.lbl2ind_dict.keys())),
-                                 {"labels":list(np.array(targets).reshape(-1))})
+                                 {"labels": list(np.array(targets).reshape(-1))})
             tqdm_dict = {"train_loss": loss_val}
             output = OrderedDict(
                 {"loss": loss_val, "progress_bar": tqdm_dict, "log": tqdm_dict})
@@ -740,7 +749,7 @@ class ProtBertClassifier(pl.LightningModule):
                 eos_token_targets.append(t[:sl])
                 eos_token_targets[-1].append(self.lbl2ind_dict['ES'])
                 eos_token_targets[-1].extend(t[sl:])
-            loss_val = self.loss(model_out.permute(1,0,2).reshape(-1, len(self.lbl2ind_dict.keys())),
+            loss_val = self.loss(model_out.permute(1, 0, 2).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
             tqdm_dict = {"train_loss": loss_val}
             output = OrderedDict(
@@ -791,7 +800,7 @@ class ProtBertClassifier(pl.LightningModule):
             inputs, targets = batch
             model_out = self.forward(**inputs)
             loss_val = self.loss(model_out.reshape(-1, len(self.lbl2ind_dict.keys())),
-                                 {"labels":list(np.array(targets).reshape(-1))})
+                                 {"labels": list(np.array(targets).reshape(-1))})
             y = targets
             y_hat = model_out
             labels_hat = torch.argmax(y_hat, dim=-1)
@@ -809,7 +818,7 @@ class ProtBertClassifier(pl.LightningModule):
                 eos_token_targets.append(t[:sl])
                 eos_token_targets[-1].append(self.lbl2ind_dict['ES'])
                 eos_token_targets[-1].extend(t[sl:])
-            loss_val = self.loss(model_out.permute(1,0,2).reshape(-1, len(self.lbl2ind_dict.keys())),
+            loss_val = self.loss(model_out.permute(1, 0, 2).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
             y = eos_token_targets
             y_hat = model_out
@@ -848,7 +857,6 @@ class ProtBertClassifier(pl.LightningModule):
         Returns:
             - Dictionary with metrics to be added to the lightning logger.
         """
-        print("YALLO")
         val_loss_mean = torch.stack([x['val_loss'] for x in outputs]).mean()
         val_acc_mean = torch.stack([x['val_acc'] for x in outputs]).mean()
 
@@ -860,15 +868,15 @@ class ProtBertClassifier(pl.LightningModule):
         }
         return result
 
-    def greedy_decode(self, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
+    def greedy_decode(self, inputs, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
                       test_only_cs=False, glbl_lbls=None):
+        input_ids, attention_mask = inputs[0]['input_ids'], inputs[0]['attention_mask']
+        seq_lengths = inputs[-1]
         input_ids = torch.tensor(input_ids, device=self.device)
-        batch_size, seq_dim = input_ids.shape[0], input_ids.shape[1]
         attention_mask = torch.tensor(attention_mask, device=self.device)
-        word_embeddings = self.ProtBertBFD(input_ids,
-                                           attention_mask)[0]
+        memory = self.ProtBertBFD(input_ids, attention_mask)[0]
+        src = inputs[0]['input_ids']
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        src = src
         seq_lens = [len(src_) for src_ in src]
         sp_probs = []
         sp_logits = []
@@ -878,177 +886,184 @@ class ProtBertClassifier(pl.LightningModule):
         all_outs = []
         all_outs_2nd_mdl = []
         glbl_labels = None
-        with torch.no_grad():
-            memory = model.encode(src)
-            if second_model is not None:
-                memory_2nd_mdl = model.encode(src)
-            else:
-                memory_2nd_mdl = None
-            if model.glbl_lbl_version == 3:
-                if test_only_cs:
-                    batch_size = len(src)
-                    glbl_labels = torch.zeros(batch_size, 6)
-                    glbl_labels[list(range(batch_size)), glbl_lbls] = 1
-                    _, glbl_preds = torch.max(glbl_labels, dim=1)
-                else:
-                    glbl_labels = model.get_v3_glbl_lbls(src)
-                    _, glbl_preds = torch.max(glbl_labels, dim=1)
-
         # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
         ys = []
 
         if not ys:
             for _ in range(len(src)):
+                # do not append anything because the input enecoder for the labels in the T-decoder already appends
+                # beginning of sequence token
                 ys.append([])
         start_ind = 0
         # if below condition, then global labels are computed with a separate model. This also affects the first label pred
         # of the model predicting the sequence label. Because of this, compute the first predictions first, and take care
         # of the glbl label model and sequence-model consistency (e.g. one predicts SP other NO-SP - take care of that)
-        if glbl_labels is not None:
-            tgt_mask = (self.generate_square_subsequent_mask(1))
-            out = model.decode(ys, memory.to(device), tgt_mask.to(device))
-            out = out.transpose(0, 1)
-            prob = model.generator(out[:, -1])
-            _, next_words = torch.max(prob, dim=1)
-            next_word = [nw.item() for nw in next_words]
-            current_ys = []
-            # ordered indices of no-sp aa labels O, M, I
-            ordered_no_sp = [lbl2ind['O'], lbl2ind['M'], lbl2ind['I']]
-            for bach_ind in range(len(src)):
-                if ind2glbl_lbl[glbl_preds[bach_ind].item()] == "NO_SP" and ind2lbl[next_word[bach_ind]] == "S":
-                    max_no_sp = np.argmax([prob[bach_ind][lbl2ind['O']].item(), prob[bach_ind][lbl2ind['M']].item(),
-                                           prob[bach_ind][lbl2ind['I']].item()])
-                    current_ys.append(ys[bach_ind])
-                    current_ys[-1].append(ordered_no_sp[max_no_sp])
-                elif ind2glbl_lbl[glbl_preds[bach_ind].item()] in ['SP', 'TATLIPO', 'LIPO', 'TAT', 'PILIN'] \
-                        and ind2lbl[next_word[bach_ind]] != "S":
-                    current_ys.append(ys[bach_ind])
-                    current_ys[-1].append(lbl2ind["S"])
-                else:
-                    current_ys.append(ys[bach_ind])
-                    current_ys[-1].append(next_word[bach_ind])
-            ys = current_ys
-            start_ind = 1
-        model.eval()
-        model.glbl_generator.eval()
+        # if glbl_labels is not None:
+        #     tgt_mask = (self.generate_square_subsequent_mask(1))
+        #     out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+        #     out = out.transpose(0, 1)
+        #     prob = model.generator(out[:, -1])
+        #     _, next_words = torch.max(prob, dim=1)
+        #     next_word = [nw.item() for nw in next_words]
+        #     current_ys = []
+        #     # ordered indices of no-sp aa labels O, M, I
+        #     ordered_no_sp = [lbl2ind['O'], lbl2ind['M'], lbl2ind['I']]
+        #     for bach_ind in range(len(src)):
+        #         if ind2glbl_lbl[glbl_preds[bach_ind].item()] == "NO_SP" and ind2lbl[next_word[bach_ind]] == "S":
+        #             max_no_sp = np.argmax([prob[bach_ind][lbl2ind['O']].item(), prob[bach_ind][lbl2ind['M']].item(),
+        #                                    prob[bach_ind][lbl2ind['I']].item()])
+        #             current_ys.append(ys[bach_ind])
+        #             current_ys[-1].append(ordered_no_sp[max_no_sp])
+        #         elif ind2glbl_lbl[glbl_preds[bach_ind].item()] in ['SP', 'TATLIPO', 'LIPO', 'TAT', 'PILIN'] \
+        #                 and ind2lbl[next_word[bach_ind]] != "S":
+        #             current_ys.append(ys[bach_ind])
+        #             current_ys[-1].append(lbl2ind["S"])
+        #         else:
+        #             current_ys.append(ys[bach_ind])
+        #             current_ys[-1].append(next_word[bach_ind])
+        #     ys = current_ys
+        #     start_ind = 1
         all_probs = []
         for i in range(start_ind, max(seq_lens) + 1):
             with torch.no_grad():
-                tgt_mask = (self.generate_square_subsequent_mask(len(ys[0]) + 1))
-                if second_model is not None:
-                    out_2nd_mdl = second_model.decode(ys, memory_2nd_mdl.to(device), tgt_mask.to(device))
-                    out_2nd_mdl = out_2nd_mdl.transpose(0, 1)
-                    prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
-                    all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
-                out = model.decode(ys, memory.to(device), tgt_mask.to(device))
-                out = out.transpose(0, 1)
-                prob = model.generator(out[:, -1])
-                all_outs.append(out[:, -1])
+                tgt = self.pos_encoder(self.label_encoder_t_dec(ys).transpose(0, 1))
+                prob = self.generator( self.classification_head(tgt, memory))
 
             if i == 0 and not form_sp_reg_data:
                 # extract the sp-presence probabilities
-                sp_probs = [sp_prb.item() for sp_prb in torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
-                all_seq_sp_probs = [[sp_prob.item()] for sp_prob in
-                                    torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
-                all_seq_sp_logits = [[sp_prob.item()] for sp_prob in prob[:, lbl2ind['S']]]
-            elif not form_sp_reg_data:
-                # used to update the sequences of probabilities
-                softmax_probs = torch.nn.functional.softmax(prob, dim=-1)
-                next_sp_probs = softmax_probs[:, lbl2ind['S']]
-                next_sp_logits = prob[:, lbl2ind['S']]
-                for seq_prb_ind in range(len(all_seq_sp_probs)):
-                    all_seq_sp_probs[seq_prb_ind].append(next_sp_probs[seq_prb_ind].item())
-                    all_seq_sp_logits[seq_prb_ind].append(next_sp_logits[seq_prb_ind].item())
-            all_probs.append(prob)
-            if second_model is not None:
-                probs_fm, next_words_fm = torch.max(torch.nn.functional.softmax(prob, dim=-1), dim=1)
-                probs_sm, next_words_sm = torch.max(torch.nn.functional.softmax(prob_2nd_mdl, dim=-1), dim=1)
-                all_probs_mdls = torch.stack([probs_fm, probs_sm])
-                all_next_w_mdls = torch.stack([next_words_fm, next_words_sm])
-                if i == 0:
-                    _, inds = torch.max(all_probs_mdls, dim=0)
-                next_words = all_next_w_mdls[inds, torch.tensor(list(range(inds.shape[0])))]
-            else:
-                _, next_words = torch.max(prob, dim=1)
+                sp_probs = [sp_prb for sp_prb in torch.nn.functional.softmax(prob[0], dim=-1)]
+                all_seq_sp_logits = [sp_prb for sp_prb in prob[0]]
+                all_seq_sp_probs = [sp_prb for sp_prb in prob[0]]
+            # elif not form_sp_reg_data:
+            #     # used to update the sequences of probabilities
+            #     softmax_probs = torch.nn.functional.softmax(prob, dim=-1)
+            #     next_sp_probs = softmax_probs[:, lbl2ind['S']]
+            #     next_sp_logits = prob[:, lbl2ind['S']]
+            #     for seq_prb_ind in range(len(all_seq_sp_probs)):
+            #         all_seq_sp_probs[seq_prb_ind].append(next_sp_probs[seq_prb_ind].item())
+            #         all_seq_sp_logits[seq_prb_ind].append(next_sp_logits[seq_prb_ind].item())
+            all_probs.append(prob[-1, : ,:])
+            _, next_words = torch.max(prob[-1, :, :], dim=1)
             next_word = [nw.item() for nw in next_words]
             current_ys = []
             for bach_ind in range(len(src)):
                 current_ys.append(ys[bach_ind])
                 current_ys[-1].append(next_word[bach_ind])
             ys = current_ys
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        if form_sp_reg_data:
-            if model.glbl_lbl_version == 2 and model.use_glbl_lbls:
-                if model.version2_agregation == "max":
-                    glbl_labels = model.glbl_generator(torch.max(torch.stack(all_outs).transpose(0, 1), dim=1)[0])
-                    if second_model is not None:
-                        glbl_labels = torch.stack([torch.nn.functional.softmax(glbl_labels, dim=1),
-                                                   torch.nn.functional.softmax(second_model.glbl_generator(
-                                                       torch.max(torch.stack(all_outs_2nd_mdl).transpose(0, 1), dim=1)[
-                                                           0]),
-                                                       dim=1)])
-                        glbl_labels = glbl_labels[inds, torch.tensor(list(range(inds.shape[0]))), :]
-
-
-                elif model.version2_agregation == "avg":
-                    glbl_labels = model.glbl_generator(torch.mean(torch.stack(all_outs).transpose(0, 1), dim=1))
-                    if second_model is not None:
-                        glbl_labels = torch.nn.functional.softmax(glbl_labels) + \
-                                      torch.nn.functional.softmax(second_model.glbl_generator(
-                                          torch.mean(torch.stack(all_outs_2nd_mdl).transpose(0, 1), dim=1)), -1)
-            elif model.glbl_lbl_version == 1 and model.use_glbl_lbls:
-                glbl_labels = model.glbl_generator(memory.transpose(0, 1)[:, 1, :])
-                if second_model is not None:
-                    glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
-                                  torch.nn.functional.softmax(
-                                      second_model.glbl_generator(memory_2nd_mdl.transpose(0, 1)[:, 1, :]), dim=-1)
-            elif model.glbl_lbl_version != 3:
-                glbl_labels = model.glbl_generator(
-                    torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1))
-                if second_model is not None:
-                    glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
-                                  second_model.glbl_generator(
-                                      torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1), dim=-1)
-            return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
-                   glbl_labels
+        # if form_sp_reg_data:
+        #     if model.glbl_lbl_version == 2 and model.use_glbl_lbls:
+        #         if model.version2_agregation == "max":
+        #             glbl_labels = model.glbl_generator(torch.max(torch.stack(all_outs).transpose(0, 1), dim=1)[0])
+        #         elif model.version2_agregation == "avg":
+        #             glbl_labels = model.glbl_generator(torch.mean(torch.stack(all_outs).transpose(0, 1), dim=1))
+        #             if second_model is not None:
+        #                 glbl_labels = torch.nn.functional.softmax(glbl_labels) + \
+        #                               torch.nn.functional.softmax(second_model.glbl_generator(
+        #                                   torch.mean(torch.stack(all_outs_2nd_mdl).transpose(0, 1), dim=1)), -1)
+        #     elif model.glbl_lbl_version == 1 and model.use_glbl_lbls:
+        #         glbl_labels = model.glbl_generator(memory.transpose(0, 1)[:, 1, :])
+        #         if second_model is not None:
+        #             glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
+        #                           torch.nn.functional.softmax(
+        #                               second_model.glbl_generator(memory_2nd_mdl.transpose(0, 1)[:, 1, :]), dim=-1)
+        #     elif model.glbl_lbl_version != 3:
+        #         glbl_labels = model.glbl_generator(
+        #             torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1))
+        #         if second_model is not None:
+        #             glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
+        #                           second_model.glbl_generator(
+        #                               torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1), dim=-1)
+        #     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
+        #            glbl_labels
         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 
-    def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1,
-             dataset_loader=None,use_beams_search=False, form_sp_reg_data=False, simplified=False, second_model=None,
-             very_simplified=False, test_only_cs=False, glbl_lbl_2ind=None, account_lipos=False,
-             tuned_bert_embs_prefix=""):
-        if glbl_lbl_2ind is not None:
-            ind2glbl_lbl = {v:k for k,v in glbl_lbl_2ind.items()}
-        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
+    def evaluate(self, dataset_loader=None, use_beams_search=False, form_sp_reg_data=False, second_model=None,
+                 test_only_cs=False, glbl_lbl_2ind=None, account_lipos=False, validation=True):
         eval_dict = {}
         sp_type_dict = {}
         seqs2probs = {}
-        model.eval()
-        if second_model is not None:
-            second_model.eval()
-        val_or_test = "test" if len(sets) == 2 else "validation"
-        if dataset_loader is None:
-            sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
-            sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                        glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data,
-                                        tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+        self.ProtBertBFD.eval()
+        self.classification_head.eval()
+        self.label_encoder_t_dec.eval()
+        self.generator.eval()
+        self.pos_encoder.eval()
+        if validation:
+            dataset = SP6TuningDataset(hparams.relative_data_path, hparams.dev_csv)
+            dataset_loader =  DataLoader(
+                                dataset=dataset,
+                                batch_size=self.hparams.batch_size,
+                                collate_fn=self.prepare_sample,
+                                num_workers=self.hparams.loader_workers)
 
-            dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                         batch_size=test_batch_size, shuffle=False,
-                                                         num_workers=4, collate_fn=collate_fn)
-
-        ind2lbl = {v: k for k, v in lbl2ind.items()}
+        ind2lbl = {v: k for k, v in self.lbl2ind_dict.items()}
+        ind2tkn = {v:k for k, v in self.tokenizer.get_vocab().items()}
         total_loss = 0
-        for ind, (src, tgt, _, glbl_lbls) in tqdm(enumerate(dataset_loader), "Epoch {} {}".format(epoch, val_or_test),
-                                                  total=len(dataset_loader)):
+        for ind, src in tqdm(enumerate(dataset_loader), total=len(dataset_loader)):
             # print("Number of sequences tested: {}".format(ind * test_batch_size))
-            src = src
-            tgt = tgt
-            if form_sp_reg_data:
-                predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
-                    translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
-                              form_sp_reg_data=form_sp_reg_data, second_model=second_model, test_only_cs=test_only_cs,
-                              glbl_lbls=glbl_lbls)
+            tgt = src[-2]
+            seqs = src[0]['input_ids']
+            predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
+                self.translate(src, self.lbl2ind_dict['BS'], self.lbl2ind_dict, form_sp_reg_data=form_sp_reg_data,
+                               second_model=second_model, test_only_cs=test_only_cs)
+            for s, t, pt, sp_type in zip(seqs, tgt, predicted_tokens, sp_type_probs):
+                predicted_lbls = "".join([ind2lbl[i] for i in pt])
+                # TODO: maybe consider the two modifications for this approach also
+                # if account_lipos:
+                #     predicted_lbls, sp_type = clean_sec_sp2_preds(s, predicted_lbls, sp_type, ind2glbl_lbl)
+                # sp_type_dict[s] = torch.argmax(sp_type).item()
+                # if form_sp_reg_data:
+                #     new_predicted_lbls = modify_sp_subregion_preds(predicted_lbls, sp_type)
+                #     predicted_lbls = new_predicted_lbls
+                s = "".join([ind2tkn[s_] for s_ in s])
+                eval_dict[s] = predicted_lbls[:len(t)]
+                sp_type_dict[s] = torch.argmax(sp_type).item()
+
+        pickle.dump(eval_dict, open(self.hparams.run_name + ".bin", "wb"))
+        pickle.dump(sp_type_dict, open(self.hparams.run_name + "_sptype.bin", "wb"))
+        sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
+        all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
+        all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
+            get_cs_and_sp_pred_results(filename=self.hparams.run_name + ".bin", v=False, return_everything=True,
+                                       return_class_prec_rec=True)
+        all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
+                                                       list(np.array(all_precisions).flatten()), list(
+            np.array(total_positives).flatten())
+        log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=self.e,
+                                         all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
+        self.e += 1
+        self.ProtBertBFD.train()
+        self.classification_head.train()
+        self.label_encoder_t_dec.train()
+        self.generator.train()
+        self.pos_encoder.train()
+
+    def translate(self, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False,
+                  form_sp_reg_data=False, second_model=None, test_only_cs=False, glbl_lbls=None):
+        tgt_tokens, probs, sp_probs, \
+        all_sp_probs, all_seq_sp_logits = self.greedy_decode(src, start_symbol=bos_id,
+                                                                    lbl2ind=lbl2ind,
+                                                                    tgt=tgt,
+                                                                    form_sp_reg_data=form_sp_reg_data,
+                                                                    second_model=second_model,
+                                                                    test_only_cs=test_only_cs,
+                                                                    glbl_lbls=glbl_lbls)
+        # self.lbl2ind_dict = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'W': 7, 'PD': 8, 'BS': 9,
+        #                      'ES': 10}
+        sp_type_probs = []
+        for sp_prbs in sp_probs:
+            # ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
+
+            sp, tatlipo, lipo, tat, pilin = sp_prbs[self.lbl2ind_dict['S']].item(), sp_prbs[self.lbl2ind_dict['W']].item(), \
+                                            sp_prbs[self.lbl2ind_dict['L']].item(), sp_prbs[self.lbl2ind_dict['T']].item(), \
+                                            sp_prbs[self.lbl2ind_dict['P']].item()
+            no_sp = 1 - (sp + tatlipo + lipo + tat + pilin)
+            sp_type_probs.append(torch.tensor([no_sp, sp, tatlipo, lipo, tat, pilin]))
+        return tgt_tokens, probs, sp_probs, \
+               all_sp_probs, all_seq_sp_logits, sp_type_probs
+
+        # tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = self.greedy_decode(src, start_symbol=bos_id,
+        #                                                                                   lbl2ind=lbl2ind, tgt=tgt)
+        # return tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits
 
     def test_step(self, batch: tuple, batch_nb: int, *args, **kwargs) -> dict:
         """ Similar to the training step but with the model in eval mode.
@@ -1103,6 +1118,7 @@ class ProtBertClassifier(pl.LightningModule):
 
     def on_epoch_end(self):
         """ Pytorch lightning hook """
+        self.evaluate()
         if self.current_epoch + 1 >= self.nr_frozen_epochs:
             self.unfreeze_encoder()
 
@@ -1255,6 +1271,7 @@ def setup_testube_logger(save_dir="experiments") -> TestTubeLogger:
         name="lightning_logs",
     )
 
+
 def parse_arguments_and_retrieve_logger(save_dir="experiments"):
     """
         Function for parsing all arguments
@@ -1358,19 +1375,21 @@ def parse_arguments_and_retrieve_logger(save_dir="experiments"):
             "if it's huge), set how much of the dev set you want to use with this flag."
         ),
     )
-    parser.add_argument("--only_tcrb", default=False, action="store_true", help="Create and train on only the tcrb files")
+    parser.add_argument("--only_tcrb", default=False, action="store_true",
+                        help="Create and train on only the tcrb files")
 
     # mixed precision
     parser.add_argument("--precision", type=int, default="32", help="full precision or mixed precision mode")
     parser.add_argument("--amp_level", type=str, default="O1", help="mixed precision type")
     parser.add_argument("--tune_epitope_specificity", default=False, action="store_true")
     parser.add_argument("--folds", default=False, action="store_true")
-    parser.add_argument("--embedding_save_name",default="some_emb", type=str)
-    parser.add_argument("--add_long_aa",default=-1, type=int)
-    parser.add_argument("--relative_data_path",default="./", type=str)
+    parser.add_argument("--embedding_save_name", default="some_emb", type=str)
+    parser.add_argument("--add_long_aa", default=-1, type=int)
+    parser.add_argument("--relative_data_path", default="./", type=str)
     parser.add_argument("--tune_sp6_labels", default=False, action="store_true")
     parser.add_argument("--train_enc_dec_sp6", default=False, action="store_true")
-    parser.add_argument("--train_folds", default=[0,1], nargs="+")
+    parser.add_argument("--train_folds", default=[0, 1], nargs="+")
+    parser.add_argument("--run_name", default="generic_run_name", type=str)
 
     # each LightningModule defines arguments relevant to it
     parser = ProtBertClassifier.add_model_specific_args(parser)
@@ -1395,9 +1414,9 @@ def create_tuning_data(hparams):
                 "sp6_fine_tuning_valid_{}_{}_{}.csv".format(*hparams.train_folds)
         else:
             hparams.test_csv, hparams.train_csv, hparams.dev_csv = \
-                        "sp6_fine_tuning_test_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
-                        "sp6_fine_tuning_train_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
-                        "sp6_fine_tuning_valid_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1])
+                "sp6_fine_tuning_test_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
+                "sp6_fine_tuning_train_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
+                "sp6_fine_tuning_valid_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1])
 
     if hparams.create_data:
         if hparams.tune_epitope_specificity:
@@ -1405,12 +1424,10 @@ def create_tuning_data(hparams):
             create_epitope_tuning_files(hparams.relative_data_path)
         elif hparams.tune_sp6_labels:
             create_sp6_tuning_dataset(hparams.relative_data_path, hparams.train_folds)
-        elif  hparams.train_enc_dec_sp6:
-            print("YO---")
+        elif hparams.train_enc_dec_sp6:
             create_sp6_training_ds(hparams.relative_data_path, hparams.train_folds)
         else:
             create_bert_further_tuning_files(hparams.relative_data_path)
-
 
     if hparams.gradient_checkpointing and hparams.distributed_backend == "ddp":
         print("!!!ERROR!!! When using ddp as the distributed backend method, gradient checkpointing "
@@ -1418,11 +1435,15 @@ def create_tuning_data(hparams):
         exit(1)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
 
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
     create_tuning_data(hparams)
     print(hparams.train_csv, hparams.dev_csv, hparams.test_csv)
+
+    logging.getLogger('some_logger')
+    logging.basicConfig(filename=hparams.run_name + ".log", level=logging.INFO)
+    logging.info("Started training")
 
     if hparams.gradient_checkpointing and hparams.distributed_backend == "ddp":
         # gradient checkpoint does not work with ddp, which is necessary for multi-gpu training
@@ -1474,4 +1495,3 @@ if __name__=="__main__":
         deterministic=True
     )
     trainer.fit(model)
-

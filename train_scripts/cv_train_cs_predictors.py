@@ -1,7 +1,6 @@
 from copy import deepcopy
 from utils.swa_bn_update import update_bn
 from torch.optim.swa_utils import AveragedModel, SWALR
-from ignite.handlers.param_scheduler import create_lr_scheduler_with_warmup
 from torch.optim.lr_scheduler import ExponentialLR, StepLR, CosineAnnealingWarmRestarts
 from tqdm import tqdm
 import logging
@@ -514,6 +513,7 @@ def other_fold_mdl_finished(model_name="", tr_f=0, val_f=1):
 
 def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=-1,
                                      beam_txt="Greedy", all_f1_scores=None,sptype_f1=None, only_cs=False):
+    print(beam_txt, test_on + "_ONLY_CS" if only_cs else test_on, ep, all_recalls)
     print(
         "{}_{}, epoch {} Mean sp_pred mcc for life groups: {}, {}, {}, {}".format(beam_txt, test_on + "_ONLY_CS" if only_cs else test_on, ep, *sp_pred_mccs))
     print("{}_{}, epoch {} Mean cs recall: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
