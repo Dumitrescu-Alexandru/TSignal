@@ -69,9 +69,9 @@ def create_sp6_training_ds(relative_data_path, folds=[0, 1]):
     train_seqs, train_lbls = extract_seq_lbls(folds, "train", relative_data_path)
     test_seqs, test_lbls = extract_seq_lbls(folds, "test", relative_data_path)
 
-    train_df = pd.DataFrame({'seqs': train_seqs[:10], 'lbls': train_lbls[:10]})
-    test_df = pd.DataFrame({'seqs': test_seqs[:10], 'lbls': test_lbls[:10]})
-    valid_df = pd.DataFrame({'seqs': test_seqs[:10], 'lbls': test_lbls[:10]})
+    train_df = pd.DataFrame({'seqs': train_seqs, 'lbls': train_lbls})
+    test_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls})
+    valid_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls})
     if len(folds) == 3:
         train_df.to_csv(relative_data_path + "sp6_fine_tuning_train_{}_{}_{}.csv".format(*folds))
         test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_{}_{}_{}.csv".format(*folds))
