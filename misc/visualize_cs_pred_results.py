@@ -363,7 +363,9 @@ def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_
 
 
 def get_data_folder():
-    if os.path.exists("results"):
+    if os.path.exists("sp6_data/"):
+        return "./"
+    elif os.path.exists("results"):
         return "../sp_data/"
     elif os.path.exists("/scratch/work/dumitra1"):
         return "/scratch/work/dumitra1/sp_data/"

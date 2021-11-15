@@ -1015,7 +1015,7 @@ class ProtBertClassifier(pl.LightningModule):
                 # if form_sp_reg_data:
                 #     new_predicted_lbls = modify_sp_subregion_preds(predicted_lbls, sp_type)
                 #     predicted_lbls = new_predicted_lbls
-                s = "".join([ind2tkn[s_] for s_ in s])
+                s = "".join([ind2tkn[s_] for s_ in s]).replace("[PAD]", "")
                 eval_dict[s] = predicted_lbls[:len(t)]
                 sp_type_dict[s] = torch.argmax(sp_type).item()
 
