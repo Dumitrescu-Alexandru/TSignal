@@ -618,9 +618,7 @@ class ProtBertClassifier(pl.LightningModule):
             padding_mask_tgt = padding_mask_tgt.to(self.device)
             word_embeddings = word_embeddings.transpose(0, 1)
             word_embeddings = self.pos_encoder(word_embeddings)
-
             tgt = self.pos_encoder(self.label_encoder_t_dec(targets).transpose(0, 1))
-            # print(tgt.shape, word_embeddings.shape, tgt_mask.shape, padding_mask_tgt.shape)
             return self.generator(
                 self.classification_head(tgt, word_embeddings, tgt_mask, tgt_key_padding_mask=padding_mask_tgt))
         word_embeddings = word_embeddings.reshape(-1, 1024)
