@@ -269,6 +269,10 @@ class TransformerModel(nn.Module):
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
         padded_tgt = self.pos_encoder(padded_tgt.transpose(0,1))
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
+        # def forward(src, tgt, src_mask, tgt_mask,
+        #             memory_mask: Optional[Tensor] = None, src_key_padding_mask: Optional[Tensor] = None,
+        #             tgt_key_padding_mask: Optional[Tensor] = None,
+        #             memory_key_padding_mask: Optional[Tensor] = None) -> Tensor:
         outs = self.transformer(padded_src, padded_tgt, src_mask, tgt_mask, None, padding_mask_src, padding_mask_tgt,
                                 padding_mask_src)
         if self.glbl_lbl_version == 2 and self.use_glbl_lbls:

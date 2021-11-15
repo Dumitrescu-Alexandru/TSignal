@@ -443,7 +443,7 @@ class ProtBertClassifier(pl.LightningModule):
         )
         self.label_encoder.unknown_index = None
         if hparams.train_enc_dec_sp6:
-            decoder_layer = TransformerDecoderLayer(1024, 16)
+            decoder_layer = TransformerDecoderLayer(1024, 16, dropout=0.1)
             self.classification_head = TransformerDecoder(decoder_layer, num_layers=3)
             self.label_encoder_t_dec = TokenEmbedding(len(self.lbl2ind_dict.keys()), 1024, lbl2ind=self.lbl2ind_dict)
             self.pos_encoder = PositionalEncoding(1024)
@@ -617,10 +617,9 @@ class ProtBertClassifier(pl.LightningModule):
             # print(padding_mask_tgt)
             padding_mask_tgt = padding_mask_tgt.to(self.device)
             word_embeddings = word_embeddings.transpose(0, 1)
-            word_embeddings = self.pos_encoder(word_embeddings)
             tgt = self.pos_encoder(self.label_encoder_t_dec(targets).transpose(0, 1))
             return self.generator(
-                self.classification_head(tgt, word_embeddings, tgt_mask, tgt_key_padding_mask=padding_mask_tgt))
+                self.classification_head(tgt, word_embeddings, tgt_mask))
         word_embeddings = word_embeddings.reshape(-1, 1024)
         seq_delim = torch.tensor(list(range(batch_size)), device=self.device) * seq_dim
         seq_delim = seq_delim.reshape(-1, 1)
@@ -751,10 +750,6 @@ class ProtBertClassifier(pl.LightningModule):
                 eos_token_targets.append(t[:sl])
                 eos_token_targets[-1].append(self.lbl2ind_dict['ES'])
                 eos_token_targets[-1].extend(t[sl:])
-            # if sum(torch.argmax(model_out, -1)[0, :] == 5) == model_out.shape[1]:
-            #     print("yep")
-            # else:
-            #     print("nope")
             loss_val = self.loss(model_out.permute(1, 0, 2).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
             tqdm_dict = {"train_loss": loss_val}
@@ -880,7 +875,6 @@ class ProtBertClassifier(pl.LightningModule):
         input_ids = torch.tensor(input_ids, device=self.device)
         attention_mask = torch.tensor(attention_mask, device=self.device)
         memory = self.ProtBertBFD(input_ids, attention_mask)[0].transpose(0,1)
-        memory = self.pos_encoder(memory)
         src = inputs[0]['input_ids']
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         seq_lens = [len(src_) for src_ in src]
