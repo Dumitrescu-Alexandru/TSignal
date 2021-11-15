@@ -989,7 +989,6 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
                     dont_add = True
             if not dont_add:
                 unique_params.add("_".join(f.split("_")[:-2]))
-    print(unique_params)
     mdl2results = {}
     mdl2summarized_results = {}
     mdlind2mdlparams = {}
@@ -1368,6 +1367,7 @@ def ask_uniprot():
     return int(cData.split("PE=")[1].split(" ")[0])
 
 def correct_duplicates_training_data():
+    sublbls=True
     file_new = "../sp_data/sp6_data/train_set.fasta"
     decided_ids = ['B3GZ85', 'B0R5Y3', 'Q0T616', 'Q7CI09', 'P33937', 'P63883', 'P33937', 'Q9P121', 'C1CTN0', 'Q8FAX0',
                    'P9WK51', 'Q5GZP1', 'P0AD45', 'P0DC88', 'Q8E6W4', 'Q5HMD1', 'Q2FWG4', 'Q5HLG6', 'Q8Y7A9', 'P65631',
@@ -1398,15 +1398,16 @@ def correct_duplicates_training_data():
     seen_seqs = []
     removed_lbls = []
     for tr_f in [0, 1, 2]:
-        for t_s in ["train"]:
+        for t_s in ["train", "test"]:
             new_seqs_2_info = {}
-            seqs = pickle.load(open("../sp_data/sp6_partitioned_data_{}_{}.bin".format(t_s, tr_f), "rb"))
+            seqs = pickle.load(open("../sp_data/sp6_partitioned_data_{}_{}.bin".format(t_s, tr_f), "rb")) \
+                if not sublbls else pickle.load(open("../sp_data/sp6_partitioned_data_sublbls_{}_{}.bin".format(t_s, tr_f), "rb"))
             for k, info in seqs.items():
                 total_count += 1
                 if info[1] != decided_str_2_info[k][-1] or info[2] != decided_str_2_info[k][0] or  info[3] != decided_str_2_info[k][1] :
                     remove_count += 1
                     removed_lbls.append((info[1], decided_str_2_info[k][-1]))
-                    newlbls = info[1] if decided_str_2_info[k][1] != "TATLIPO" else info[1].replace("T", "W")
+                    newlbls = info[1] if decided_str_2_info[k][1] != "TATLIPO" or sublbls else info[1].replace("T", "W")
                     new_seqs_2_info[k] = (newlbls, decided_str_2_info[k][-1], decided_str_2_info[k][0], decided_str_2_info[k][1])
                 elif k in seen_seqs:
                     removed_lbls.append((info[1], decided_str_2_info[k][-1]))
@@ -1414,10 +1415,13 @@ def correct_duplicates_training_data():
 
                 elif k not in seen_seqs:
                     seen_seqs.append(k)
-                    newlbls = info[1].replace("T", "W") if info[-1] == "TATLIPO" else info[1]
+                    newlbls = info[1].replace("T", "W") if info[-1] == "TATLIPO" and not sublbls else info[1]
                     new_seqs_2_info[k] = (info[0], newlbls, info[2], info[3])
             key = list(new_seqs_2_info.keys())[0]
-            pickle.dump(new_seqs_2_info, open("../sp_data/sp6_partitioned_data_{}_{}.bin".format(t_s, tr_f), "wb"))
+            if sublbls:
+                pickle.dump(new_seqs_2_info, open("../sp_data/sp6_partitioned_data_sublbls_{}_{}.bin".format(t_s, tr_f), "wb"))
+            else:
+                pickle.dump(new_seqs_2_info, open("../sp_data/sp6_partitioned_data_{}_{}.bin".format(t_s, tr_f), "wb"))
 
 def extract_id2seq_dict(file="train_set.fasta"):
 
@@ -1426,7 +1430,11 @@ def extract_id2seq_dict(file="train_set.fasta"):
     # id2truelbls[seq_record.id.split("|")[0]] = str(seq_record.seq[len(seq_record.seq) // 2:])
     # id2lg[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[1])
     # id2type[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[2])
-
+    decided_ids = ['B3GZ85', 'B0R5Y3', 'Q0T616', 'Q7CI09', 'P33937', 'P63883', 'P33937', 'Q9P121', 'C1CTN0', 'Q8FAX0',
+                   'P9WK51', 'Q5GZP1', 'P0AD45', 'P0DC88', 'Q8E6W4', 'Q5HMD1', 'Q2FWG4', 'Q5HLG6', 'Q8Y7A9', 'P65631',
+                   'B1AIC4', 'Q2FZJ9', ' P0ABJ2', 'P0AD46', 'P0ABJ2', 'Q99V36', 'Q7A698', 'Q5HH23', 'Q6GI23', 'Q7A181',
+                   'Q2YX14', 'Q6GAF2', 'P65628', 'P65629', 'P65630', 'Q5HEA9', 'P0DC86', 'Q2YUI9', 'Q5XDY9', 'Q2FF36',
+                   'Q1R3H8', 'P0DC87', 'A5IUN6', 'A6QIT4', 'A7X4S6', 'Q6G7M0', 'Q1CHD5']
     file = "../sp_data/sp6_data/benchmark_set_sp5.fasta"
     file_new = "../sp_data/sp6_data/train_set.fasta"
     id2seq = {}
@@ -1673,11 +1681,37 @@ def remove_non_unique():
     #         else:
     #             unique_seq2info[k] = (v[1:], f)
 
+def pred_lipos():
+    for tr_f in [2]:
+        for t_s in ['train']:
 
+            f = "../sp_data/sp6_partitioned_data_{}_{}.bin".format(t_s, tr_f)
+            a = pickle.load(open(f, "rb"))
+            for k,v in a.items():
+                if v[-1] == "TATLIPO":
+                    print("ok, wtf")
 
 if __name__ == "__main__":
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_non_tuned_trimmed_d/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    visualize_validation(run="tuned_bert_trimmed_d_correct_test_embs_inpdrop_", folds=[1, 2], folder="separate-glbl_tuned_bert_trimmed_d/")
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_trimmed_d/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    visualize_validation(run="tuned_bert_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 2], folder="separate-glbl_tuned_bert_trimmed_d/")
+
     correct_duplicates_training_data()
     exit(1)
+    # pred_lipos()
+    # exit(1)
+
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/",
                                             compare_mdl_plots=False,
