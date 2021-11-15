@@ -751,6 +751,10 @@ class ProtBertClassifier(pl.LightningModule):
                 eos_token_targets.append(t[:sl])
                 eos_token_targets[-1].append(self.lbl2ind_dict['ES'])
                 eos_token_targets[-1].extend(t[sl:])
+            if sum(torch.argmax(model_out, -1)[0, :] == 5) == model_out.shape[1]:
+                print("yep")
+            else:
+                print("nope")
             loss_val = self.loss(model_out.permute(1, 0, 2).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
             tqdm_dict = {"train_loss": loss_val}
@@ -1062,7 +1066,6 @@ class ProtBertClassifier(pl.LightningModule):
         sp_type_probs = []
         for sp_prbs in sp_probs:
             # ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
-
             sp, tatlipo, lipo, tat, pilin = sp_prbs[self.lbl2ind_dict['S']].item(), sp_prbs[self.lbl2ind_dict['W']].item(), \
                                             sp_prbs[self.lbl2ind_dict['L']].item(), sp_prbs[self.lbl2ind_dict['T']].item(), \
                                             sp_prbs[self.lbl2ind_dict['P']].item()
@@ -1207,13 +1210,13 @@ class ProtBertClassifier(pl.LightningModule):
         )
         parser.add_argument(
             "--encoder_learning_rate",
-            default=5e-6,
+            default=1e-5,
             type=float,
             help="Encoder specific learning rate.",
         )
         parser.add_argument(
             "--learning_rate",
-            default=3e-5,
+            default=1e-5,
             type=float,
             help="Classification head learning rate.",
         )
