@@ -443,7 +443,7 @@ class ProtBertClassifier(pl.LightningModule):
         )
         self.label_encoder.unknown_index = None
         if hparams.train_enc_dec_sp6:
-            decoder_layer = TransformerDecoderLayer(1024, 16, dropout=0.1)
+            decoder_layer = TransformerDecoderLayer(1024, 16, dropout=0.1, dim_feedforward=4096)
             self.classification_head = TransformerDecoder(decoder_layer, num_layers=3)
             self.label_encoder_t_dec = TokenEmbedding(len(self.lbl2ind_dict.keys()), 1024, lbl2ind=self.lbl2ind_dict)
             self.pos_encoder = PositionalEncoding(1024)
@@ -584,7 +584,7 @@ class ProtBertClassifier(pl.LightningModule):
         return mask
 
     def forward(self, input_ids, token_type_ids, attention_mask, target_positions=None, return_embeddings=False,
-                seq_lengths=None, targets=None):
+                targets=None, seq_lengths=None):
         """ Usual pytorch forward function.
         :param tokens: text sequences [batch_size x src_seq_len]
         :param lengths: source lengths [batch_size]
@@ -721,6 +721,7 @@ class ProtBertClassifier(pl.LightningModule):
         # inputs, targets = batch
         self.classification_head.train()
         self.ProtBertBFD.train()
+
         if self.hparams.tune_epitope_specificity:
             inputs, targets = batch
             model_out = self.forward(**inputs)
@@ -741,6 +742,8 @@ class ProtBertClassifier(pl.LightningModule):
             # can also return just a scalar instead of a dict (return loss_val)
             return output
         elif self.hparams.train_enc_dec_sp6:
+            self.label_encoder_t_dec.train()
+            self.generator.train()
             inputs, targets, seq_lengths = batch
             inputs['targets'] = targets
             inputs['seq_lengths'] = seq_lengths
@@ -750,7 +753,11 @@ class ProtBertClassifier(pl.LightningModule):
                 eos_token_targets.append(t[:sl])
                 eos_token_targets[-1].append(self.lbl2ind_dict['ES'])
                 eos_token_targets[-1].extend(t[sl:])
-            loss_val = self.loss(model_out.permute(1, 0, 2).reshape(-1, len(self.lbl2ind_dict.keys())),
+            # if sum(torch.argmax(model_out[:, 0, :], -1) == 5) == model_out.shape[1]:
+            #     print("yep")
+            # else:
+            #     print("nope")
+            loss_val = self.loss(model_out.transpose(1, 0).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
             tqdm_dict = {"train_loss": loss_val}
             output = OrderedDict(
@@ -784,6 +791,11 @@ class ProtBertClassifier(pl.LightningModule):
         Returns:
             - dictionary passed to the validation_end function.
         """
+        self.ProtBertBFD.eval()
+        self.classification_head.eval()
+        self.label_encoder_t_dec.eval()
+        self.generator.eval()
+        self.pos_encoder.eval()
         if self.hparams.tune_epitope_specificity:
             inputs, targets = batch
             model_out = self.forward(**inputs)
