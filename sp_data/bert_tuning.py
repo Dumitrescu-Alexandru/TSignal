@@ -751,10 +751,10 @@ class ProtBertClassifier(pl.LightningModule):
                 eos_token_targets.append(t[:sl])
                 eos_token_targets[-1].append(self.lbl2ind_dict['ES'])
                 eos_token_targets[-1].extend(t[sl:])
-            if sum(torch.argmax(model_out, -1)[0, :] == 5) == model_out.shape[1]:
-                print("yep")
-            else:
-                print("nope")
+            # if sum(torch.argmax(model_out, -1)[0, :] == 5) == model_out.shape[1]:
+            #     print("yep")
+            # else:
+            #     print("nope")
             loss_val = self.loss(model_out.permute(1, 0, 2).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
             tqdm_dict = {"train_loss": loss_val}
