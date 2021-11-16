@@ -621,7 +621,7 @@ class ProtBertClassifier(pl.LightningModule):
         return mask
 
     def forward(self, input_ids, token_type_ids, attention_mask, target_positions=None, return_embeddings=False,
-                targets=None, seq_lengths=None):
+                targets=None, seq_lengths=None, v=False):
         """ Usual pytorch forward function.
         :param tokens: text sequences [batch_size x src_seq_len]
         :param lengths: source lengths [batch_size]
@@ -805,7 +805,7 @@ class ProtBertClassifier(pl.LightningModule):
             inputs['targets'] = targets
             inputs['seq_lengths'] = seq_lengths
             if hparams.use_glbl_labels:
-                model_out, glbl_out = self.forward(**inputs)
+                model_out, glbl_out = self.forward(**inputs, v=True)
             else:
                 model_out = self.forward(**inputs)
 
