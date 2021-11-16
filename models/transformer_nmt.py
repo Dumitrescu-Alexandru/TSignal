@@ -255,9 +255,11 @@ class TransformerModel(nn.Module):
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
         if self.add_lg_info:
             trim_ind_l, trim_ind_r = 2, 1
+            src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for i in range(len(src))]
+
         else:
             trim_ind_l, trim_ind_r = 0, 0
-        src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for i in range(len(src))]
+            src_for_glbl_l = [src[i] for i in range(len(src))]
         padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
         return self.glbl_generator(padded_src_glbl.transpose(2, 1))
 
@@ -296,7 +298,7 @@ class TransformerModel(nn.Module):
             elif self.version2_agregation == "avg":
                 return self.generator(outs), self.glbl_generator(torch.mean(outs.transpose(0, 1), dim=1))
         elif self.glbl_lbl_version == 3 and self.use_glbl_lbls:
-            padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
+            padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
             return self.generator(outs), self.glbl_generator(padded_src_glbl.transpose(2, 1))
         elif self.form_sp_reg_data:
             preds = self.generator(outs)
