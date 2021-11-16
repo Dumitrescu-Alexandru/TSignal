@@ -761,6 +761,9 @@ class ProtBertClassifier(pl.LightningModule):
             raise Exception("Label encoder found an unknown label.")
 
     def training_step(self, batch: tuple, batch_nb: int, *args, **kwargs) -> dict:
+        self.evaluate(self.classification_head, self.lbl2ind_dict, run_name=self.hparams.run_name, partitions=hparams.train_folds,
+                      form_sp_reg_data=hparams.use_glbl_labels, simplified=hparams.use_glbl_labels, very_simplified=hparams.use_glbl_labels, glbl_lbl_2ind=self.glbl_lbl2ind ,)
+
         # self.evaluate(self.classification_head, self.lbl2ind_dict, run_name=self.hparams.run_name,
         #               partitions=hparams.train_folds,
         #               form_sp_reg_data=hparams.use_glbl_labels, simplified=hparams.use_glbl_labels,
@@ -934,7 +937,6 @@ class ProtBertClassifier(pl.LightningModule):
         labels_hat = torch.argmax(y_hat, dim=1)
         # labels_hat = y_hat
         val_acc = self.metric_acc(labels_hat, y)
-
         output = OrderedDict({"val_loss": loss_val, "val_acc": val_acc, })
         return output
 
@@ -1026,6 +1028,7 @@ class ProtBertClassifier(pl.LightningModule):
             ys = current_ys
             start_ind = 1
         model.eval()
+        model.glbl_generator.eval()
         all_probs = []
         for i in range(start_ind, max(seq_lens) + 1):
             with torch.no_grad():
