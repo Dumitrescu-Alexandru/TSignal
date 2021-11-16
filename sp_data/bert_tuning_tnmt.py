@@ -13,6 +13,7 @@ import os
 sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
 from train_scripts.cv_train_cs_predictors import log_and_print_mcc_and_cs_results
+from models.transformer_nmt import TransformerModel
 import torch
 import torch.nn as nn
 from torch import optim
@@ -446,7 +447,10 @@ class ProtBertClassifier(pl.LightningModule):
         if hparams.train_enc_dec_sp6:
             decoder_layer = TransformerDecoderLayer(1024, 16, dropout=0.1, dim_feedforward=4096)
             decoder_norm = LayerNorm(1024)
-            self.classification_head = TransformerDecoder(decoder_layer, num_layers=3, norm=decoder_norm)
+            self.classification_head = TransformerModel(ntoken=len(self.lbl2ind_dict.keys()), d_model=1024, nhead=16,
+                        d_hid=1024, nlayers=3, dropout= 0.1, data_folder="./", lbl2ind=self.lbl2ind_dict, lg2ind=None,
+                        use_glbl_lbls=False, ff_dim=4096, form_sp_reg_data=False, no_pos_enc=True,
+                                                        aa2ind=self.tokenizer.get_vocab(), tuning_bert=True)
             self.label_encoder_t_dec = TokenEmbedding(len(self.lbl2ind_dict.keys()), 1024, lbl2ind=self.lbl2ind_dict)
             self.pos_encoder = PositionalEncoding(1024)
             self.generator = nn.Linear(1024, len(self.lbl2ind_dict.keys()))
@@ -612,16 +616,10 @@ class ProtBertClassifier(pl.LightningModule):
         elif self.hparams.tune_sp6_labels:
             return self.classification_head(word_embeddings)
         elif self.hparams.train_enc_dec_sp6:
-            max_len_out = max(seq_lengths)
-            tgt_mask = self.generate_square_subsequent_mask(max_len_out + 1)
-            padding_mask_tgt = torch.arange(max_len_out + 1)[None, :] < torch.tensor(seq_lengths)[:, None] + 1
-            padding_mask_tgt = ~padding_mask_tgt
-            # print(padding_mask_tgt)
-            padding_mask_tgt = padding_mask_tgt.to(self.device)
-            word_embeddings = word_embeddings.transpose(0, 1)
-            tgt = self.pos_encoder(self.label_encoder_t_dec(targets).transpose(0, 1))
-            return self.generator(
-                self.classification_head(tgt, word_embeddings, tgt_mask))
+            return self.classification_head(word_embeddings,targets)
+
+
+
         word_embeddings = word_embeddings.reshape(-1, 1024)
         seq_delim = torch.tensor(list(range(batch_size)), device=self.device) * seq_dim
         seq_delim = seq_delim.reshape(-1, 1)
@@ -659,7 +657,6 @@ class ProtBertClassifier(pl.LightningModule):
             for lbl_seq in all_lbls:
                 padded_lbl = lbl_seq.copy()
                 seqs_lengths.append(len(lbl_seq))
-                padded_lbl.extend([self.lbl2ind_dict['PD']] * (max_len - len(padded_lbl)))
                 all_padded_lbls.append(padded_lbl)
             if self.hparams.train_enc_dec_sp6:
                 return all_padded_lbls, seqs_lengths
@@ -744,17 +741,20 @@ class ProtBertClassifier(pl.LightningModule):
             # can also return just a scalar instead of a dict (return loss_val)
             return output
         elif self.hparams.train_enc_dec_sp6:
-            self.label_encoder_t_dec.train()
             self.generator.train()
             inputs, targets, seq_lengths = batch
             inputs['targets'] = targets
             inputs['seq_lengths'] = seq_lengths
             model_out = self.forward(**inputs)
+
             eos_token_targets = []
+            max_len = max(seq_lengths)
             for t, sl in zip(targets, seq_lengths):
-                eos_token_targets.append(t[:sl])
+                eos_token_targets.append(t)
                 eos_token_targets[-1].append(self.lbl2ind_dict['ES'])
-                eos_token_targets[-1].extend(t[sl:])
+                eos_token_targets[-1].extend([self.lbl2ind_dict['PD']] * (max_len - sl))
+            # print([len(a) for a in list(np.array(eos_token_targets))])
+            # print("model_out.shape", model_out.shape)
             loss_val = self.loss(model_out.transpose(1, 0).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
             tqdm_dict = {"train_loss": loss_val}
@@ -791,9 +791,7 @@ class ProtBertClassifier(pl.LightningModule):
         """
         self.ProtBertBFD.eval()
         self.classification_head.eval()
-        self.label_encoder_t_dec.eval()
         self.generator.eval()
-        self.pos_encoder.eval()
         if self.hparams.tune_epitope_specificity:
             inputs, targets = batch
             model_out = self.forward(**inputs)
@@ -885,6 +883,7 @@ class ProtBertClassifier(pl.LightningModule):
         input_ids = torch.tensor(input_ids, device=self.device)
         attention_mask = torch.tensor(attention_mask, device=self.device)
         memory = self.ProtBertBFD(input_ids, attention_mask)[0].transpose(1, 0)
+        memory = self.classification_head.encode(memory)
         src = inputs[0]['input_ids']
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         seq_lens = [len(src_) for src_ in src]
@@ -937,8 +936,10 @@ class ProtBertClassifier(pl.LightningModule):
         for i in range(start_ind, max(seq_lens) + 1):
             with torch.no_grad():
                 tgt_mask = (self.generate_square_subsequent_mask(len(ys[0]) + 1))
-                tgt = self.pos_encoder(self.label_encoder_t_dec(ys).transpose(0, 1))
-                prob = self.generator( self.classification_head(tgt, memory, tgt_mask))
+                out = self.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
+                out = out.transpose(0, 1)
+                prob = self.classification_head.generator(out[:, -1])
+                all_outs.append(out[:, -1])
                 # tgt_mask = self.generate_square_subsequent_mask(len(ys[0]) + 1).to(self.device)
                 # print(tgt, memory.to(device), tgt_mask.to(device))
                 # self.classification_head(tgt, memory, tgt_mask)
@@ -949,7 +950,7 @@ class ProtBertClassifier(pl.LightningModule):
 
             if i == 0 and not form_sp_reg_data:
                 # extract the sp-presence probabilities
-                sp_probs = [sp_prb for sp_prb in torch.nn.functional.softmax(prob[0], dim=-1)]
+                sp_probs = [sp_prb for sp_prb in torch.nn.functional.softmax(prob, dim=-1)]
                 all_seq_sp_logits = [sp_prb for sp_prb in prob[0]]
                 all_seq_sp_probs = [sp_prb for sp_prb in prob[0]]
             # elif not form_sp_reg_data:
@@ -960,8 +961,8 @@ class ProtBertClassifier(pl.LightningModule):
             #     for seq_prb_ind in range(len(all_seq_sp_probs)):
             #         all_seq_sp_probs[seq_prb_ind].append(next_sp_probs[seq_prb_ind].item())
             #         all_seq_sp_logits[seq_prb_ind].append(next_sp_logits[seq_prb_ind].item())
-            all_probs.append(prob[-1, : ,:])
-            _, next_words = torch.max(prob[-1, :, :], dim=1)
+            all_probs.append(prob)
+            _, next_words = torch.max(prob, dim=1)
             next_word = [nw.item() for nw in next_words]
             current_ys = []
             for bach_ind in range(len(src)):
@@ -1002,9 +1003,7 @@ class ProtBertClassifier(pl.LightningModule):
         seqs2probs = {}
         self.ProtBertBFD.eval()
         self.classification_head.eval()
-        self.label_encoder_t_dec.eval()
         self.generator.eval()
-        self.pos_encoder.eval()
         if validation:
             dataset = SP6TuningDataset(hparams.relative_data_path, hparams.dev_csv)
             dataset_loader =  DataLoader(
@@ -1052,9 +1051,7 @@ class ProtBertClassifier(pl.LightningModule):
         self.e += 1
         self.ProtBertBFD.train()
         self.classification_head.train()
-        self.label_encoder_t_dec.train()
         self.generator.train()
-        self.pos_encoder.train()
 
     def translate(self, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False,
                   form_sp_reg_data=False, second_model=None, test_only_cs=False, glbl_lbls=None):

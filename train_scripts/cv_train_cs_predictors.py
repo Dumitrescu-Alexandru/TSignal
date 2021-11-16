@@ -650,6 +650,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         losses = 0
         losses_glbl = 0
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
+            continue
             seqs, lbl_seqs, _, glbl_lbls = batch
             if use_glbl_lbls:
                 logits, glbl_logits = model(seqs, lbl_seqs)
