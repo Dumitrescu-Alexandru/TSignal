@@ -30,7 +30,7 @@ from transformers import BertTokenizer, BertModel
 from torchnlp.encoders import LabelEncoder
 from torchnlp.datasets.dataset import Dataset
 from torchnlp.utils import collate_tensors
-
+torch.manual_seed(123)
 import pandas as pd
 from test_tube import HyperOptArgumentParser
 import os
@@ -40,7 +40,8 @@ from datetime import datetime
 from collections import OrderedDict
 import logging as log
 import numpy as np
-
+np.random.seed(123)
+random.seed(123)
 
 def gpu_acc_metric(y_hat, labels):
     # A torch way of extracting accuracy. Used like this for gpu compatibility
@@ -773,6 +774,8 @@ class ProtBertClassifier(pl.LightningModule):
         self.classification_head.train()
         if self.train_BFD:
             self.ProtBertBFD.train()
+        else:
+            self.ProtBertBFD.eval()
 
         if self.hparams.tune_epitope_specificity:
             inputs, targets = batch
