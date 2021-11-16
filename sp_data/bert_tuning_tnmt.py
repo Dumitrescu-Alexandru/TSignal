@@ -791,7 +791,6 @@ class ProtBertClassifier(pl.LightningModule):
         """
         self.ProtBertBFD.eval()
         self.classification_head.eval()
-        self.generator.eval()
         if self.hparams.tune_epitope_specificity:
             inputs, targets = batch
             model_out = self.forward(**inputs)
@@ -822,10 +821,11 @@ class ProtBertClassifier(pl.LightningModule):
             inputs['seq_lengths'] = seq_lengths
             model_out = self.forward(**inputs)
             eos_token_targets = []
+            max_len = max(seq_lengths)
             for t, sl in zip(targets, seq_lengths):
-                eos_token_targets.append(t[:sl])
+                eos_token_targets.append(t)
                 eos_token_targets[-1].append(self.lbl2ind_dict['ES'])
-                eos_token_targets[-1].extend(t[sl:])
+                eos_token_targets[-1].extend([self.lbl2ind_dict['PD']] * (max_len - sl))
             loss_val = self.loss(model_out.permute(1, 0, 2).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
             y = eos_token_targets
