@@ -281,7 +281,12 @@ class TransformerModel(nn.Module):
                 trim_ind_l, trim_ind_r = 0, 0
             src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for i in range(len(src))]
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
-        padded_src = self.pos_encoder(padded_src.transpose(0, 1), self.no_pos_enc)
+        # print(padded_src[0, -1, :50],  self.no_pos_enc)
+        # print(src[0][ -1, :50],  self.no_pos_enc)
+        # print(padded_src.transpose(0,1)[-1, 0, :50],  self.no_pos_enc, padded_src.shape)
+        padded_src = self.pos_encoder(padded_src.transpose(0, 1), no_pos_enc=self.no_pos_enc)
+        # print(padded_src[-1, 0, :50])
+        # exit(1)
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
         padded_tgt = self.pos_encoder(padded_tgt.transpose(0, 1))
 
@@ -331,15 +336,19 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
+        print("WTF", no_pos_enc, scale)
         if self.linear_pos_enc:
+            print("I apply linear?")
             pos_enc = self.pos_enc(torch.tensor(list(range(x.shape[0]))).to(self.device))
             pos_enc = pos_enc.repeat(1, x.shape[1]).reshape(x.shape[0], x.shape[1], x.shape[2])
             if scale:
+                print("I scale?")
                 x = self.dropout(x * np.sqrt(1024) + self.pe[:x.size(0)] + pos_enc)
                 return x
             else:
                 return self.dropout(x + pos_enc)  # + self.pe[:x.size(0)])
         if no_pos_enc:
+            print("Seems I somehow don't apply anything except maybe dropout", self.dropout)
             return self.dropout(x)
         if scale:
             x = self.dropout(x * np.sqrt(1024) + self.pe[:x.size(0)])

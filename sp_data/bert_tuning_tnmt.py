@@ -817,6 +817,9 @@ class ProtBertClassifier(pl.LightningModule):
                 eos_token_targets[-1].extend([self.lbl2ind_dict['PD']] * (max_len - sl))
             # print([len(a) for a in list(np.array(eos_token_targets))])
             # print("model_out.shape", model_out.shape)
+            print(inputs['input_ids'])
+            print(model_out[-1, 0, :], model_out.shape)
+            exit(1)
             loss_val = self.loss(model_out.transpose(1, 0).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
             if hparams.use_glbl_labels:
@@ -1302,6 +1305,7 @@ class ProtBertClassifier(pl.LightningModule):
             batch_size=self.hparams.batch_size,
             collate_fn=self.prepare_sample,
             num_workers=self.hparams.loader_workers,
+            shuffle=False
         )
 
     def val_dataloader(self) -> DataLoader:
