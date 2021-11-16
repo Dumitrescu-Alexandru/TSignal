@@ -882,7 +882,7 @@ class ProtBertClassifier(pl.LightningModule):
         seq_lengths = inputs[-1]
         input_ids = torch.tensor(input_ids, device=self.device)
         attention_mask = torch.tensor(attention_mask, device=self.device)
-        memory = self.ProtBertBFD(input_ids, attention_mask)[0].transpose(1, 0)
+        memory = self.ProtBertBFD(input_ids, attention_mask)[0]
         memory = self.classification_head.encode(memory)
         src = inputs[0]['input_ids']
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -1212,13 +1212,13 @@ class ProtBertClassifier(pl.LightningModule):
         )
         parser.add_argument(
             "--encoder_learning_rate",
-            default=1e-5,
+            default=5e-6,
             type=float,
             help="Encoder specific learning rate.",
         )
         parser.add_argument(
             "--learning_rate",
-            default=1e-5,
+            default=3e-5,
             type=float,
             help="Classification head learning rate.",
         )
