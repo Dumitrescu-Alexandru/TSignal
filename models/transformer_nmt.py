@@ -149,6 +149,9 @@ class InputEmbeddingEncoder(nn.Module):
             additional_inp_tkns += 1
         if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             additional_inp_tkns += 1
+        if tensor_inputs[0].shape[0] == 70:
+            # no bos/eos tokens on the input, but the label input always has BOS token
+            additional_inp_tkns = -1
         output_lens = [ti.shape[0] - additional_inp_tkns for ti in tensor_inputs]
         max_len = max(input_lens)
         max_len_out = max(output_lens)
@@ -279,6 +282,7 @@ class TransformerModel(nn.Module):
         padded_src = self.pos_encoder(padded_src.transpose(0, 1), self.no_pos_enc)
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
         padded_tgt = self.pos_encoder(padded_tgt.transpose(0, 1))
+
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
         # def forward(src, tgt, src_mask, tgt_mask,
         #             memory_mask: Optional[Tensor] = None, src_key_padding_mask: Optional[Tensor] = None,
