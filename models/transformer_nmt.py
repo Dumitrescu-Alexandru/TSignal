@@ -303,7 +303,7 @@ class TransformerModel(nn.Module):
             elif self.version2_agregation == "avg":
                 return self.generator(outs), self.glbl_generator(torch.mean(outs.transpose(0, 1), dim=1))
         elif self.glbl_lbl_version == 3 and self.use_glbl_lbls:
-            padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
+            padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
             return self.generator(outs), self.glbl_generator(padded_src_glbl.transpose(2, 1))
         elif self.form_sp_reg_data:
             preds = self.generator(outs)

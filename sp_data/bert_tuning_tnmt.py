@@ -481,7 +481,6 @@ class ProtBertClassifier(pl.LightningModule):
                             aa2ind=self.tokenizer.get_vocab(), tuning_bert=True, glbl_lbl_version=3)
             self.label_encoder_t_dec = TokenEmbedding(len(self.lbl2ind_dict.keys()), 1024, lbl2ind=self.lbl2ind_dict)
             self.pos_encoder = PositionalEncoding(1024)
-            self.generator = nn.Linear(1024, len(self.lbl2ind_dict.keys()))
         elif self.hparams.tune_sp6_labels:
             self.classification_head = nn.Sequential(
                 nn.Linear(self.encoder_features, len(self.lbl2ind_dict.keys()))
@@ -633,6 +632,7 @@ class ProtBertClassifier(pl.LightningModule):
         attention_mask = torch.tensor(attention_mask, device=self.device)
         word_embeddings = self.ProtBertBFD(input_ids,
                                            attention_mask)[0]
+
         if self.extract_emb:
             # used for extracting the actual embeddings after tuning
             return word_embeddings
@@ -797,7 +797,6 @@ class ProtBertClassifier(pl.LightningModule):
             # can also return just a scalar instead of a dict (return loss_val)
             return output
         elif self.hparams.train_enc_dec_sp6:
-            self.generator.train()
             if hparams.use_glbl_labels:
                 inputs, targets, seq_lengths, glbl_labels = batch
             else:
@@ -1020,7 +1019,6 @@ class ProtBertClassifier(pl.LightningModule):
             ys = current_ys
             start_ind = 1
         model.eval()
-        model.glbl_generator.eval()
         all_probs = []
         for i in range(start_ind, max(seq_lens) + 1):
             with torch.no_grad():
@@ -1176,6 +1174,7 @@ class ProtBertClassifier(pl.LightningModule):
             np.array(total_positives).flatten())
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=self.e,
                                          all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
+        model.train()
         if sp_probs is not None and len(sets) > 1:
             # retrieve the dictionary of calibration only for the test set (not for validation) - for now it doesn't
             # make sense to do prob calibration since like 98% of predictions have >0.99 and are correct. See with weight decay
