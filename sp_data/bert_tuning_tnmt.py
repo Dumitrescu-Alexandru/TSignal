@@ -1272,6 +1272,7 @@ class ProtBertClassifier(pl.LightningModule):
         """ Pytorch lightning hook """
         self.evaluate(self.classification_head, self.lbl2ind_dict, run_name=self.hparams.run_name, partitions=hparams.train_folds,
                       form_sp_reg_data=hparams.use_glbl_labels, simplified=hparams.use_glbl_labels, very_simplified=hparams.use_glbl_labels, glbl_lbl_2ind=self.glbl_lbl2ind ,)
+        self.e += 1
         if self.current_epoch + 1 >= self.nr_frozen_epochs:
             self.unfreeze_encoder()
 
