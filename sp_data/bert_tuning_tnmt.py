@@ -781,8 +781,6 @@ class ProtBertClassifier(pl.LightningModule):
         self.classification_head.train()
         if self.train_BFD:
             self.ProtBertBFD.train()
-        else:
-            self.ProtBertBFD.eval()
 
         if self.hparams.tune_epitope_specificity:
             inputs, targets = batch
@@ -1354,13 +1352,13 @@ class ProtBertClassifier(pl.LightningModule):
         )
         parser.add_argument(
             "--encoder_learning_rate",
-            default=5e-6,
+            default=1e-6,
             type=float,
             help="Encoder specific learning rate.",
         )
         parser.add_argument(
             "--learning_rate",
-            default=3e-5,
+            default=1e-5,
             type=float,
             help="Classification head learning rate.",
         )
