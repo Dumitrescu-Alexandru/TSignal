@@ -478,7 +478,7 @@ class ProtBertClassifier(pl.LightningModule):
         if hparams.train_enc_dec_sp6:
             self.classification_head = TransformerModel(ntoken=len(self.lbl2ind_dict.keys()), d_model=1024, nhead=16,
                         d_hid=1024, nlayers=3, dropout= 0.1, data_folder="./", lbl2ind=self.lbl2ind_dict, lg2ind={'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
-                        use_glbl_lbls=True, ff_dim=4096, form_sp_reg_data=False, no_pos_enc=True,
+                        use_glbl_lbls=True, ff_dim=4096, form_sp_reg_data=False, no_pos_enc=False,
                             aa2ind=self.tokenizer.get_vocab(), glbl_lbl_version=3, tuning_bert=True)
             self.label_encoder_t_dec = TokenEmbedding(len(self.lbl2ind_dict.keys()), 1024, lbl2ind=self.lbl2ind_dict)
             self.pos_encoder = PositionalEncoding(1024)
