@@ -258,19 +258,18 @@ class TransformerModel(nn.Module):
             src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for i in range(len(src))]
 
         else:
-            trim_ind_l, trim_ind_r = 0, 0
-            src_for_glbl_l = [src[i] for i in range(len(src))]
+            src_for_glbl_l = [src[i][:, :] for i in range(len(src))]
         padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
         return self.glbl_generator(padded_src_glbl.transpose(2, 1))
 
     def forward(self, src: Tensor, tgt: list) -> Tensor:
         """
-        Args:
-            src: Tensor, shape [seq_len, batch_size]
-            tgt: list of lists containing sequence labels
-        Returns:
-            output Tensor of shape [seq_len, batch_size, ntoken]
-        """
+                Args:
+                    src: Tensor, shape [seq_len, batch_size]
+                    tgt: list of lists containing sequence labels
+                Returns:
+                    output Tensor of shape [seq_len, batch_size, ntoken]
+                """
         if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             return self.forward_glb_lbls(src, tgt)
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
@@ -279,22 +278,12 @@ class TransformerModel(nn.Module):
                 trim_ind_l, trim_ind_r = 2, 1
             else:
                 trim_ind_l, trim_ind_r = 0, 0
-            src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for i in range(len(src))]
+            src_for_glbl_l = [src[i][:, :] for i in range(len(src))]
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
-        # print(padded_src[0, -1, :50],  self.no_pos_enc)
-        # print(src[0][ -1, :50],  self.no_pos_enc)
-        # print(padded_src.transpose(0,1)[-1, 0, :50],  self.no_pos_enc, padded_src.shape)
-        padded_src = self.pos_encoder(padded_src.transpose(0, 1))
-        # print(padded_src[-1, 0, :50])
-        # exit(1)
+        padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input)
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
         padded_tgt = self.pos_encoder(padded_tgt.transpose(0, 1))
-
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
-        # def forward(src, tgt, src_mask, tgt_mask,
-        #             memory_mask: Optional[Tensor] = None, src_key_padding_mask: Optional[Tensor] = None,
-        #             tgt_key_padding_mask: Optional[Tensor] = None,
-        #             memory_key_padding_mask: Optional[Tensor] = None) -> Tensor:
         outs = self.transformer(padded_src, padded_tgt, src_mask, tgt_mask, None, padding_mask_src, padding_mask_tgt,
                                 padding_mask_src)
         if self.glbl_lbl_version == 2 and self.use_glbl_lbls:
@@ -309,8 +298,6 @@ class TransformerModel(nn.Module):
             preds = self.generator(outs)
             return preds, self.glbl_generator(torch.mean(torch.sigmoid(preds.transpose(0, 1)), dim=1))
         return self.generator(outs)
-
-        # * math.sqrt(self.d_model)
 
 
 class PositionalEncoding(nn.Module):

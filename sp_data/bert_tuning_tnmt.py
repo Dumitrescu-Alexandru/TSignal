@@ -78,9 +78,9 @@ def create_sp6_training_ds(relative_data_path, folds=[0, 1], use_glbl_labels=Fal
     test_seqs, test_lbls, test_glbl_lbls = extract_seq_lbls(folds, "test", relative_data_path, use_glbl_labels=use_glbl_labels)
 
     if use_glbl_labels:
-        train_df = pd.DataFrame({'seqs': train_seqs, 'lbls': train_lbls, 'glbl_lbls':train_glbl_lbls})
-        test_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls, 'glbl_lbls':test_glbl_lbls})
-        valid_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls, 'glbl_lbls':test_glbl_lbls})
+        train_df = pd.DataFrame({'seqs': train_seqs[:100], 'lbls': train_lbls[:100], 'glbl_lbls':train_glbl_lbls[:100]})
+        test_df = pd.DataFrame({'seqs': test_seqs[:100], 'lbls': test_lbls[:100], 'glbl_lbls':test_glbl_lbls[:100]})
+        valid_df = pd.DataFrame({'seqs': test_seqs[:100], 'lbls': test_lbls[:100], 'glbl_lbls':test_glbl_lbls[:100]})
     else:
         train_df = pd.DataFrame({'seqs': train_seqs, 'lbls': train_lbls})
         test_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls})
@@ -1146,7 +1146,7 @@ class ProtBertClassifier(pl.LightningModule):
                 src = []
                 for inds in inputs['input_ids']:
 
-                    src.append("".join([aaind2lblvocab[i_] for i_ in inds]))
+                    src.append("".join([aaind2lblvocab[i_] for i_ in inds]).replace("[PAD]", ""))
             true_targets = padd_add_eos_tkn(tgt, lbl2ind)
             # if not use_beams_search:
             #     total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
