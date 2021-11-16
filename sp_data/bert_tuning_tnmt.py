@@ -428,6 +428,7 @@ class ProtBertClassifier(pl.LightningModule):
         else:
             self._frozen = False
         self.nr_frozen_epochs = self.hparams.nr_frozen_epochs
+        self.aaind2lblvocab = {v:k for k, v in self.tokenizer.get_vocab().items()}
 
     def __download_model(self) -> None:
         modelUrl = 'https://www.dropbox.com/s/dm3m1o0tsv9terq/pytorch_model.bin?dl=1'
@@ -476,9 +477,9 @@ class ProtBertClassifier(pl.LightningModule):
         self.label_encoder.unknown_index = None
         if hparams.train_enc_dec_sp6:
             self.classification_head = TransformerModel(ntoken=len(self.lbl2ind_dict.keys()), d_model=1024, nhead=16,
-                        d_hid=1024, nlayers=3, dropout= 0.1, data_folder="./", lbl2ind=self.lbl2ind_dict, lg2ind=None,
+                        d_hid=1024, nlayers=3, dropout= 0.1, data_folder="./", lbl2ind=self.lbl2ind_dict, lg2ind={'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
                         use_glbl_lbls=True, ff_dim=4096, form_sp_reg_data=False, no_pos_enc=True,
-                            aa2ind=self.tokenizer.get_vocab(), tuning_bert=True, glbl_lbl_version=3)
+                            aa2ind=self.tokenizer.get_vocab(), glbl_lbl_version=3, tuning_bert=True)
             self.label_encoder_t_dec = TokenEmbedding(len(self.lbl2ind_dict.keys()), 1024, lbl2ind=self.lbl2ind_dict)
             self.pos_encoder = PositionalEncoding(1024)
         elif self.hparams.tune_sp6_labels:
@@ -628,6 +629,9 @@ class ProtBertClassifier(pl.LightningModule):
             Dictionary with model outputs (e.g: logits)
         """
         input_ids = torch.tensor(input_ids, device=self.device)
+        inp_seqs = []
+        for inp in input_ids:
+            inp_seqs.append("".join([self.aaind2lblvocab[i_] for i_ in inp.detach().cpu().numpy()]).replace("[PAD]", ""))
         batch_size, seq_dim = input_ids.shape[0], input_ids.shape[1]
         attention_mask = torch.tensor(attention_mask, device=self.device)
         word_embeddings = self.ProtBertBFD(input_ids,
@@ -647,7 +651,7 @@ class ProtBertClassifier(pl.LightningModule):
         elif self.hparams.tune_sp6_labels:
             return self.classification_head(word_embeddings)
         elif self.hparams.train_enc_dec_sp6:
-            return self.classification_head(word_embeddings,targets)
+            return self.classification_head(word_embeddings, targets, inp_seqs=inp_seqs)
 
 
 
@@ -958,6 +962,9 @@ class ProtBertClassifier(pl.LightningModule):
         ind2lbl = {v: k for k, v in lbl2ind.items()}
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         src = src
+        inp_seqs = []
+        for inp in src['input_ids']:
+            inp_seqs.append("".join([self.aaind2lblvocab[i_] for i_ in inp]).replace("[PAD]", ""))
         seq_lens = [len(src_) for src_ in src['input_ids']]
         sp_probs = []
         sp_logits = []
@@ -971,7 +978,7 @@ class ProtBertClassifier(pl.LightningModule):
             input_ids = torch.tensor(src['input_ids'], device=self.device)
             attention_mask = torch.tensor(src['attention_mask'], device=self.device)
             memory_bfd = self.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
-            memory = self.classification_head.encode(memory_bfd)
+            memory = self.classification_head.encode(memory_bfd, inp_seqs=inp_seqs)
             memory_2nd_mdl = None
             if self.classification_head.glbl_lbl_version == 3:
                 if test_only_cs:
@@ -980,7 +987,7 @@ class ProtBertClassifier(pl.LightningModule):
                     glbl_labels[list(range(batch_size)), glbl_lbls] = 1
                     _, glbl_preds = torch.max(glbl_labels, dim=1)
                 else:
-                    glbl_labels = model.get_v3_glbl_lbls(memory_bfd)
+                    glbl_labels = model.get_v3_glbl_lbls(memory_bfd, inp_seqs=inp_seqs)
                     _, glbl_preds = torch.max(glbl_labels, dim=1)
 
         # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
