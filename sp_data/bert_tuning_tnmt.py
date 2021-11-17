@@ -30,7 +30,6 @@ from transformers import BertTokenizer, BertModel
 from torchnlp.encoders import LabelEncoder
 from torchnlp.datasets.dataset import Dataset
 from torchnlp.utils import collate_tensors
-torch.manual_seed(123)
 import pandas as pd
 from test_tube import HyperOptArgumentParser
 import os
@@ -40,8 +39,6 @@ from datetime import datetime
 from collections import OrderedDict
 import logging as log
 import numpy as np
-np.random.seed(123)
-random.seed(123)
 
 def gpu_acc_metric(y_hat, labels):
     # A torch way of extracting accuracy. Used like this for gpu compatibility
@@ -654,15 +651,6 @@ class ProtBertClassifier(pl.LightningModule):
         elif self.hparams.tune_sp6_labels:
             return self.classification_head(word_embeddings)
         elif self.hparams.train_enc_dec_sp6:
-            # if v:
-            #     desired_seq = "MALTDGGWCLPKRFGAAGADASDSRAFPAREPSTPPSPISSSSSSCSRGGERGPGGASNCGTPQLDTEAA"
-            #     desired_id = -1
-            #     for ind, ii in enumerate(input_ids):
-            #         if "".join( [self.aaind2lblvocab[i_.item()] for i_ in ii] ) == desired_seq:
-            #             desired_id = ind
-            #     if desired_id != -1:
-            #         print(word_embeddings[desired_id, -1, :50])
-
             return self.classification_head(word_embeddings, targets, inp_seqs=inp_seqs)
 
 
@@ -816,7 +804,7 @@ class ProtBertClassifier(pl.LightningModule):
             inputs['targets'] = targets
             inputs['seq_lengths'] = seq_lengths
             if hparams.use_glbl_labels:
-                model_out, glbl_out = self.forward(**inputs)
+                model_out, glbl_out = self.forward(**inputs, v=True)
             else:
                 model_out = self.forward(**inputs)
 
@@ -1273,7 +1261,7 @@ class ProtBertClassifier(pl.LightningModule):
             },
         ]
         # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
-        optimizer = optim.Adam(parameters, lr=self.hparams.learning_rate)
+        optimizer = optim.Adam(parameters, lr=self.hparams.learning_rate,  betas=(0.9, 0.98))
         return [optimizer], []
 
     def on_epoch_end(self):

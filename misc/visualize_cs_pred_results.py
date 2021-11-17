@@ -1694,20 +1694,27 @@ def pred_lipos():
                     print("ok, wtf")
 
 if __name__ == "__main__":
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_non_tuned_trimmed_d/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    visualize_validation(run="tuned_bert_trimmed_d_correct_test_embs_inpdrop_", folds=[1, 2], folder="separate-glbl_tuned_bert_trimmed_d/")
-
+    #
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_tuned_bert_trimmed_d/acc_lipos/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
     exit(1)
-    visualize_validation(run="tuned_bert_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 2], folder="separate-glbl_tuned_bert_trimmed_d/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_non_tuned_trimmed_d/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+
+    visualize_validation(run="tuned_bert_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 2],
+                         folder="separate-glbl_tuned_bert_trimmed_d/")
+
+    visualize_validation(run="non_tuned_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 2],
+                         folder="separate-glbl_non_tuned_trimmed_d/")
+
+    exit(1)
 
     correct_duplicates_training_data()
     exit(1)
