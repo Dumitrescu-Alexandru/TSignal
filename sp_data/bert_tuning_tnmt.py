@@ -1014,7 +1014,7 @@ class ProtBertClassifier(pl.LightningModule):
             }
         else:
 
-            tqdm_dict = {"val_loss": val_loss_mean, "val_acc": val_acc_mean}
+            tqdm_dict = {"val_loss": val_loss_mean, "val_acc": torch.tensor(val_acc_mean)}
             result = {
                 "progress_bar": tqdm_dict,
                 "log": tqdm_dict,
