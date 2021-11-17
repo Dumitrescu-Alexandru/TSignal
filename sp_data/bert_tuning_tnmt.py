@@ -254,7 +254,8 @@ class SP6TuningDataset(Dataset):
 
     def __init__(self, raw_path, file, use_glbl_lbls=False) -> None:
         self.data = []
-        vocab = pickle.load(open(raw_path + "sp6_dicts.bin", "rb"))[0] if not use_glbl_lbls else \
+        vocab = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'W': 7, 'PD': 8, 'BS': 9,
+                                 'ES': 10} if not use_glbl_lbls else \
             {'S': 0, 'O': 1, 'M': 2, 'I': 3, 'PD': 4, 'BS': 5, 'ES': 6}
         self.glbl_vocab = {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5}
         path = raw_path + file
@@ -474,8 +475,8 @@ class ProtBertClassifier(pl.LightningModule):
         )
         self.label_encoder.unknown_index = None
         if hparams.train_enc_dec_sp6:
-            self.classification_head = TransformerModel(ntoken=7,
-                                    lbl2ind={'S': 0, 'O': 1, 'M': 2, 'I': 3, 'PD': 4, 'BS': 5, 'ES': 6},
+            self.classification_head = TransformerModel(ntoken=len(self.lbl2ind_dict.keys()),
+                                    lbl2ind=self.lbl2ind_dict,
                                     lg2ind={'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3}, dropout=0.1,
                                     use_glbl_lbls=self.hparams.use_glbl_labels, no_glbl_lbls=6, ff_dim=4096, nlayers=3, nhead=16, aa2ind=None,
                                     train_oh=False, glbl_lbl_version=3, form_sp_reg_data=self.hparams.use_glbl_labels, version2_agregation="max",
@@ -888,6 +889,7 @@ class ProtBertClassifier(pl.LightningModule):
             output = OrderedDict({"val_loss": loss_val, "val_acc": val_acc, })
             return output
         elif self.hparams.train_enc_dec_sp6:
+
             if hparams.use_glbl_labels:
                 inputs, targets, seq_lengths, glbl_labels = batch
             else:
@@ -913,9 +915,59 @@ class ProtBertClassifier(pl.LightningModule):
             y_hat = model_out
             labels_hat = torch.argmax(y_hat, dim=-1)
             val_acc = self.metric_acc(labels_hat.reshape(-1), list(np.array(y).reshape(-1)))
+            if self.hparams.validate_on_mcc:
+                if self.hparams.use_glbl_labels:
+                    inputs, tgt, seq_lengths, glbl_lbls = batch
+                else:
+                    inputs, tgt, seq_lengths = batch
+                all_lbls, all_predicted_lbls = [], []
+                # print("Number of sequences tested: {}".format(ind * test_batch_size))
+                ind2lbl = {v: k for k, v in self.lbl2ind_dict.items()}
+                ind2glbl_lbl = {v: k for k, v in self.glbl_lbl2ind.items()}
+
+                predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
+                    self.translate(self.classification_head, inputs, self.lbl2ind_dict['BS'], self.lbl2ind_dict, tgt=None, use_beams_search=False,
+                              form_sp_reg_data=self.hparams.use_glbl_labels, second_model=None, test_only_cs=False,
+                              glbl_lbls=self.glbl_lbl2ind if self.hparams.use_glbl_labels else None)
+                tgt, predicted_tokens = np.array(tgt), np.array(predicted_tokens)
+                glbl_lbls_pred = torch.argmax(sp_type_probs, dim=1).cpu().numpy()
+                tp, tn, fp, fn = 0, 0, 0, 0
+                if not self.hparams.use_glbl_labels:
+                    min_lens = [min(len(tgt_), len(prd_), 70) for tgt_, prd_ in zip(tgt, predicted_tokens)]
+                    all_tgts, all_pred_tkns = [], []
+                    for i in range(len(tgt)):
+                        all_tgts.extend(tgt[i][:min_lens[i]])
+                        all_pred_tkns.extend(predicted_tokens[i][:min_lens[i]])
+                    all_tgts = np.array(all_tgts)
+                    all_pred_tkns = np.array(all_pred_tkns)
+                    for pred, target in zip(all_pred_tkns, all_tgts):
+                        if pred == target and target in [0, 1, 4, 6, 7]:
+                            tp += 1
+                        elif pred == target and target not in [0, 1, 4, 6, 7]:
+                            tn += 1
+                        elif pred != target and target in [0, 1, 4, 6, 7]:
+                            fn += 1
+                        else:
+                            fp += 1
+                else:
+                    for target, pred, glbl_l_t, glbl_lbl_p in zip(tgt, predicted_tokens, glbl_lbls, glbl_lbls_pred):
+                        min_len = min(70, len(pred), len(target))
+                        for p, t in zip(pred[:min_len], target[:min_len]):
+                            if p == t and t == 0:
+                                if glbl_l_t == glbl_lbl_p:
+                                    tp +=1
+                                else:
+                                    fn += 1
+                            elif p == t and t !=0:
+                                tn += 1
+                            elif p != t and t == 0:
+                                fn += 1
+                            elif p != t and t != 0:
+                                fp += 1
+                output = OrderedDict({"val_loss": loss_val, "val_acc": val_acc, "tp":tp, "tn":tn, "fn":fn, "fp":fp})
+                return output
             output = OrderedDict({"val_loss": loss_val, "val_acc": val_acc, })
             return output
-
         inputs, targets, target_positions = batch
         all_targets = []
         for tl in targets["labels"]:
@@ -947,13 +999,27 @@ class ProtBertClassifier(pl.LightningModule):
         """
         val_loss_mean = torch.stack([x['val_loss'] for x in outputs]).mean()
         val_acc_mean = torch.stack([x['val_acc'] for x in outputs]).mean()
+        if self.hparams.validate_on_mcc:
+            tp, tn, fn, fp = sum(x['tp'] for x in outputs), sum(x['tn'] for x in outputs), sum(x['fn'] for x in outputs), sum(x['fp'] for x in outputs)
+            if tp == 0 or tn == 0:
+                mcc_mean = -1
+            else:
+                mcc_mean = (tp * tn - fp * fn)/(np.sqrt( (tp+fp)*(tp+fn)*(tn+fp)*(tn+fn) ))
 
-        tqdm_dict = {"val_loss": val_loss_mean, "val_acc": val_acc_mean}
-        result = {
-            "progress_bar": tqdm_dict,
-            "log": tqdm_dict,
-            "val_loss": val_loss_mean,
-        }
+            tqdm_dict = {"val_loss": val_loss_mean, "val_acc": val_acc_mean, "mcc_mean": mcc_mean}
+            result = {
+                "progress_bar": tqdm_dict,
+                "log": tqdm_dict,
+                "val_loss": val_loss_mean,
+            }
+        else:
+
+            tqdm_dict = {"val_loss": val_loss_mean, "val_acc": val_acc_mean}
+            result = {
+                "progress_bar": tqdm_dict,
+                "log": tqdm_dict,
+                "val_loss": val_loss_mean,
+            }
         return result
 
     def greedy_decode(self, model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
@@ -986,7 +1052,7 @@ class ProtBertClassifier(pl.LightningModule):
                     glbl_labels = torch.zeros(batch_size, 6)
                     glbl_labels[list(range(batch_size)), glbl_lbls] = 1
                     _, glbl_preds = torch.max(glbl_labels, dim=1)
-                else:
+                elif form_sp_reg_data:
                     glbl_labels = model.get_v3_glbl_lbls(memory_bfd, inp_seqs=inp_seqs)
                     _, glbl_preds = torch.max(glbl_labels, dim=1)
 
@@ -1026,7 +1092,8 @@ class ProtBertClassifier(pl.LightningModule):
             ys = current_ys
             start_ind = 1
         model.eval()
-        model.glbl_generator.eval()
+        if form_sp_reg_data:
+            model.glbl_generator.eval()
         all_probs = []
         for i in range(start_ind, max(seq_lens) + 1):
             with torch.no_grad():
@@ -1043,6 +1110,7 @@ class ProtBertClassifier(pl.LightningModule):
 
             if i == 0 and not form_sp_reg_data:
                 # extract the sp-presence probabilities
+                glbl_labels = torch.nn.functional.softmax(prob, dim=-1)
                 sp_probs = [sp_prb.item() for sp_prb in torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
                 all_seq_sp_probs = [[sp_prob.item()] for sp_prob in
                                     torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
@@ -1107,7 +1175,7 @@ class ProtBertClassifier(pl.LightningModule):
                                       torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1), dim=-1)
             return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
                    glbl_labels
-        return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
+        return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, glbl_labels
 
     def evaluate(self, model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1,
                  dataset_loader=None, use_beams_search=False, form_sp_reg_data=False, simplified=False,
@@ -1141,20 +1209,23 @@ class ProtBertClassifier(pl.LightningModule):
 
         # for ind, (src, tgt, _, glbl_lbls) in tqdm(enumerate(dataset_loader), "Epoch {} {}".format(epoch, val_or_test),
         #                                           total=len(dataset_loader)):
-        for ind, (inputs, tgt, seq_lengths, glbl_lbls) in tqdm(enumerate(dataset_loader),
+        for ind, test_datapoints in tqdm(enumerate(dataset_loader),
                                                   "Epoch {} {}".format(epoch, val_or_test),
                                                   total=len(dataset_loader)):
+            if form_sp_reg_data:
+                inputs, tgt, seq_lengths, glbl_lbls = test_datapoints
+            else:
+                inputs, tgt, seq_lengths = test_datapoints
 
             # print("Number of sequences tested: {}".format(ind * test_batch_size))
-            if form_sp_reg_data:
-                predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
-                    self.translate(model, inputs, lbl2ind['BS'], lbl2ind, tgt=None, use_beams_search=use_beams_search,
-                              form_sp_reg_data=form_sp_reg_data, second_model=second_model, test_only_cs=test_only_cs,
-                              glbl_lbls=glbl_lbls)
-                src = []
-                for inds in inputs['input_ids']:
+            predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
+                self.translate(model, inputs, lbl2ind['BS'], lbl2ind, tgt=None, use_beams_search=use_beams_search,
+                          form_sp_reg_data=form_sp_reg_data, second_model=second_model, test_only_cs=test_only_cs,
+                          glbl_lbls=None)
+            src = []
+            for inds in inputs['input_ids']:
 
-                    src.append("".join([aaind2lblvocab[i_] for i_ in inds]).replace("[PAD]", ""))
+                src.append("".join([aaind2lblvocab[i_] for i_ in inds]).replace("[PAD]", ""))
             true_targets = padd_add_eos_tkn(tgt, lbl2ind)
             # if not use_beams_search:
             #     total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
@@ -1199,24 +1270,18 @@ class ProtBertClassifier(pl.LightningModule):
                                                                     second_model=second_model,
                                                                     test_only_cs=test_only_cs,
                                                                     glbl_lbls=glbl_lbls)
+        sp_type_probs_ = []
+        if not form_sp_reg_data:
+            for sp_prbs in sp_type_probs:
+                # ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
+                sp, tatlipo, lipo, tat, pilin = sp_prbs[self.lbl2ind_dict['S']].item(), sp_prbs[self.lbl2ind_dict['W']].item(), \
+                                                sp_prbs[self.lbl2ind_dict['L']].item(), sp_prbs[self.lbl2ind_dict['T']].item(), \
+                                                sp_prbs[self.lbl2ind_dict['P']].item()
+                no_sp = 1 - (sp + tatlipo + lipo + tat + pilin)
+                sp_type_probs_.append(torch.tensor([no_sp, sp, tatlipo, lipo, tat, pilin]))
+            sp_type_probs = sp_type_probs_
         return tgt_tokens, probs, sp_probs, \
                all_sp_probs, all_seq_sp_logits, sp_type_probs
-        # self.lbl2ind_dict = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'W': 7, 'PD': 8, 'BS': 9,
-        #                      'ES': 10}
-        sp_type_probs = []
-        for sp_prbs in sp_probs:
-            # ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
-            sp, tatlipo, lipo, tat, pilin = sp_prbs[self.lbl2ind_dict['S']].item(), sp_prbs[self.lbl2ind_dict['W']].item(), \
-                                            sp_prbs[self.lbl2ind_dict['L']].item(), sp_prbs[self.lbl2ind_dict['T']].item(), \
-                                            sp_prbs[self.lbl2ind_dict['P']].item()
-            no_sp = 1 - (sp + tatlipo + lipo + tat + pilin)
-            sp_type_probs.append(torch.tensor([no_sp, sp, tatlipo, lipo, tat, pilin]))
-        return tgt_tokens, probs, sp_probs, \
-               all_sp_probs, all_seq_sp_logits, sp_type_probs
-
-        # tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = self.greedy_decode(src, start_symbol=bos_id,
-        #                                                                                   lbl2ind=lbl2ind, tgt=tgt)
-        # return tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits
 
     def test_step(self, batch: tuple, batch_nb: int, *args, **kwargs) -> dict:
         """ Similar to the training step but with the model in eval mode.
@@ -1546,6 +1611,7 @@ def parse_arguments_and_retrieve_logger(save_dir="experiments"):
     parser.add_argument("--train_folds", default=[0, 1], nargs="+")
     parser.add_argument("--run_name", default="generic_run_name", type=str)
     parser.add_argument("--use_glbl_labels", default=False, action="store_true")
+    parser.add_argument("--validate_on_mcc", default=False, action="store_true")
     parser.add_argument("--no_pos_enc", default=False, action="store_true")
 
     # each LightningModule defines arguments relevant to it
