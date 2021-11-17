@@ -1006,7 +1006,7 @@ class ProtBertClassifier(pl.LightningModule):
             else:
                 mcc_mean = (tp * tn - fp * fn)/(np.sqrt( (tp+fp)*(tp+fn)*(tn+fp)*(tn+fn) ))
 
-            tqdm_dict = {"val_loss": val_loss_mean, "val_acc": val_acc_mean, "mcc_mean": mcc_mean}
+            tqdm_dict = {"val_loss": val_loss_mean, "val_acc": val_acc_mean, "mcc_mean": torch.tensor(mcc_mean)}
             result = {
                 "progress_bar": tqdm_dict,
                 "log": tqdm_dict,
@@ -1014,7 +1014,7 @@ class ProtBertClassifier(pl.LightningModule):
             }
         else:
 
-            tqdm_dict = {"val_loss": val_loss_mean, "val_acc": torch.tensor(val_acc_mean)}
+            tqdm_dict = {"val_loss": val_loss_mean, "val_acc": val_acc_mean}
             result = {
                 "progress_bar": tqdm_dict,
                 "log": tqdm_dict,
