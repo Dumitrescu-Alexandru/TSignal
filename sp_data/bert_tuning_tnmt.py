@@ -761,13 +761,8 @@ class ProtBertClassifier(pl.LightningModule):
             raise Exception("Label encoder found an unknown label.")
 
     def training_step(self, batch: tuple, batch_nb: int, *args, **kwargs) -> dict:
-        self.evaluate(self.classification_head, self.lbl2ind_dict, run_name=self.hparams.run_name, partitions=hparams.train_folds,
-                      form_sp_reg_data=hparams.use_glbl_labels, simplified=hparams.use_glbl_labels, very_simplified=hparams.use_glbl_labels, glbl_lbl_2ind=self.glbl_lbl2ind ,)
-
-        # self.evaluate(self.classification_head, self.lbl2ind_dict, run_name=self.hparams.run_name,
-        #               partitions=hparams.train_folds,
-        #               form_sp_reg_data=hparams.use_glbl_labels, simplified=hparams.use_glbl_labels,
-        #               very_simplified=hparams.use_glbl_labels, glbl_lbl_2ind=self.glbl_lbl2ind, )
+        # self.evaluate(self.classification_head, self.lbl2ind_dict, run_name=self.hparams.run_name, partitions=hparams.train_folds,
+        #               form_sp_reg_data=hparams.use_glbl_labels, simplified=hparams.use_glbl_labels, very_simplified=hparams.use_glbl_labels, glbl_lbl_2ind=self.glbl_lbl2ind ,)
         """
         Runs one training step. This usually consists in the forward function followed
             by the loss function.
