@@ -191,6 +191,7 @@ class TransformerModel(nn.Module):
         self.form_sp_reg_data = form_sp_reg_data
         self.model_type = 'Transformer'
         self.version2_agregation = "max"
+        self.no_pos_enc=no_pos_enc
         self.scale_input = scale_input
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.pos_encoder = PositionalEncoding(d_model, dropout=dropout if input_drop else 0, no_pos_enc=no_pos_enc,
@@ -272,7 +273,7 @@ class TransformerModel(nn.Module):
                 trim_ind_l , trim_ind_r = 0, 0
             src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for  i in range(len(src))]
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
-        padded_src = self.pos_encoder(padded_src.transpose(0,1), scale=self.scale_input)
+        padded_src = self.pos_encoder(padded_src.transpose(0,1), scale=self.scale_input, no_pos_enc=self.no_pos_enc)
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
         padded_tgt = self.pos_encoder(padded_tgt.transpose(0,1))
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
@@ -298,7 +299,6 @@ class PositionalEncoding(nn.Module):
 
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000, no_pos_enc=False, linear_pos_enc=False):
         super().__init__()
-        self.no_pos_enc = no_pos_enc
         self.linear_pos_enc = linear_pos_enc
         self.dropout = nn.Dropout(p=dropout)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -312,7 +312,7 @@ class PositionalEncoding(nn.Module):
         if self.linear_pos_enc:
             self.pos_enc = torch.nn.Embedding(100, 1024).to(self.device)
 
-    def forward(self, x: Tensor, scale=False) -> Tensor:
+    def forward(self, x: Tensor, scale=False, no_pos_enc=False) -> Tensor:
         """
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
@@ -325,7 +325,7 @@ class PositionalEncoding(nn.Module):
                 return x
             else:
                 return self.dropout(x + pos_enc)# + self.pe[:x.size(0)])
-        if self.no_pos_enc:
+        if no_pos_enc:
             return self.dropout(x)
         if scale:
             x = self.dropout(x * np.sqrt(1024)+ self.pe[:x.size(0)])

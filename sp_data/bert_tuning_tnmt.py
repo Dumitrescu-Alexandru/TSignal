@@ -479,7 +479,7 @@ class ProtBertClassifier(pl.LightningModule):
                                     lg2ind={'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3}, dropout=0.1,
                                     use_glbl_lbls=self.hparams.use_glbl_labels, no_glbl_lbls=6, ff_dim=4096, nlayers=3, nhead=16, aa2ind=None,
                                     train_oh=False, glbl_lbl_version=3, form_sp_reg_data=self.hparams.use_glbl_labels, version2_agregation="max",
-                                    input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False,
+                                    input_drop=False, no_pos_enc=hparams.no_pos_enc, linear_pos_enc=False, scale_input=False,
                                                         tuned_bert_embs_prefix="",tuning_bert=True, d_model = 1024, d_hid=1024)
             self.label_encoder_t_dec = TokenEmbedding(len(self.lbl2ind_dict.keys()), 1024, lbl2ind=self.lbl2ind_dict)
             self.pos_encoder = PositionalEncoding(1024)
@@ -1546,6 +1546,7 @@ def parse_arguments_and_retrieve_logger(save_dir="experiments"):
     parser.add_argument("--train_folds", default=[0, 1], nargs="+")
     parser.add_argument("--run_name", default="generic_run_name", type=str)
     parser.add_argument("--use_glbl_labels", default=False, action="store_true")
+    parser.add_argument("--no_pos_enc", default=False, action="store_true")
 
     # each LightningModule defines arguments relevant to it
     parser = ProtBertClassifier.add_model_specific_args(parser)
@@ -1621,12 +1622,10 @@ if __name__ == "__main__":
         mode=hparams.metric_mode,
     )
 
-    ckpt_path = os.path.join(
-        logger.save_dir,
+    ckpt_path = os.path.join(logger.save_dir,
         logger.name,
-        f"version_{logger.version}",
-        "checkpoints",
-    )
+        hparams.run_name,
+        "checkpoints",)
     checkpoint_callback = ModelCheckpoint(
         filepath=ckpt_path + "/" + "{epoch}-{val_loss:.2f}-{val_acc:.2f}",
         save_top_k=hparams.save_top_k,
