@@ -71,6 +71,7 @@ def extract_seq_lbls(folds=[0, 1], t_set="train", relative_data_path="", use_glb
     return seqs, lbls, glbl_lbls
 
 def create_sp6_training_ds(relative_data_path, folds=[0, 1], use_glbl_labels=False):
+    agnostic_lbls_identifier = "sublbls_" if use_glbl_labels else ""
     train_seqs, train_lbls, train_glbl_lbls = extract_seq_lbls(folds, "train", relative_data_path, use_glbl_labels=use_glbl_labels)
     test_seqs, test_lbls, test_glbl_lbls = extract_seq_lbls(folds, "test", relative_data_path, use_glbl_labels=use_glbl_labels)
 
@@ -84,13 +85,13 @@ def create_sp6_training_ds(relative_data_path, folds=[0, 1], use_glbl_labels=Fal
         valid_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls})
 
     if len(folds) == 3:
-        train_df.to_csv(relative_data_path + "sp6_fine_tuning_train_{}_{}_{}.csv".format(*folds))
-        test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_{}_{}_{}.csv".format(*folds))
-        valid_df.to_csv(relative_data_path + "sp6_fine_tuning_valid_{}_{}_{}.csv".format(*folds))
+        train_df.to_csv(relative_data_path + "sp6_fine_tuning_train_"+ agnostic_lbls_identifier +"{}_{}_{}.csv".format(*folds))
+        test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_"+ agnostic_lbls_identifier +"{}_{}_{}.csv".format(*folds))
+        valid_df.to_csv(relative_data_path + "sp6_fine_tuning_valid_"+ agnostic_lbls_identifier+ "{}_{}_{}.csv".format(*folds))
     else:
-        train_df.to_csv(relative_data_path + "sp6_fine_tuning_train_{}_{}.csv".format(*folds))
-        test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_{}_{}.csv".format(*folds))
-        valid_df.to_csv(relative_data_path + "sp6_fine_tuning_valid_{}_{}.csv".format(*folds))
+        train_df.to_csv(relative_data_path + "sp6_fine_tuning_train_" + agnostic_lbls_identifier +"{}_{}.csv".format(*folds))
+        test_df.to_csv(relative_data_path + "sp6_fine_tuning_test_"+ agnostic_lbls_identifier +"{}_{}.csv".format(*folds))
+        valid_df.to_csv(relative_data_path + "sp6_fine_tuning_valid_"+ agnostic_lbls_identifier +"{}_{}.csv".format(*folds))
 
 
 def create_sp6_tuning_dataset(relative_data_path, folds=[0, 1]):
@@ -476,8 +477,8 @@ class ProtBertClassifier(pl.LightningModule):
             self.classification_head = TransformerModel(ntoken=7,
                                     lbl2ind={'S': 0, 'O': 1, 'M': 2, 'I': 3, 'PD': 4, 'BS': 5, 'ES': 6},
                                     lg2ind={'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3}, dropout=0.1,
-                                    use_glbl_lbls=True, no_glbl_lbls=6, ff_dim=4096, nlayers=3, nhead=16, aa2ind=None,
-                                    train_oh=False, glbl_lbl_version=3, form_sp_reg_data=True, version2_agregation="max",
+                                    use_glbl_lbls=self.hparams.use_glbl_labels, no_glbl_lbls=6, ff_dim=4096, nlayers=3, nhead=16, aa2ind=None,
+                                    train_oh=False, glbl_lbl_version=3, form_sp_reg_data=self.hparams.use_glbl_labels, version2_agregation="max",
                                     input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False,
                                                         tuned_bert_embs_prefix="",tuning_bert=True, d_model = 1024, d_hid=1024)
             self.label_encoder_t_dec = TokenEmbedding(len(self.lbl2ind_dict.keys()), 1024, lbl2ind=self.lbl2ind_dict)
@@ -651,6 +652,10 @@ class ProtBertClassifier(pl.LightningModule):
         elif self.hparams.tune_sp6_labels:
             return self.classification_head(word_embeddings)
         elif self.hparams.train_enc_dec_sp6:
+            # if v:
+                # "MALTDGGWCLPKRFGAAGADASDSRAFPAREPSTPPSPISSSSSSCSRGGERGPGGASNCGTPQLDTEAA"
+                # print( "".join(self.aaind2lblvocab[i_.item()] for i_ in input_ids[0]))
+                # print(inp_seqs)
             return self.classification_head(word_embeddings, targets, inp_seqs=inp_seqs)
 
 
@@ -788,7 +793,7 @@ class ProtBertClassifier(pl.LightningModule):
             return output
         if self.hparams.tune_sp6_labels:
             inputs, targets = batch
-            model_out = self.forward(**inputs)
+            model_out = self.forward(**inputs, v=True)
             loss_val = self.loss(model_out.reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(targets).reshape(-1))})
             tqdm_dict = {"train_loss": loss_val}
@@ -869,7 +874,7 @@ class ProtBertClassifier(pl.LightningModule):
             # labels_hat = y_hat
             val_acc = self.metric_acc(labels_hat, y)
 
-            output = OrderedDict({"val_loss": loss_val, "val_acc": val_acc, })
+            output = OrderedDict({"val_loss": loss_val, "val_acc": val_acc, "mcc":10})
             return output
         elif self.hparams.tune_sp6_labels:
             inputs, targets = batch
@@ -1558,16 +1563,17 @@ def create_tuning_data(hparams):
               "the special_tokens parameter. Setting it to true atuomatically...")
         hparams.special_tokens = True
     if hparams.tune_sp6_labels or hparams.train_enc_dec_sp6:
+        agnostic_lbls_identifier = "sublbls_" if hparams.use_glbl_labels else ""
         if len(hparams.train_folds) == 3:
             hparams.test_csv, hparams.train_csv, hparams.dev_csv = \
-                "sp6_fine_tuning_test_{}_{}_{}.csv".format(*hparams.train_folds), \
-                "sp6_fine_tuning_train_{}_{}_{}.csv".format(*hparams.train_folds), \
-                "sp6_fine_tuning_valid_{}_{}_{}.csv".format(*hparams.train_folds)
+                "sp6_fine_tuning_test_"+ agnostic_lbls_identifier + "{}_{}_{}.csv".format(*hparams.train_folds), \
+                "sp6_fine_tuning_train_" + agnostic_lbls_identifier +"{}_{}_{}.csv".format(*hparams.train_folds), \
+                "sp6_fine_tuning_valid_"+ agnostic_lbls_identifier +"{}_{}_{}.csv".format(*hparams.train_folds)
         else:
             hparams.test_csv, hparams.train_csv, hparams.dev_csv = \
-                "sp6_fine_tuning_test_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
-                "sp6_fine_tuning_train_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
-                "sp6_fine_tuning_valid_{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1])
+                "sp6_fine_tuning_test_"+ agnostic_lbls_identifier +"{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
+                "sp6_fine_tuning_train_"+ agnostic_lbls_identifier +"{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1]), \
+                "sp6_fine_tuning_valid_"+ agnostic_lbls_identifier +"{}_{}.csv".format(hparams.train_folds[0], hparams.train_folds[1])
 
     if hparams.create_data:
         if hparams.tune_epitope_specificity:
