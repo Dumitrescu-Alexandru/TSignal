@@ -476,10 +476,13 @@ class ProtBertClassifier(pl.LightningModule):
         )
         self.label_encoder.unknown_index = None
         if hparams.train_enc_dec_sp6:
-            self.classification_head = TransformerModel(ntoken=len(self.lbl2ind_dict.keys()), d_model=1024, nhead=16,
-                        d_hid=1024, nlayers=3, dropout= 0.1, data_folder="./", lbl2ind=self.lbl2ind_dict, lg2ind={'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
-                        use_glbl_lbls=True, ff_dim=4096, form_sp_reg_data=False, no_pos_enc=False,
-                            aa2ind=self.tokenizer.get_vocab(), glbl_lbl_version=3, tuning_bert=True)
+            self.classification_head = TransformerModel(ntoken=7,
+                                    lbl2ind={'S': 0, 'O': 1, 'M': 2, 'I': 3, 'PD': 4, 'BS': 5, 'ES': 6},
+                                    lg2ind={'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3}, dropout=0.1,
+                                    use_glbl_lbls=True, no_glbl_lbls=6, ff_dim=4096, nlayers=3, nhead=16, aa2ind=None,
+                                    train_oh=False, glbl_lbl_version=3, form_sp_reg_data=True, version2_agregation="max",
+                                    input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False,
+                                                        tuned_bert_embs_prefix="",tuning_bert=True, d_model = 1024, d_hid=1024)
             self.label_encoder_t_dec = TokenEmbedding(len(self.lbl2ind_dict.keys()), 1024, lbl2ind=self.lbl2ind_dict)
             self.pos_encoder = PositionalEncoding(1024)
         elif self.hparams.tune_sp6_labels:
@@ -651,6 +654,15 @@ class ProtBertClassifier(pl.LightningModule):
         elif self.hparams.tune_sp6_labels:
             return self.classification_head(word_embeddings)
         elif self.hparams.train_enc_dec_sp6:
+            # if v:
+            #     desired_seq = "MALTDGGWCLPKRFGAAGADASDSRAFPAREPSTPPSPISSSSSSCSRGGERGPGGASNCGTPQLDTEAA"
+            #     desired_id = -1
+            #     for ind, ii in enumerate(input_ids):
+            #         if "".join( [self.aaind2lblvocab[i_.item()] for i_ in ii] ) == desired_seq:
+            #             desired_id = ind
+            #     if desired_id != -1:
+            #         print(word_embeddings[desired_id, -1, :50])
+
             return self.classification_head(word_embeddings, targets, inp_seqs=inp_seqs)
 
 
@@ -804,7 +816,7 @@ class ProtBertClassifier(pl.LightningModule):
             inputs['targets'] = targets
             inputs['seq_lengths'] = seq_lengths
             if hparams.use_glbl_labels:
-                model_out, glbl_out = self.forward(**inputs, v=True)
+                model_out, glbl_out = self.forward(**inputs)
             else:
                 model_out = self.forward(**inputs)
 
