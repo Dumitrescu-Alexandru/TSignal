@@ -530,7 +530,6 @@ def visualize_validation(run="param_search_0.2_2048_0.0001_", folds=[0, 1], fold
                 all_f1[lg_ind][tol].append(2 * prec * rec / (prec + rec) if prec + rec else 0)
     cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc = all_f1
     plot_mcc([euk_mcc, neg_mcc, pos_mcc, arc_mcc], name=run)
-    print(np.argmin(valid_loss))
     plot_losses([train_loss, valid_loss], name=run)
     extract_and_plot_prec_recall([cs_f1_euk, cs_f1_neg, cs_f1_pos, cs_f1_arc], metric="f1", name=run, sp_type_f1=sp_type_f1)
     extract_and_plot_prec_recall([cs_recalls_euk, cs_recalls_neg, cs_recalls_pos, cs_recalls_arc], metric="recall",
@@ -1694,6 +1693,15 @@ def pred_lipos():
                     print("ok, wtf")
 
 if __name__ == "__main__":
+    visualize_validation(run="tnmt_train_folds_", folds=[0, 1],
+                         folder="folds_0_1_tnmnt_train/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
+
     #
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_tuned_bert_trimmed_d/acc_lipos/",

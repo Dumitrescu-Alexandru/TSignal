@@ -1215,13 +1215,13 @@ class ProtBertClassifier(pl.LightningModule):
         )
         parser.add_argument(
             "--encoder_learning_rate",
-            default=1e-5,
+            default=5e-5,
             type=float,
             help="Encoder specific learning rate.",
         )
         parser.add_argument(
             "--learning_rate",
-            default=1e-5,
+            default=3e-5,
             type=float,
             help="Classification head learning rate.",
         )

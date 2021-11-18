@@ -820,11 +820,16 @@ class ProtBertClassifier(pl.LightningModule):
                 eos_token_targets.append(t)
                 eos_token_targets[-1].append(self.lbl2ind_dict['ES'])
                 eos_token_targets[-1].extend([self.lbl2ind_dict['PD']] * (max_len - sl))
+            # ind2lbl = {v:k for k,v in self.lbl2ind_dict.items()}
+            # for eo_t_t in eos_token_targets:
+            #     print("".join(ind2lbl[e] for e in eo_t_t))
+            # print(eos_token_targets)
             # print([len(a) for a in list(np.array(eos_token_targets))])
             # print("model_out.shape", model_out.shape)
             # print(inputs['input_ids'])
             # print(model_out[-1, 0, :], model_out.shape)
             # exit(1)
+            # print(model_out.shape)
             loss_val = self.loss(model_out.transpose(1, 0).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
             if hparams.use_glbl_labels:
@@ -1331,7 +1336,7 @@ class ProtBertClassifier(pl.LightningModule):
             },
         ]
         # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
-        optimizer = optim.Adam(parameters, lr=self.hparams.learning_rate,  betas=(0.9, 0.98), eps=1e-9,)
+        optimizer = optim.Adam(parameters, lr=self.hparams.learning_rate,  eps=1e-9,)
         return [optimizer], []
 
     def on_epoch_end(self):
