@@ -1438,7 +1438,6 @@ class ProtBertClassifier(pl.LightningModule):
             type=int,
             help="Number of epochs we want to keep the encoder model frozen.",
             tunable=True,
-            options=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         )
         # Data Args:
         parser.add_argument(

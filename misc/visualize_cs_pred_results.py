@@ -1693,6 +1693,8 @@ def pred_lipos():
                     print("ok, wtf")
 
 if __name__ == "__main__":
+    visualize_validation(run="v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1],
+                         folder="detailed_v2_glbl_max/")
     visualize_validation(run="tnmt_train_folds_", folds=[0, 1],
                          folder="folds_0_1_tnmnt_train/")
     mdl2results = extract_all_param_results(only_cs_position=False,
