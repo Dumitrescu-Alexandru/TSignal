@@ -1279,7 +1279,7 @@ class ProtBertClassifier(pl.LightningModule):
                                                 sp_prbs[self.lbl2ind_dict['P']].item()
                 no_sp = 1 - (sp + tatlipo + lipo + tat + pilin)
                 sp_type_probs_.append(torch.tensor([no_sp, sp, tatlipo, lipo, tat, pilin]))
-            sp_type_probs = sp_type_probs_
+            sp_type_probs = torch.stack(sp_type_probs_)
         return tgt_tokens, probs, sp_probs, \
                all_sp_probs, all_seq_sp_logits, sp_type_probs
 
