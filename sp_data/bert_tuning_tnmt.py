@@ -1336,7 +1336,7 @@ class ProtBertClassifier(pl.LightningModule):
             },
         ]
         # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
-        optimizer = optim.Adam(parameters, lr=self.hparams.learning_rate,  eps=1e-9,)
+        optimizer = optim.Adam(parameters,  betas=(0.9, 0.98), lr=self.hparams.learning_rate,  eps=1e-9,)
         return [optimizer], []
 
     def on_epoch_end(self):
@@ -1438,6 +1438,7 @@ class ProtBertClassifier(pl.LightningModule):
             type=int,
             help="Number of epochs we want to keep the encoder model frozen.",
             tunable=True,
+            options=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,20,30],
         )
         # Data Args:
         parser.add_argument(
