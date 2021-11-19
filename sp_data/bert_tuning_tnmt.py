@@ -807,7 +807,8 @@ class ProtBertClassifier(pl.LightningModule):
                 inputs, targets, seq_lengths, glbl_labels = batch
             else:
                 inputs, targets, seq_lengths = batch
-            inputs['targets'] = targets
+            input_targets = [t[:seq_l] for t, seq_l in zip(targets, seq_lengths)]
+            inputs['targets'] = input_targets
             inputs['seq_lengths'] = seq_lengths
             if hparams.use_glbl_labels:
                 model_out, glbl_out = self.forward(**inputs, v=True)
@@ -820,6 +821,18 @@ class ProtBertClassifier(pl.LightningModule):
                 eos_token_targets.append(t)
                 eos_token_targets[-1].append(self.lbl2ind_dict['ES'])
                 eos_token_targets[-1].extend([self.lbl2ind_dict['PD']] * (max_len - sl))
+            # input_ids = inputs['input_ids']
+            # seqs = []
+            # for i_d in input_ids:
+            #     seqs.append("".join([self.aaind2lblvocab[i_d_] for i_d_ in i_d]).replace("[PAD]", ""))
+            # if "MKIFFAVLVILVLFSMLIWTAYGTPYPVNCKTDRDCVMCGLGISCKNGYCQGCTR" in seqs:
+            #     datruind = -1
+            #     for ind__, s in enumerate(seqs):
+            #         if s == "MKIFFAVLVILVLFSMLIWTAYGTPYPVNCKTDRDCVMCGLGISCKNGYCQGCTR":
+            #             datruind = ind__
+            #     print(targets[datruind])
+            #     print(eos_token_targets[datruind])
+            #     print(input_targets[datruind])
             # ind2lbl = {v:k for k,v in self.lbl2ind_dict.items()}
             # for eo_t_t in eos_token_targets:
             #     print("".join(ind2lbl[e] for e in eo_t_t))

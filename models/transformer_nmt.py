@@ -246,6 +246,8 @@ class TransformerModel(nn.Module):
         return self.generator(outs), self.glbl_generator(memory.transpose(0,1)[:,1,:])
 
     def get_v3_glbl_lbls(self, src, inp_seqs=None):
+        if inp_seqs is not None:
+            src = [src_[:len(s_)] for src_, s_ in zip(src, inp_seqs)]
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src, inp_seqs=inp_seqs)
         if self.add_lg_info:
             trim_ind_l , trim_ind_r = 2, 1
@@ -265,6 +267,8 @@ class TransformerModel(nn.Module):
         """
         if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             return self.forward_glb_lbls(src, tgt)
+        if inp_seqs is not None:
+            src = [src_[:len(s_)] for src_, s_ in zip(src, inp_seqs)]
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src, inp_seqs=inp_seqs)
         if self.glbl_lbl_version == 3:
             if self.add_lg_info:

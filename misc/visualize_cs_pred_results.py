@@ -1693,6 +1693,11 @@ def pred_lipos():
                     print("ok, wtf")
 
 if __name__ == "__main__":
+
+    visualize_validation(run="tuned_bert_correct_test_embs_", folds=[0, 1],
+                         folder="separate-glbl_tuned_bert_correct/")
+    visualize_validation(run="cnn3_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1],
+                         folder="separate-glbl_cnn3/")
     visualize_validation(run="v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1],
                          folder="detailed_v2_glbl_max/")
     visualize_validation(run="tnmt_train_folds_", folds=[0, 1],

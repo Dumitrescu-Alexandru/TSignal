@@ -652,6 +652,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
             seqs, lbl_seqs, _, glbl_lbls = batch
             if use_glbl_lbls:
+                # if "MKIFFAVLVILVLFSMLIWTAYGTPYPVNCKTDRDCVMCGLGISCKNGYCQGCTR" in seqs:
+                #     datruind = -1
+                #     for ind__, s in enumerate(seqs):
+                #         if s == "MKIFFAVLVILVLFSMLIWTAYGTPYPVNCKTDRDCVMCGLGISCKNGYCQGCTR":
+                #             datruind = ind__
+                #     print(lbl_seqs[datruind])
                 logits, glbl_logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
@@ -676,6 +682,13 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     losses_glbl += loss_glbl.item()
                     loss += loss_glbl * glbl_lbl_weight
                 else:
+                    # if "MKIFFAVLVILVLFSMLIWTAYGTPYPVNCKTDRDCVMCGLGISCKNGYCQGCTR" in seqs:
+                    #     datruind = -1
+                    #     for ind__, s in enumerate(seqs):
+                    #         if s == "MKIFFAVLVILVLFSMLIWTAYGTPYPVNCKTDRDCVMCGLGISCKNGYCQGCTR":
+                    #             datruind = ind__
+                    #     print(lbl_seqs[datruind])
+                    #     print(targets[datruind])
                     loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
                     losses += loss.item()
                     loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
