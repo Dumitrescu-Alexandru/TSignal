@@ -223,6 +223,8 @@ class TransformerModel(nn.Module):
             # self.glbl_generator = BinarySPClassifier(input_size=1024, output_size=no_glbl_lbls).to(self.device)
 
     def encode(self, src, inp_seqs=None):
+        if inp_seqs is not None:
+            src = [src_[:len(s_)] for src_, s_ in zip(src, inp_seqs)]
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src, inp_seqs=inp_seqs)
         if len(src) == 1:
             src = src[0].reshape(1, *src[0].shape).transpose(0,1)

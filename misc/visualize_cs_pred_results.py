@@ -657,7 +657,6 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
             except:
                 epochs.append(int(lines[-2].split(":")[-3].split(" ")[-1]))
     avg_epoch = np.mean(epochs)
-    print("Results found on epochs: {}, {}, {}".format(*epochs))
     id2seq, _, _, _ = extract_id2seq_dict()
     unique_bench_seqs = set(id2seq.values())
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
@@ -1694,7 +1693,18 @@ def pred_lipos():
 
 if __name__ == "__main__":
 
-    visualize_validation(run="tuned_bert_correct_test_embs_", folds=[0, 1],
+    visualize_validation(run="tuned_bert_correct_test_embs_", folds=[0, 2],
+                         folder="separate-glbl_tuned_bert_correct/")
+    visualize_validation(run="tuned_bert_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 1],
+                         folder="separate-glbl_tuned_bert_trimmed_d/")
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
+    visualize_validation(run="tuned_bert_correct_test_embs_", folds=[0, 2],
                          folder="separate-glbl_tuned_bert_correct/")
     visualize_validation(run="cnn3_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1],
                          folder="separate-glbl_cnn3/")
