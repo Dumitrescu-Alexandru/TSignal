@@ -1692,7 +1692,12 @@ def pred_lipos():
                     print("ok, wtf")
 
 if __name__ == "__main__":
-
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
     visualize_validation(run="tuned_bert_correct_test_embs_", folds=[0, 2],
                          folder="separate-glbl_tuned_bert_correct/")
     visualize_validation(run="tuned_bert_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 1],

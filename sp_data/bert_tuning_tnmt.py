@@ -1396,6 +1396,7 @@ class ProtBertClassifier(pl.LightningModule):
             batch_size=self.hparams.batch_size,
             collate_fn=self.prepare_sample,
             num_workers=self.hparams.loader_workers,
+            shuffle=True
         )
 
     def val_dataloader(self) -> DataLoader:
