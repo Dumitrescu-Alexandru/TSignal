@@ -7,7 +7,7 @@ import logging
 import sys
 
 logging.getLogger('some_logger')
-
+from sp_data.bert_tuning_tnmt import ProtBertClassifier, parse_arguments_and_retrieve_logger
 import os
 import numpy as np
 import random
@@ -66,7 +66,7 @@ def generate_square_subsequent_mask(sz):
     return mask
 
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
-                  test_only_cs=False, glbl_lbls=None):
+                  test_only_cs=False, glbl_lbls=None, tune_bert=False):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -81,20 +81,38 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     all_outs_2nd_mdl = []
     glbl_labels = None
     with torch.no_grad():
-        memory = model.encode(src)
+        if tune_bert:
+            seq_lengths = [len(s) for s in src]
+            seqs = [" ".join(r_ for r_ in s) for s in src]
+            inputs = model.tokenizer.batch_encode_plus(seqs,
+                                                       add_special_tokens=model.hparams.special_tokens,
+                                                       padding=True,
+                                                       truncation=True,
+                                                       max_length=model.hparams.max_length)
+            input_ids = torch.tensor(inputs['input_ids'], device=model.device)
+            attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
+            memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
+            memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
+        else:
+            memory = model.encode(src)
         if second_model is not None:
             memory_2nd_mdl = model.encode(src)
         else:
             memory_2nd_mdl = None
-        if model.glbl_lbl_version == 3:
+        if tune_bert and model.classification_head.glbl_lbl_version or \
+                not tune_bert and model.glbl_lbl_version == 3:
             if test_only_cs:
                 batch_size = len(src)
                 glbl_labels = torch.zeros(batch_size, 6)
                 glbl_labels[list(range(batch_size)), glbl_lbls] = 1
                 _, glbl_preds = torch.max(glbl_labels, dim=1)
             else:
-                glbl_labels = model.get_v3_glbl_lbls(src)
-                _, glbl_preds = torch.max(glbl_labels, dim=1)
+                if tune_bert:
+                    glbl_labels = model.classification_head.get_v3_glbl_lbls(memory_bfd, inp_seqs=src)
+                    _, glbl_preds = torch.max(glbl_labels, dim=1)
+                else:
+                    glbl_labels = model.get_v3_glbl_lbls(src)
+                    _, glbl_preds = torch.max(glbl_labels, dim=1)
 
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
     ys = []
@@ -108,9 +126,16 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     # of the glbl label model and sequence-model consistency (e.g. one predicts SP other NO-SP - take care of that)
     if glbl_labels is not None:
         tgt_mask = (generate_square_subsequent_mask(1))
-        out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+        if tune_bert:
+            out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
+        else:
+            out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+
         out = out.transpose(0, 1)
-        prob = model.generator(out[:, -1])
+        if tune_bert:
+            prob = model.classification_head.generator(out[:, -1])
+        else:
+            prob = model.generator(out[:, -1])
         _, next_words = torch.max(prob, dim=1)
         next_word = [nw.item() for nw in next_words]
         current_ys = []
@@ -131,7 +156,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         ys = current_ys
         start_ind = 1
     model.eval()
-    model.glbl_generator.eval()
+    if not tune_bert:
+        model.glbl_generator.eval()
     all_probs = []
     for i in range(start_ind, max(seq_lens) + 1):
         with torch.no_grad():
@@ -141,10 +167,16 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 out_2nd_mdl = out_2nd_mdl.transpose(0, 1)
                 prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
                 all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
-            out = model.decode(ys, memory.to(device), tgt_mask.to(device))
-            out = out.transpose(0, 1)
-            prob = model.generator(out[:, -1])
-            all_outs.append(out[:, -1])
+            if tune_bert:
+                out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
+                out = out.transpose(0, 1)
+                prob = model.classification_head.generator(out[:, -1])
+                all_outs.append(out[:, -1])
+            else:
+                out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+                out = out.transpose(0, 1)
+                prob = model.generator(out[:, -1])
+                all_outs.append(out[:, -1])
 
         if i == 0 and not form_sp_reg_data:
             # extract the sp-presence probabilities
@@ -179,7 +211,9 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         ys = current_ys
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if form_sp_reg_data:
-        if model.glbl_lbl_version == 2 and model.use_glbl_lbls:
+        glbl_lbl_version, use_glbl_lbls = (model.glbl_lbl_version, model.use_glbl_lbls) if not tune_bert else \
+            (model.classification_head.glbl_lbl_version, model.classification_head.use_glbl_lbls)
+        if glbl_lbl_version == 2 and use_glbl_lbls:
             if model.version2_agregation == "max":
                 glbl_labels = model.glbl_generator(torch.max(torch.stack(all_outs).transpose(0, 1), dim=1)[0])
                 if second_model is not None:
@@ -196,13 +230,13 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     glbl_labels = torch.nn.functional.softmax(glbl_labels) + \
                                   torch.nn.functional.softmax(second_model.glbl_generator(
                                       torch.mean(torch.stack(all_outs_2nd_mdl).transpose(0, 1), dim=1)), -1)
-        elif model.glbl_lbl_version == 1 and model.use_glbl_lbls:
+        elif glbl_lbl_version == 1 and use_glbl_lbls:
             glbl_labels = model.glbl_generator(memory.transpose(0, 1)[:, 1, :])
             if second_model is not None:
                 glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
                               torch.nn.functional.softmax(
                                   second_model.glbl_generator(memory_2nd_mdl.transpose(0, 1)[:, 1, :]), dim=-1)
-        elif model.glbl_lbl_version != 3:
+        elif glbl_lbl_version != 3:
             glbl_labels = model.glbl_generator(torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1))
             if second_model is not None:
                 glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
@@ -311,14 +345,15 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=3):
 
 
 def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False,
-              form_sp_reg_data=False, second_model=None, test_only_cs=False, glbl_lbls=None):
+              form_sp_reg_data=False, second_model=None, test_only_cs=False, glbl_lbls=None,
+              tune_bert=False):
     model.eval()
     if form_sp_reg_data:
         tgt_tokens, probs, sp_probs, \
         all_sp_probs, all_seq_sp_logits, sp_type_probs = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind,
                                                                        tgt=tgt, form_sp_reg_data=form_sp_reg_data,
                                                                        second_model=second_model, test_only_cs=test_only_cs,
-                                                                       glbl_lbls=glbl_lbls)
+                                                                       glbl_lbls=glbl_lbls, tune_bert=tune_bert)
         return tgt_tokens, probs, sp_probs, \
                all_sp_probs, all_seq_sp_logits, sp_type_probs
     if use_beams_search:
@@ -331,14 +366,14 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_b
 
 
 def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"],
-                        form_sp_reg_data=False, simplified=False, very_simplified=False, tuned_bert_embs_prefix=""):
+                        form_sp_reg_data=False, simplified=False, very_simplified=False, tuned_bert_embs_prefix="",
+                        tune_bert=False):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     model.eval()
     sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified)
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data,
                                 tuned_bert_embs_prefix=tuned_bert_embs_prefix)
-
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=test_batch_size, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
@@ -346,12 +381,29 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
     total_loss = 0
     for ind, (src, tgt, _, _) in enumerate(dataset_loader):
         with torch.no_grad():
-            if model.use_glbl_lbls:
-                logits, _ = model(src, tgt)
-            elif form_sp_reg_data:
-                logits, _ = model(src, tgt)
+            if tune_bert:
+                seq_lengths = [len(s) for s in src]
+                src = [" ".join(r_ for r_ in s) for s in src]
+                inputs = model.tokenizer.batch_encode_plus(src,
+                                                           add_special_tokens=model.hparams.special_tokens,
+                                                           padding=True,
+                                                           truncation=True,
+                                                           max_length=model.hparams.max_length)
+                inputs['targets'] = tgt
+                inputs['seq_lengths'] = seq_lengths
+                if model.classification_head.use_glbl_lbls:
+                    logits, _ = model(**inputs)
+                elif form_sp_reg_data:
+                    logits, _ = model(**inputs)
+                else:
+                    logits = model(**inputs)
             else:
-                logits = model(src, tgt)
+                if model.use_glbl_lbls:
+                    logits, _ = model(src, tgt)
+                elif form_sp_reg_data:
+                    logits, _ = model(src, tgt)
+                else:
+                    logits = model(src, tgt)
         targets = padd_add_eos_tkn(tgt, sp_data.lbl2ind)
         loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
         total_loss += loss.item()
@@ -411,7 +463,7 @@ def clean_sec_sp2_preds(seq, preds, sp_type, ind2glbl_lbl):
 def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1,
              dataset_loader=None,use_beams_search=False, form_sp_reg_data=False, simplified=False, second_model=None,
              very_simplified=False, test_only_cs=False, glbl_lbl_2ind=None, account_lipos=False,
-             tuned_bert_embs_prefix=""):
+             tuned_bert_embs_prefix="", tune_bert=False):
     if glbl_lbl_2ind is not None:
         ind2glbl_lbl = {v:k for k,v in glbl_lbl_2ind.items()}
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
@@ -443,11 +495,11 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
             predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
                           form_sp_reg_data=form_sp_reg_data, second_model=second_model, test_only_cs=test_only_cs,
-                          glbl_lbls=glbl_lbls)
+                          glbl_lbls=glbl_lbls, tune_bert=tune_bert)
         else:
             predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
-                          form_sp_reg_data=form_sp_reg_data, second_model=second_model)
+                          form_sp_reg_data=form_sp_reg_data, second_model=second_model, tune_bert=tune_bert)
             sp_type_probs = [""] * len(predicted_tokens)
         true_targets = padd_add_eos_tkn(tgt, lbl2ind)
         # if not use_beams_search:
@@ -478,17 +530,20 @@ def load_sptype_model(model_path):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     return model.to(device)
 
-def load_model(model_path, dict_file=None, tuned_bert_embs_prefix=""):
+def load_model(model_path, dict_file=None, tuned_bert_embs_prefix="", tune_bert=False):
     folder = get_data_folder()
     model = torch.load(folder + model_path)
-    model.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+    if not tune_bert:
+        model.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     return model
 
-def save_model(model, model_name="", tuned_bert_embs_prefix=""):
+def save_model(model, model_name="", tuned_bert_embs_prefix="", tune_bert=False):
     folder = get_data_folder()
-    model.input_encoder.seq2emb = {}
+    if not tune_bert:
+        model.input_encoder.seq2emb = {}
     torch.save(model, folder + model_name + "_best_eval.pth")
-    model.input_encoder.update(tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+    if not tune_bert:
+        model.input_encoder.update(tuned_bert_embs_prefix=tuned_bert_embs_prefix)
 
 def save_sptype_model(model, model_name="", best=False, optimizer=None):
     folder = get_data_folder()
@@ -579,7 +634,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
-                        tuned_bert_embs=False, warmup_epochs=20):
+                        tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -605,12 +660,21 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
         lg2ind = sp_data.lg2ind
     aa2ind = sp_data.aa2ind if train_oh else None
-    model = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
-                       dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
-                       ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
-                       glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
-                       version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
-                       linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+    if tune_bert:
+        hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
+        hparams.train_enc_dec_sp6 = True
+        hparams.use_glbl_lbls = use_glbl_lbls
+        model = ProtBertClassifier(hparams)
+        model.to(device)
+        if frozen_epochs > 0:
+            model.freeze_encoder()
+    else:
+        model = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
+                           dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
+                           ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
+                           glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
+                           version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
+                           linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     if weight_class_loss:
         glbl_lbl_2weights = get_sp_type_loss_weights()
         ind2glbl_lbl = {v:k for k,v in sp_data.glbl_lbl_2ind.items()}
@@ -645,7 +709,16 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     e = -1
     while patience != 0:
         print("LR:", optimizer.param_groups[0]['lr'])
-        model.train()
+        if tune_bert and frozen_epochs > e:
+            model.eval()
+            model.classification_head.train()
+        elif tune_bert and frozen_epochs == e:
+            model.unfreeze_encoder()
+            model.train()
+        elif frozen_epochs > e:
+            model.train()
+        else:
+            model.train()
         e += 1
         losses = 0
         losses_glbl = 0
@@ -658,7 +731,20 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 #         if s == "MKIFFAVLVILVLFSMLIWTAYGTPYPVNCKTDRDCVMCGLGISCKNGYCQGCTR":
                 #             datruind = ind__
                 #     print(lbl_seqs[datruind])
-                logits, glbl_logits = model(seqs, lbl_seqs)
+                if tune_bert:
+                    seq_lengths = [len(s) for s in seqs]
+                    seqs = [" ".join(r_ for r_ in s) for s in seqs]
+                    inputs = model.tokenizer.batch_encode_plus(seqs,
+                                                               add_special_tokens=model.hparams.special_tokens,
+                                                               padding=True,
+                                                               truncation=True,
+                                                               max_length=model.hparams.max_length)
+                    inputs['targets'] = lbl_seqs
+                    inputs['seq_lengths'] = seq_lengths
+                    logits, glbl_logits = model(**inputs)
+                else:
+                    logits, glbl_logits = model(seqs, lbl_seqs)
+
                 optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
                 if tune_cs > 0 and e > 35:
@@ -738,7 +824,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
             valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
                                              sets=["test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
-                                             very_simplified=very_simplified)
+                                             very_simplified=very_simplified, tune_bert=tune_bert)
             # revert valid_loss to not change the loss condition next ( this won't be a loss
             # but it's the quickest way to test performance when validation with the test set
         else:
@@ -746,11 +832,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             validate_partitions = [validate_partition] if validate_partition is not None else partitions
             valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
                                              sets=valid_sets, form_sp_reg_data=form_sp_reg_data, simplified=simplified,
-                                             very_simplified=very_simplified)
+                                             very_simplified=very_simplified, tune_bert=tune_bert)
             _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model, sp_data.lbl2ind, run_name=run_name,
                          partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
                          simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
-                         tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+                         tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -780,7 +866,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             print("On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
             logging.info(
                 "On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
-        if current_sptype_f1 > bestf1_sp_type:
+        if current_sptype_f1 > bestf1_sp_type and separate_save_sptype_preds:
             bestf1_sp_type = current_sptype_f1
             save_sptype_model(model.glbl_generator, run_name, best=True, optimizer=optimizer)
             print("Best SP type has been saved with score {}".format(current_sptype_f1))
@@ -797,7 +883,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             _ = evaluate(eval_model, sp_data.lbl2ind, run_name=run_name,
                          partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
                          simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
-                         tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+                         tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -815,7 +901,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             best_epoch = e
             best_valid_loss = valid_loss
             best_valid_mcc_and_recall = patiente_metric
-            save_model(swa_model.module if use_swa and e + 1>= swa_start else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+            save_model(swa_model.module if use_swa and e + 1>= swa_start else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
             if e == eps - 1:
                 patience = 0
         elif (e > warmup_epochs and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
@@ -829,19 +915,21 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} from epoch {} compared to best {}.".
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
+        patience = 0
     if use_swa:
         update_bn(dataset_loader, swa_model)
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
+    model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
     if not deployment_model and not validate_partition is not None or (
             validate_partition is not None and other_mdl_name):
-        model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix)
         model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
         # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
         second_model = load_model(other_mdl_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix) if other_mdl_name else None
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
                  form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified,
-                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                 tune_bert=tune_bert)
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False, return_class_prec_rec=True)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
@@ -854,12 +942,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             evaluate(model, sp_data.lbl2ind, run_name=run_name + "_lippos_best", partitions=test_partition,
                      sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model,
                      very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind, account_lipos=account_lipos,
-                     tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+                     tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
         if test_only_cs:
             evaluate(model, sp_data.lbl2ind, run_name=run_name + "_onlycs_best", partitions=test_partition,
                      sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
                      second_model=second_model, very_simplified=very_simplified, test_only_cs=test_only_cs, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
-                     tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+                     tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
                 get_cs_and_sp_pred_results(filename=run_name + "_onlycs_best.bin".format(e), v=False,
                                            return_class_prec_rec=True)
@@ -871,7 +959,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if test_beam:
             model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix)
             evaluate(model, sp_data.lbl2ind, run_name="best_beam_" + run_name, partitions=test_partition,
-                     sets=["train", "test"], use_beams_search=True, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+                     sets=["train", "test"], use_beams_search=True, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                     tune_bert=tune_bert)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
                 get_cs_and_sp_pred_results(filename="best_beam_" + run_name + ".bin".format(e), v=False)
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(

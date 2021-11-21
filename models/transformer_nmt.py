@@ -1,3 +1,4 @@
+import os
 import pickle
 import numpy as np
 import math
@@ -44,7 +45,8 @@ class InputEmbeddingEncoder(nn.Module):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.data_folder = get_data_folder()
         if tuning_bert and self.data_folder == "sp_data/":
-            self.data_folder = "./"
+            if not os.path.exists("sp_data/"):
+                self.data_folder = "./"
         super().__init__()
         self.glbl_lbl_version = glbl_lbl_version
         seq2emb = {}

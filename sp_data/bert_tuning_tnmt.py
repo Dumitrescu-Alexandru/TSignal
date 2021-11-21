@@ -12,7 +12,6 @@ import sys
 import os
 sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
-from train_scripts.cv_train_cs_predictors import log_and_print_mcc_and_cs_results, modify_sp_subregion_preds, clean_sec_sp2_preds, padd_add_eos_tkn
 from models.transformer_nmt import TransformerModel
 import torch
 import torch.nn as nn
@@ -47,8 +46,8 @@ def gpu_acc_metric(y_hat, labels):
     return acc
 
 
-def extract_seq_lbls(folds=[0, 1], t_set="train", relative_data_path="", use_glbl_labels=False):
-    prefix = "sublbls_" if use_glbl_labels else ""
+def extract_seq_lbls(folds=[0, 1], t_set="train", relative_data_path="", use_glbl_lbls=False):
+    prefix = "sublbls_" if use_glbl_lbls else ""
     data = pickle.load(open(relative_data_path + "sp6_partitioned_data_" + prefix + "{}_{}.bin".format(t_set, folds[0]), "rb"))
     seqs = list(data.keys())
     lbls = [data[s][1] for s in seqs]
@@ -70,12 +69,12 @@ def extract_seq_lbls(folds=[0, 1], t_set="train", relative_data_path="", use_glb
 
     return seqs, lbls, glbl_lbls
 
-def create_sp6_training_ds(relative_data_path, folds=[0, 1], use_glbl_labels=False):
-    agnostic_lbls_identifier = "sublbls_" if use_glbl_labels else ""
-    train_seqs, train_lbls, train_glbl_lbls = extract_seq_lbls(folds, "train", relative_data_path, use_glbl_labels=use_glbl_labels)
-    test_seqs, test_lbls, test_glbl_lbls = extract_seq_lbls(folds, "test", relative_data_path, use_glbl_labels=use_glbl_labels)
+def create_sp6_training_ds(relative_data_path, folds=[0, 1], use_glbl_lbls=False):
+    agnostic_lbls_identifier = "sublbls_" if use_glbl_lbls else ""
+    train_seqs, train_lbls, train_glbl_lbls = extract_seq_lbls(folds, "train", relative_data_path, use_glbl_lbls=use_glbl_lbls)
+    test_seqs, test_lbls, test_glbl_lbls = extract_seq_lbls(folds, "test", relative_data_path, use_glbl_lbls=use_glbl_lbls)
 
-    if use_glbl_labels:
+    if use_glbl_lbls:
         train_df = pd.DataFrame({'seqs': train_seqs, 'lbls': train_lbls, 'glbl_lbls':train_glbl_lbls})
         test_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls, 'glbl_lbls':test_glbl_lbls})
         valid_df = pd.DataFrame({'seqs': test_seqs, 'lbls': test_lbls, 'glbl_lbls':test_glbl_lbls})
@@ -400,14 +399,21 @@ class ProtBertClassifier(pl.LightningModule):
         self.batch_size = self.hparams.batch_size
         self.e = 0
 
-        if self.hparams.tune_sp6_labels or hparams.train_enc_dec_sp6:
+        if self.hparams.tune_sp6_labels or self.hparams.train_enc_dec_sp6:
             self.lbl2ind_dict = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'W': 7, 'PD': 8, 'BS': 9,
-                                 'ES': 10} if not hparams.use_glbl_labels else {'S': 0, 'O': 1, 'M': 2, 'I': 3, 'PD': 4, 'BS': 5, 'ES': 6}
+                                 'ES': 10} if not hparams.use_glbl_lbls else {'S': 0, 'O': 1, 'M': 2, 'I': 3, 'PD': 4, 'BS': 5, 'ES': 6}
             self.glbl_lbl2ind = {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5}
         if os.path.exists('/scratch/work/dumitra1'):
-            self.modelFolderPath = "../../../covid_tcr_protein_embeddings/models/ProtBert/"
+            if os.path.exists("../../../covid_tcr_protein_embeddings/models/ProtBert/"):
+                self.modelFolderPath = "../../../covid_tcr_protein_embeddings/models/ProtBert/"
+            else:
+                self.modelFolderPath = "../../covid_tcr_protein_embeddings/models/ProtBert/"
         else:
-            self.modelFolderPath = './models/ProtBert/'
+            if os.path.exists('./models/ProtBert/'):
+                self.modelFolderPath = './models/ProtBert/'
+            else:
+                self.modelFolderPath = 'sp_data/models/ProtBert/'
+
         self.vocabFilePath = os.path.join(self.modelFolderPath, 'vocab.txt')
 
         self.extract_emb = False
@@ -474,13 +480,13 @@ class ProtBertClassifier(pl.LightningModule):
             self.hparams.label_set.split(","), reserved_labels=[]
         )
         self.label_encoder.unknown_index = None
-        if hparams.train_enc_dec_sp6:
+        if self.hparams.train_enc_dec_sp6:
             self.classification_head = TransformerModel(ntoken=len(self.lbl2ind_dict.keys()),
                                     lbl2ind=self.lbl2ind_dict,
                                     lg2ind={'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3}, dropout=0.1,
-                                    use_glbl_lbls=self.hparams.use_glbl_labels, no_glbl_lbls=6, ff_dim=4096, nlayers=3, nhead=16, aa2ind=None,
-                                    train_oh=False, glbl_lbl_version=3, form_sp_reg_data=self.hparams.use_glbl_labels, version2_agregation="max",
-                                    input_drop=False, no_pos_enc=hparams.no_pos_enc, linear_pos_enc=False, scale_input=False,
+                                    use_glbl_lbls=self.hparams.use_glbl_lbls, no_glbl_lbls=6, ff_dim=4096, nlayers=3, nhead=16, aa2ind=None,
+                                    train_oh=False, glbl_lbl_version=3, form_sp_reg_data=self.hparams.use_glbl_lbls, version2_agregation="max",
+                                    input_drop=False, no_pos_enc=self.hparams.no_pos_enc, linear_pos_enc=False, scale_input=False,
                                                         tuned_bert_embs_prefix="",tuning_bert=True, d_model = 1024, d_hid=1024)
             self.label_encoder_t_dec = TokenEmbedding(len(self.lbl2ind_dict.keys()), 1024, lbl2ind=self.lbl2ind_dict)
             self.pos_encoder = PositionalEncoding(1024)
@@ -521,9 +527,9 @@ class ProtBertClassifier(pl.LightningModule):
 
     def __build_loss(self):
         """ Initializes the loss function/s. """
-        if self.hparams.tune_sp6_labels or hparams.train_enc_dec_sp6:
+        if self.hparams.tune_sp6_labels or self.hparams.train_enc_dec_sp6:
             self._loss = nn.CrossEntropyLoss(ignore_index=self.lbl2ind_dict['PD'])
-            if self.hparams.use_glbl_labels:
+            if self.hparams.use_glbl_lbls:
                 self._loss2 = nn.CrossEntropyLoss()
         elif self.hparams.tune_epitope_specificity:
             weights = self.get_epitope_weights(self.hparams.relative_data_path)
@@ -701,7 +707,7 @@ class ProtBertClassifier(pl.LightningModule):
                 all_lbls.append(sample['target'])
                 max_len = len(sample['target']) if len(sample['target']) > max_len else max_len
             for lbl_seq in all_lbls:
-                if hparams.use_glbl_labels:
+                if hparams.use_glbl_lbls:
                     lbl_seq_, glbl_lbl = lbl_seq
                     padded_lbl = lbl_seq_.copy()
                     global_labels.append(glbl_lbl)
@@ -711,7 +717,7 @@ class ProtBertClassifier(pl.LightningModule):
                     seqs_lengths.append(len(lbl_seq))
                 all_padded_lbls.append(padded_lbl)
             if self.hparams.train_enc_dec_sp6:
-                if hparams.use_glbl_labels:
+                if hparams.use_glbl_lbls:
                     return all_padded_lbls, seqs_lengths, global_labels
                 return all_padded_lbls, seqs_lengths
             return all_padded_lbls
@@ -735,7 +741,7 @@ class ProtBertClassifier(pl.LightningModule):
         """
 
         if self.hparams.train_enc_dec_sp6:
-            if hparams.use_glbl_labels:
+            if hparams.use_glbl_lbls:
                 target, seq_lengths, glbl_labels = self.encode_labels(sample)
             else:
                 target, seq_lengths = self.encode_labels(sample)
@@ -748,7 +754,7 @@ class ProtBertClassifier(pl.LightningModule):
                                                   truncation=True,
                                                   max_length=self.hparams.max_length)
         if self.hparams.train_enc_dec_sp6:
-            if hparams.use_glbl_labels:
+            if hparams.use_glbl_lbls:
                 return inputs, target, seq_lengths, glbl_labels
             return inputs, target, seq_lengths
         if self.hparams.tune_sp6_labels:
@@ -768,7 +774,7 @@ class ProtBertClassifier(pl.LightningModule):
 
     def training_step(self, batch: tuple, batch_nb: int, *args, **kwargs) -> dict:
         # self.evaluate(self.classification_head, self.lbl2ind_dict, run_name=self.hparams.run_name, partitions=hparams.train_folds,
-        #               form_sp_reg_data=hparams.use_glbl_labels, simplified=hparams.use_glbl_labels, very_simplified=hparams.use_glbl_labels, glbl_lbl_2ind=self.glbl_lbl2ind ,)
+        #               form_sp_reg_data=hparams.use_glbl_lbls, simplified=hparams.use_glbl_lbls, very_simplified=hparams.use_glbl_lbls, glbl_lbl_2ind=self.glbl_lbl2ind ,)
         """
         Runs one training step. This usually consists in the forward function followed
             by the loss function.
@@ -780,8 +786,6 @@ class ProtBertClassifier(pl.LightningModule):
         """
         # inputs, targets = batch
         self.classification_head.train()
-        self.classification_head.to(torch.float64)
-        self.ProtBertBFD.to(torch.float64)
         if self.train_BFD:
             self.ProtBertBFD.train()
 
@@ -805,14 +809,14 @@ class ProtBertClassifier(pl.LightningModule):
             # can also return just a scalar instead of a dict (return loss_val)
             return output
         elif self.hparams.train_enc_dec_sp6:
-            if hparams.use_glbl_labels:
+            if hparams.use_glbl_lbls:
                 inputs, targets, seq_lengths, glbl_labels = batch
             else:
                 inputs, targets, seq_lengths = batch
             input_targets = [t[:seq_l] for t, seq_l in zip(targets, seq_lengths)]
             inputs['targets'] = input_targets
             inputs['seq_lengths'] = seq_lengths
-            if hparams.use_glbl_labels:
+            if hparams.use_glbl_lbls:
                 model_out, glbl_out = self.forward(**inputs, v=True)
             else:
                 model_out = self.forward(**inputs)
@@ -847,7 +851,7 @@ class ProtBertClassifier(pl.LightningModule):
             # print(model_out.shape)
             loss_val = self.loss(model_out.transpose(1, 0).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
-            if hparams.use_glbl_labels:
+            if hparams.use_glbl_lbls:
                 loss_glbl = self.loss2(glbl_out, glbl_labels)
                 loss_val += loss_glbl
             tqdm_dict = {"train_loss": loss_val}
@@ -910,13 +914,13 @@ class ProtBertClassifier(pl.LightningModule):
             return output
         elif self.hparams.train_enc_dec_sp6:
 
-            if hparams.use_glbl_labels:
+            if hparams.use_glbl_lbls:
                 inputs, targets, seq_lengths, glbl_labels = batch
             else:
                 inputs, targets, seq_lengths = batch
             inputs['targets'] = targets
             inputs['seq_lengths'] = seq_lengths
-            if hparams.use_glbl_labels:
+            if hparams.use_glbl_lbls:
                 model_out, glbl_out = self.forward(**inputs)
             else:
                 model_out = self.forward(**inputs)
@@ -928,7 +932,7 @@ class ProtBertClassifier(pl.LightningModule):
                 eos_token_targets[-1].extend([self.lbl2ind_dict['PD']] * (max_len - sl))
             loss_val = self.loss(model_out.permute(1, 0, 2).reshape(-1, len(self.lbl2ind_dict.keys())),
                                  {"labels": list(np.array(eos_token_targets).reshape(-1))})
-            if hparams.use_glbl_labels:
+            if hparams.use_glbl_lbls:
                 loss_glbl = self.loss2(glbl_out, glbl_labels)
                 loss_val += loss_glbl
             y = eos_token_targets
@@ -936,7 +940,7 @@ class ProtBertClassifier(pl.LightningModule):
             labels_hat = torch.argmax(y_hat, dim=-1)
             val_acc = self.metric_acc(labels_hat.reshape(-1), list(np.array(y).reshape(-1)))
             if self.hparams.validate_on_mcc:
-                if self.hparams.use_glbl_labels:
+                if self.hparams.use_glbl_lbls:
                     inputs, tgt, seq_lengths, glbl_lbls = batch
                 else:
                     inputs, tgt, seq_lengths = batch
@@ -947,12 +951,12 @@ class ProtBertClassifier(pl.LightningModule):
 
                 predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
                     self.translate(self.classification_head, inputs, self.lbl2ind_dict['BS'], self.lbl2ind_dict, tgt=None, use_beams_search=False,
-                              form_sp_reg_data=self.hparams.use_glbl_labels, second_model=None, test_only_cs=False,
-                              glbl_lbls=self.glbl_lbl2ind if self.hparams.use_glbl_labels else None)
+                              form_sp_reg_data=self.hparams.use_glbl_lbls, second_model=None, test_only_cs=False,
+                              glbl_lbls=self.glbl_lbl2ind if self.hparams.use_glbl_lbls else None)
                 tgt, predicted_tokens = np.array(tgt), np.array(predicted_tokens)
                 glbl_lbls_pred = torch.argmax(sp_type_probs, dim=1).cpu().numpy()
                 tp, tn, fp, fn = 0, 0, 0, 0
-                if not self.hparams.use_glbl_labels:
+                if not self.hparams.use_glbl_lbls:
                     min_lens = [min(len(tgt_), len(prd_), 70) for tgt_, prd_ in zip(tgt, predicted_tokens)]
                     all_tgts, all_pred_tkns = [], []
                     for i in range(len(tgt)):
@@ -1214,7 +1218,7 @@ class ProtBertClassifier(pl.LightningModule):
             second_model.eval()
         val_or_test = "test" if len(sets) == 2 else "validation"
         dataset = SP6TuningDataset(self.hparams.relative_data_path, self.hparams.dev_csv,
-                                   use_glbl_lbls=self.hparams.use_glbl_labels)
+                                   use_glbl_lbls=self.hparams.use_glbl_lbls)
         dataset_loader =  DataLoader(
                             dataset=dataset,
                             batch_size=self.hparams.batch_size,
@@ -1357,7 +1361,7 @@ class ProtBertClassifier(pl.LightningModule):
     def on_epoch_end(self):
         """ Pytorch lightning hook """
         self.evaluate(self.classification_head, self.lbl2ind_dict, run_name=self.hparams.run_name, partitions=hparams.train_folds,
-                      form_sp_reg_data=hparams.use_glbl_labels, simplified=hparams.use_glbl_labels, very_simplified=hparams.use_glbl_labels, glbl_lbl_2ind=self.glbl_lbl2ind ,)
+                      form_sp_reg_data=hparams.use_glbl_lbls, simplified=hparams.use_glbl_lbls, very_simplified=hparams.use_glbl_lbls, glbl_lbl_2ind=self.glbl_lbl2ind ,)
         self.e += 1
         if self.current_epoch + 1 >= self.nr_frozen_epochs:
             self.unfreeze_encoder()
@@ -1375,11 +1379,11 @@ class ProtBertClassifier(pl.LightningModule):
                 print('Incorrect dataset split')
         elif self.hparams.tune_sp6_labels or self.hparams.train_enc_dec_sp6:
             if train:
-                return SP6TuningDataset(hparams.relative_data_path, hparams.train_csv, hparams.use_glbl_labels)
+                return SP6TuningDataset(hparams.relative_data_path, hparams.train_csv, hparams.use_glbl_lbls)
             elif val:
-                return SP6TuningDataset(hparams.relative_data_path, hparams.dev_csv,hparams.use_glbl_labels)
+                return SP6TuningDataset(hparams.relative_data_path, hparams.dev_csv,hparams.use_glbl_lbls)
             elif test:
-                return SP6TuningDataset(hparams.relative_data_path, hparams.test_csv,hparams.use_glbl_labels)
+                return SP6TuningDataset(hparams.relative_data_path, hparams.test_csv,hparams.use_glbl_lbls)
         else:
             if train:
                 return BertDataset(hparams.train_csv, hparams.special_tokens, hparams.relative_data_path)
@@ -1631,7 +1635,7 @@ def parse_arguments_and_retrieve_logger(save_dir="experiments"):
     parser.add_argument("--train_enc_dec_sp6", default=False, action="store_true")
     parser.add_argument("--train_folds", default=[0, 1], nargs="+")
     parser.add_argument("--run_name", default="generic_run_name", type=str)
-    parser.add_argument("--use_glbl_labels", default=False, action="store_true")
+    parser.add_argument("--use_glbl_lbls", default=False, action="store_true")
     parser.add_argument("--validate_on_mcc", default=False, action="store_true")
     parser.add_argument("--no_pos_enc", default=False, action="store_true")
 
@@ -1651,7 +1655,7 @@ def create_tuning_data(hparams):
               "the special_tokens parameter. Setting it to true atuomatically...")
         hparams.special_tokens = True
     if hparams.tune_sp6_labels or hparams.train_enc_dec_sp6:
-        agnostic_lbls_identifier = "sublbls_" if hparams.use_glbl_labels else ""
+        agnostic_lbls_identifier = "sublbls_" if hparams.use_glbl_lbls else ""
         if len(hparams.train_folds) == 3:
             hparams.test_csv, hparams.train_csv, hparams.dev_csv = \
                 "sp6_fine_tuning_test_"+ agnostic_lbls_identifier + "{}_{}_{}.csv".format(*hparams.train_folds), \
@@ -1670,7 +1674,7 @@ def create_tuning_data(hparams):
         elif hparams.tune_sp6_labels:
             create_sp6_tuning_dataset(hparams.relative_data_path, hparams.train_folds)
         elif hparams.train_enc_dec_sp6:
-            create_sp6_training_ds(hparams.relative_data_path, hparams.train_folds, hparams.use_glbl_labels)
+            create_sp6_training_ds(hparams.relative_data_path, hparams.train_folds, hparams.use_glbl_lbls)
         else:
             create_bert_further_tuning_files(hparams.relative_data_path)
 
@@ -1681,6 +1685,8 @@ def create_tuning_data(hparams):
 
 
 if __name__ == "__main__":
+    from train_scripts.cv_train_cs_predictors import log_and_print_mcc_and_cs_results, modify_sp_subregion_preds, \
+        clean_sec_sp2_preds, padd_add_eos_tkn
 
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
     create_tuning_data(hparams)
