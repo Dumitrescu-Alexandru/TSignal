@@ -375,7 +375,7 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data,
                                 tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=test_batch_size, shuffle=True,
+                                                 batch_size=test_batch_size, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     total_loss = 0
@@ -651,7 +651,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=form_sp_reg_data,
                                 tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=bs, shuffle=False,
+                                                 batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
     swa_start = 60
     anneal_epochs = 10
