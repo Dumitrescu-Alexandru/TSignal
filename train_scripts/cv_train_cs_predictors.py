@@ -375,7 +375,7 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data,
                                 tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=test_batch_size, shuffle=False,
+                                                 batch_size=test_batch_size, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     total_loss = 0
