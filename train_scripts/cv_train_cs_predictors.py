@@ -701,7 +701,19 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
     loss_fn_tune = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
+
+    if tune_bert:
+        parameters = [
+            {"params": model.classification_head.parameters()},
+            {
+                "params": model.ProtBertBFD.parameters(),
+                "lr": lr * 0.1,
+            },
+        ]
+        # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
+        optimizer = optim.Adam(parameters,  betas=(0.9, 0.98), lr=lr,  eps=1e-9, weight_decay=wd)
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
     if use_swa:
         warmup_scheduler = None
         swa_model = AveragedModel(model)
