@@ -15,7 +15,6 @@ import pickle
 import torch.nn as nn
 import torch.optim as optim
 import torch
-
 sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights
@@ -25,13 +24,14 @@ from models.transformer_nmt import TransformerModel
 def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
                form_sp_reg_data=False, version2_agregation="max", input_drop=False, no_pos_enc=False,
-               linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix=""):
+               linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix="", tune_bert=False):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
                              glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
                              version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
-                             linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+                             linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                             tuning_bert=tune_bert)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -651,7 +651,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=form_sp_reg_data,
                                 tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=bs, shuffle=True,
+                                                 batch_size=bs, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
     swa_start = 60
     anneal_epochs = 10
@@ -664,7 +664,15 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
         hparams.train_enc_dec_sp6 = True
         hparams.use_glbl_lbls = use_glbl_lbls
+        classification_head = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
+                           dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
+                           ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
+                           glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
+                           version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
+                           linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                                         tune_bert=tune_bert)
         model = ProtBertClassifier(hparams)
+        model.classification_head = classification_head
         model.to(device)
         if frozen_epochs > 0:
             model.freeze_encoder()
@@ -744,7 +752,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     logits, glbl_logits = model(**inputs)
                 else:
                     logits, glbl_logits = model(seqs, lbl_seqs)
-
                 optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
                 if tune_cs > 0 and e > 35:
@@ -928,7 +935,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
     if not deployment_model and not validate_partition is not None or (
             validate_partition is not None and other_mdl_name):
-        model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
+        if separate_save_sptype_preds:
+            model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
         # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
         second_model = load_model(other_mdl_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix) if other_mdl_name else None
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],

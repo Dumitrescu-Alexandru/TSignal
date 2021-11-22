@@ -1692,6 +1692,9 @@ def pred_lipos():
                     print("ok, wtf")
 
 if __name__ == "__main__":
+    visualize_validation(run="sanity_check_scale_input_linear_pos_enc_separate_saves_", folds=[0, 1],
+                         folder="separate-glbl_sanity_check_scale_input_linear_pos_enc_separate_saves_0_1/")
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
                                             compare_mdl_plots=False,
