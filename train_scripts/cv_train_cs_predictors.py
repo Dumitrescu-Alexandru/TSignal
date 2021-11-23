@@ -99,8 +99,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             memory_2nd_mdl = model.encode(src)
         else:
             memory_2nd_mdl = None
-        if tune_bert and model.classification_head.glbl_lbl_version or \
-                not tune_bert and model.glbl_lbl_version == 3:
+        if tune_bert and model.classification_head.glbl_lbl_version and model.classification_head.use_glbl_lbls or \
+                not tune_bert and model.glbl_lbl_version == 3 and model.use_glbl_lbls:
             if test_only_cs:
                 batch_size = len(src)
                 glbl_labels = torch.zeros(batch_size, 6)
@@ -361,7 +361,7 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_b
         sp_probs, all_sp_probs, all_seq_sp_logits = None, None, None
     else:
         tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = greedy_decode(model, src, start_symbol=bos_id,
-                                                                                     lbl2ind=lbl2ind, tgt=tgt)
+                                                                                     lbl2ind=lbl2ind, tgt=tgt, tune_bert=tune_bert)
     return tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits
 
 
@@ -470,6 +470,11 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
     eval_dict = {}
     sp_type_dict = {}
     seqs2probs = {}
+    pred_aa_lbl2glbl_ind = {lbl2ind['P']: glbl_lbl_2ind['PILIN'], lbl2ind['S']: glbl_lbl_2ind['SP'], lbl2ind['O']:glbl_lbl_2ind['NO_SP'],
+                            lbl2ind['M']:glbl_lbl_2ind['NO_SP'], lbl2ind['I']:glbl_lbl_2ind['NO_SP'], lbl2ind['PD']:glbl_lbl_2ind['NO_SP'],
+                            lbl2ind['BS']:glbl_lbl_2ind['NO_SP'], lbl2ind['ES']:glbl_lbl_2ind['NO_SP'], lbl2ind['L']:glbl_lbl_2ind['LIPO'],
+                            lbl2ind['T']:glbl_lbl_2ind['TAT'], lbl2ind['W']:glbl_lbl_2ind['TATLIPO']}
+
     model.eval()
     if second_model is not None:
         second_model.eval()
@@ -508,7 +513,14 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
             if account_lipos:
                 predicted_lbls, sp_type = clean_sec_sp2_preds(s, predicted_lbls, sp_type, ind2glbl_lbl)
-            sp_type_dict[s] = torch.argmax(sp_type).item()
+            if type(sp_type) == str:
+                # in this case, global label is not used for the model <- glbl label is decided by the first aa label
+                # prediction
+                sp_type_dict[s] = pred_aa_lbl2glbl_ind[pt[0]]
+                # also replace W with T Tat/TATLIPO <- it will already be accounted in the sptype dict
+                predicted_lbls = predicted_lbls.replace("W", "T")
+            else:
+                sp_type_dict[s] = torch.argmax(sp_type).item()
             if form_sp_reg_data:
                 new_predicted_lbls = modify_sp_subregion_preds(predicted_lbls, sp_type)
                 predicted_lbls = new_predicted_lbls
@@ -810,7 +822,19 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 losses_glbl += loss_glbl.item()
                 loss += loss_glbl * glbl_lbl_weight
             else:
-                logits = model(seqs, lbl_seqs)
+                if tune_bert:
+                    seq_lengths = [len(s) for s in seqs]
+                    seqs = [" ".join(r_ for r_ in s) for s in seqs]
+                    inputs = model.tokenizer.batch_encode_plus(seqs,
+                                                               add_special_tokens=model.hparams.special_tokens,
+                                                               padding=True,
+                                                               truncation=True,
+                                                               max_length=model.hparams.max_length)
+                    inputs['targets'] = lbl_seqs
+                    inputs['seq_lengths'] = seq_lengths
+                    logits = model(**inputs)
+                else:
+                    logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
                 loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
