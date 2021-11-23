@@ -1689,15 +1689,23 @@ def pred_lipos():
             a = pickle.load(open(f, "rb"))
             for k,v in a.items():
                 if v[-1] == "TATLIPO":
-                    print("ok, wtf")
+                    print("ok, wrong")
 
 if __name__ == "__main__":
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_and_tnmnt_nogl/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_tune_bert_and_tnmnt_folds/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
     exit(1)
+    visualize_validation(run="tune_bert_and_tnmnt_folds_", folds=[1, 2],
+                         folder="tuning_bert_tune_bert_and_tnmnt_folds/")
     visualize_validation(run="sanity_check_scale_input_linear_pos_enc_separate_saves_", folds=[0, 1],
                          folder="separate-glbl_sanity_check_scale_input_linear_pos_enc_separate_saves_0_1/")
     exit(1)
