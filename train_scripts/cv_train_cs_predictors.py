@@ -19,7 +19,7 @@ sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights
 from models.transformer_nmt import TransformerModel
-
+torch.manual_seed(123)
 
 def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
@@ -34,7 +34,7 @@ def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, 
                              tuning_bert=tune_bert)
     for p in model.parameters():
         if p.dim() > 1:
-            nn.init.xavier_uniform_(p)
+            nn.init.xavier_uniform_(p, gain=nn.init.calculate_gain("relu"))
     return model
 
 
@@ -833,6 +833,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     inputs['targets'] = lbl_seqs
                     inputs['seq_lengths'] = seq_lengths
                     logits = model(**inputs)
+                    print(logits[-1, -1, :])
+                    exit(1)
                 else:
                     logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()

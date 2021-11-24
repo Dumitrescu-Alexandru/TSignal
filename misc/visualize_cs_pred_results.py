@@ -1696,7 +1696,12 @@ if __name__ == "__main__":
                                             result_folder="tuning_bert_tune_bert_and_tnmnt_nogl/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
-                                            benchmark=True)
+                                            benchmark=False)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
     exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_tune_bert_and_tnmnt_folds/",
