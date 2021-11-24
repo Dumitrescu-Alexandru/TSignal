@@ -833,8 +833,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     inputs['targets'] = lbl_seqs
                     inputs['seq_lengths'] = seq_lengths
                     logits = model(**inputs)
-                    print(logits[-1, -1, :])
-                    exit(1)
                 else:
                     logits = model(seqs, lbl_seqs)
                 optimizer.zero_grad()
