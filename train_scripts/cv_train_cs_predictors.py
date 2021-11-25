@@ -515,11 +515,13 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
     eval_dict = {}
     sp_type_dict = {}
     seqs2probs = {}
-    pred_aa_lbl2glbl_ind = {lbl2ind['P']: glbl_lbl_2ind['PILIN'], lbl2ind['S']: glbl_lbl_2ind['SP'], lbl2ind['O']:glbl_lbl_2ind['NO_SP'],
-                            lbl2ind['M']:glbl_lbl_2ind['NO_SP'], lbl2ind['I']:glbl_lbl_2ind['NO_SP'], lbl2ind['PD']:glbl_lbl_2ind['NO_SP'],
-                            lbl2ind['BS']:glbl_lbl_2ind['NO_SP'], lbl2ind['ES']:glbl_lbl_2ind['NO_SP'], lbl2ind['L']:glbl_lbl_2ind['LIPO'],
-                            lbl2ind['T']:glbl_lbl_2ind['TAT'], lbl2ind['W']:glbl_lbl_2ind['TATLIPO']}
-
+    if "P" in lbl2ind:
+        pred_aa_lbl2glbl_ind = {lbl2ind['P']: glbl_lbl_2ind['PILIN'], lbl2ind['S']: glbl_lbl_2ind['SP'], lbl2ind['O']:glbl_lbl_2ind['NO_SP'],
+                                lbl2ind['M']:glbl_lbl_2ind['NO_SP'], lbl2ind['I']:glbl_lbl_2ind['NO_SP'], lbl2ind['PD']:glbl_lbl_2ind['NO_SP'],
+                                lbl2ind['BS']:glbl_lbl_2ind['NO_SP'], lbl2ind['ES']:glbl_lbl_2ind['NO_SP'], lbl2ind['L']:glbl_lbl_2ind['LIPO'],
+                                lbl2ind['T']:glbl_lbl_2ind['TAT'], lbl2ind['W']:glbl_lbl_2ind['TATLIPO']}
+    else:
+        pred_aa_lbl2glbl_ind = {}
     model.eval()
     if second_model is not None:
         second_model.eval()
@@ -767,7 +769,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             },
         ]
         # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
-        optimizer = optim.Adam(parameters,  lr=lr,  eps=1e-9, weight_decay=wd)#  ,betas=(0.9, 0.98),)
+        optimizer = optim.Adam(parameters,  lr=lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
     if use_swa:

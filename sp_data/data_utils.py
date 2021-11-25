@@ -10,7 +10,7 @@ from Bio import SeqIO
 
 
 class SPCSpredictionData:
-    def __init__(self, lbl2ind=None, form_sp_reg_data=False, simplified=True, very_simplified=True):
+    def __init__(self, lbl2ind=None, form_sp_reg_data=False, simplified=True, very_simplified=True, extended_sublbs=False):
         self.aa2ind = {}
         self.lbl2ind = {}
         self.glbl_lbl_2ind = {}
@@ -18,11 +18,21 @@ class SPCSpredictionData:
         self.very_simplified = very_simplified
         self.data_folder = self.get_data_folder()
         self.lg2ind = {}
+        self.extended_sublbs = extended_sublbs
         self.form_sp_reg_data = form_sp_reg_data
         if form_sp_reg_data:
             self.set_dicts(form_sp_reg_data)
-            self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(
-                open("sp6_dicts_subregion_lbls.bin", "rb"))
+            if extended_sublbs:
+                self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(
+                    open("sp6_dicts_subregion_lbls.bin", "rb"))
+            else:
+                self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(
+                    open("sp6_dicts_subregion_lbls.bin", "rb"))
+            # {'P': 0, 'n': 1, 'h': 2, 'c': 3, 'N': 4, 'H': 5, 'R': 6, 'C': 7, 'B': 8, 'O': 9, 'M': 10, 'I': 11,
+            #  'PD': 12, 'BS': 13, 'ES': 14},
+            # {'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
+            # {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5},
+            # {'V': 0, 'R': 1, 'D': 2, 'E': 3, 'H': 4, 'A': 5, 'G': 6, 'Y': 7, 'W': 8, 'F': 9, 'M': 10, 'K': 11, 'L': 12, 'I': 13, 'C': 14, 'Q': 15, 'S': 16, 'P': 17, 'N': 18, 'T': 19, 'PD': 20, 'BS': 21, 'ES': 22}]
         else:
             self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
         if not os.path.exists(self.get_data_folder() + "sp6_partitioned_data_sublbls_test_0.bin"):
@@ -35,7 +45,15 @@ class SPCSpredictionData:
     def set_dicts(self, form_sp_reg_data=False):
 
         if form_sp_reg_data:
-            if self.very_simplified:
+            if self.extended_sublbs:
+                dicts = [{'P': 0, 'n': 1, 'h': 2, 'c': 3, 'N': 4, 'H': 5, 'R': 6, 'C': 7, 'B': 8, 'O': 9, 'M': 10, 'I': 11,'PD': 12, 'BS': 13, 'ES': 14},
+                         {'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
+                         {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5},
+                         {'V': 0, 'R': 1, 'D': 2, 'E': 3, 'H': 4, 'A': 5, 'G': 6, 'Y': 7, 'W': 8, 'F': 9, 'M': 10,
+                          'K': 11, 'L': 12, 'I': 13, 'C': 14, 'Q': 15, 'S': 16, 'P': 17, 'N': 18, 'T': 19, 'PD': 20,
+                          'BS': 21, 'ES': 22},
+                         ]
+            elif self.very_simplified:
                 dicts = [{'S': 0, 'O': 1, 'M': 2, 'I': 3, 'PD': 4, 'BS': 5, 'ES': 6},
                          {'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
                          {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5},
@@ -602,3 +620,7 @@ def get_residue_label_loss_weights():
     lbl2weights = {k:min_count/v for k,v in aalbl2count.items()}
     lbl2weights.update({'PD':1, 'BS':1, 'ES':1})
     return lbl2weights
+
+
+if __name__=="__main__":
+    sp_data = SPCSpredictionData(form_sp_reg_data=True)
