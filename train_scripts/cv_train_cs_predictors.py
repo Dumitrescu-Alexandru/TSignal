@@ -34,7 +34,7 @@ def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, 
                              tuning_bert=tune_bert)
     for p in model.parameters():
         if p.dim() > 1:
-            nn.init.xavier_uniform_(p, gain=nn.init.calculate_gain("relu"))
+            nn.init.xavier_uniform_(p)
     return model
 
 
@@ -247,32 +247,74 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 
 
-def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=3):
+def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
+                  test_only_cs=False, glbl_lbls=None, tune_bert=False, beam_width=2):
     ind2lbl = {v: k for k, v in lbl2ind.items()}
+    ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     src = src
+    all_outs = []
+    model.eval()
     seq_lens = [len(src_) for src_ in src]
     with torch.no_grad():
-        memory = model.encode(src)
+        if tune_bert:
+            seq_lengths = [len(s) for s in src]
+            seqs = [" ".join(r_ for r_ in s) for s in src]
+            inputs = model.tokenizer.batch_encode_plus(seqs,
+                                                       add_special_tokens=model.hparams.special_tokens,
+                                                       padding=True,
+                                                       truncation=True,
+                                                       max_length=model.hparams.max_length)
+            input_ids = torch.tensor(inputs['input_ids'], device=model.device)
+            attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
+            memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
+            memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
+        else:
+            memory = model.encode(src)
+        if second_model is not None:
+            memory_2nd_mdl = model.encode(src)
+        else:
+            memory_2nd_mdl = None
+        if tune_bert and model.classification_head.glbl_lbl_version and model.classification_head.use_glbl_lbls or \
+                not tune_bert and model.glbl_lbl_version == 3 and model.use_glbl_lbls:
+            if test_only_cs:
+                batch_size = len(src)
+                glbl_labels = torch.zeros(batch_size, 6)
+                glbl_labels[list(range(batch_size)), glbl_lbls] = 1
+                _, glbl_preds = torch.max(glbl_labels, dim=1)
+            else:
+                if tune_bert:
+                    glbl_labels = model.classification_head.get_v3_glbl_lbls(memory_bfd, inp_seqs=src)
+                    _, glbl_preds = torch.max(glbl_labels, dim=1)
+                else:
+                    glbl_labels = model.get_v3_glbl_lbls(src)
+                    _, glbl_preds = torch.max(glbl_labels, dim=1)
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
     ys = []
     if not ys:
         for _ in range(len(src)):
             ys.append([])
-    model.eval()
+    start_ind = 0
     all_probs, sp_probs, sp_logits = [], [], []
     current_batch_size = len(src)
     log_probs = torch.zeros(current_batch_size, beam_width)
-    for i in range(max(seq_lens) + 1):
+    for i in range(start_ind, max(seq_lens) + 1):
         with torch.no_grad():
             tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
             # seq len, batch size, emb dimensions
             # 5,5,3 -> 5,15,3 -> 5,3,15 ->
             if i == 1:
                 memory = memory.repeat(1, 1, beam_width).reshape(memory.shape[0], current_batch_size * beam_width, -1)
-            out = model.decode(ys, memory.to(device), tgt_mask.to(device))
-            out = out.transpose(0, 1)
-            prob = model.generator(out[:, -1])
+            if tune_bert:
+                out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
+                out = out.transpose(0, 1)
+                prob = model.classification_head.generator(out[:, -1])
+                all_outs.append(out[:, -1])
+            else:
+                out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+                out = out.transpose(0, 1)
+                prob = model.generator(out[:, -1])
+                all_outs.append(out[:, -1])
         softmax_probs = torch.nn.functional.softmax(prob, dim=-1)
         beam_probs, next_words = torch.topk(torch.nn.functional.softmax(prob, dim=-1), beam_width, dim=1)
         if i == 0:
@@ -341,7 +383,7 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, beam_width=3):
                                               seq_ind * beam_width + next_chosen_seq // beam_width, next_chosen_seq % beam_width].item())
         ys = current_ys
 
-    return ys, torch.tensor([0.1])
+    return ys, torch.tensor([0.1]), sp_probs, torch.tensor([1])
 
 
 def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False,
@@ -357,8 +399,11 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_b
         return tgt_tokens, probs, sp_probs, \
                all_sp_probs, all_seq_sp_logits, sp_type_probs
     if use_beams_search:
-        tgt_tokens, probs = beam_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind, tgt=tgt)
-        sp_probs, all_sp_probs, all_seq_sp_logits = None, None, None
+        tgt_tokens, probs, sp_probs, all_sp_probs = beam_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind,
+                                           tgt=tgt, form_sp_reg_data=form_sp_reg_data,
+                                           second_model=second_model, test_only_cs=test_only_cs,
+                                           glbl_lbls=glbl_lbls, tune_bert=tune_bert, beam_width=3)
+        all_seq_sp_logits = None, None, None
     else:
         tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = greedy_decode(model, src, start_symbol=bos_id,
                                                                                      lbl2ind=lbl2ind, tgt=tgt, tune_bert=tune_bert)
@@ -484,7 +529,6 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
                                     glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data,
                                     tuned_bert_embs_prefix=tuned_bert_embs_prefix)
-
         dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                      batch_size=test_batch_size, shuffle=False,
                                                      num_workers=4, collate_fn=collate_fn)
@@ -723,7 +767,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             },
         ]
         # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
-        optimizer = optim.Adam(parameters,  betas=(0.9, 0.98), lr=lr,  eps=1e-9, weight_decay=wd)
+        optimizer = optim.Adam(parameters,  lr=lr,  eps=1e-9, weight_decay=wd)#  ,betas=(0.9, 0.98),)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
     if use_swa:
@@ -1007,9 +1051,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
         if test_beam:
             model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix)
-            evaluate(model, sp_data.lbl2ind, run_name="best_beam_" + run_name, partitions=test_partition,
-                     sets=["train", "test"], use_beams_search=True, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                     tune_bert=tune_bert)
+            evaluate(model, sp_data.lbl2ind, run_name="best_beam_" + run_name + "_best", partitions=test_partition,
+                     sets=["train", "test"],
+                     form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model,
+                     very_simplified=very_simplified,
+                     glbl_lbl_2ind=sp_data.glbl_lbl_2ind, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                     tune_bert=tune_bert,use_beams_search=True)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
                 get_cs_and_sp_pred_results(filename="best_beam_" + run_name + ".bin".format(e), v=False)
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(

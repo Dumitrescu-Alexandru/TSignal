@@ -70,6 +70,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     count, count2 = 0, 0
     count_tol_fn, count_complete_fn, count_otherSPpred = 0, 0, 0
     sp_letter = sptype2letter[sp_type]
+    cnt1, cnt2 = 0, 0
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         lg, sp_info = l.split("|")
         ind = 0
@@ -102,6 +103,7 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     if v:
         print(" count_tol_fn, count_complete_fn, count_otherSPpred", count_tol_fn, count_complete_fn, count_otherSPpred)
     print(sp_type, "count, count2", count, count2 )
+    print(cnt1, cnt2)
     all_recalls = []
     all_precisions = []
     all_f1_scores = []
@@ -1692,16 +1694,29 @@ def pred_lipos():
                     print("ok, wrong")
 
 if __name__ == "__main__":
+    # visualize_validation(run="tune_bert_and_tnmnt_noglobal_folds_", folds=[0, 1],
+    #                      folder="tuning_bert_tune_bert_and_tnmnt_nogl/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_and_tnmnt_different_initialization/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_and_tnmnt_nogl_beam_test/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_tune_bert_and_tnmnt_nogl/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
-                                            benchmark=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
+                                            benchmark=True)
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
     exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_tune_bert_and_tnmnt_folds/",
