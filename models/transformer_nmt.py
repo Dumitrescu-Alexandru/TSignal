@@ -218,9 +218,9 @@ class TransformerModel(nn.Module):
         self.glbl_lbl_version = glbl_lbl_version
         if self.form_sp_reg_data and not use_glbl_lbls:
             self.glbl_generator = nn.Linear(ntoken, no_glbl_lbls).to(self.device)
-        elif use_glbl_lbls and self.glbl_lbl_version != 3:
+        elif use_glbl_lbls and self.glbl_lbl_version != 3 and self.glbl_lbl_version != 4:
             self.glbl_generator = nn.Linear(d_model, no_glbl_lbls).to(self.device)
-        elif self.use_glbl_lbls and self.glbl_lbl_version == 3:
+        elif self.use_glbl_lbls and self.glbl_lbl_version == 3 and self.glbl_lbl_version != 4:
             self.glbl_generator = CNN3(input_size=1024, output_size=no_glbl_lbls).to(self.device)
             # self.glbl_generator = BinarySPClassifier(input_size=1024, output_size=no_glbl_lbls).to(self.device)
 

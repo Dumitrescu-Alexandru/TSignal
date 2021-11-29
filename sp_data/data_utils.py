@@ -10,7 +10,7 @@ from Bio import SeqIO
 
 
 class SPCSpredictionData:
-    def __init__(self, lbl2ind=None, form_sp_reg_data=False, simplified=True, very_simplified=True, extended_sublbs=False):
+    def __init__(self, lbl2ind=None, form_sp_reg_data=False, simplified=True, very_simplified=True, extended_sublbls=False):
         self.aa2ind = {}
         self.lbl2ind = {}
         self.glbl_lbl_2ind = {}
@@ -18,11 +18,11 @@ class SPCSpredictionData:
         self.very_simplified = very_simplified
         self.data_folder = self.get_data_folder()
         self.lg2ind = {}
-        self.extended_sublbs = extended_sublbs
+        self.extended_sublbls = extended_sublbls
         self.form_sp_reg_data = form_sp_reg_data
         if form_sp_reg_data:
             self.set_dicts(form_sp_reg_data)
-            if extended_sublbs:
+            if extended_sublbls:
                 self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(
                     open("sp6_dicts_subregion_lbls.bin", "rb"))
             else:
@@ -35,7 +35,9 @@ class SPCSpredictionData:
             # {'V': 0, 'R': 1, 'D': 2, 'E': 3, 'H': 4, 'A': 5, 'G': 6, 'Y': 7, 'W': 8, 'F': 9, 'M': 10, 'K': 11, 'L': 12, 'I': 13, 'C': 14, 'Q': 15, 'S': 16, 'P': 17, 'N': 18, 'T': 19, 'PD': 20, 'BS': 21, 'ES': 22}]
         else:
             self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
-        if not os.path.exists(self.get_data_folder() + "sp6_partitioned_data_sublbls_test_0.bin"):
+        if not extended_sublbls and not os.path.exists(self.get_data_folder() + "sp6_partitioned_data_sublbls_test_0.bin"):
+            self.form_subregion_sp_data()
+        elif extended_sublbls and not os.path.exists(self.get_data_folder() + "sp6_partitioned_data_sublbls_test_0.bin"):
             self.form_subregion_sp_data()
         # if os.path.exists("sp6_dicts.bin"):
         #     self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
@@ -45,14 +47,15 @@ class SPCSpredictionData:
     def set_dicts(self, form_sp_reg_data=False):
 
         if form_sp_reg_data:
-            if self.extended_sublbs:
-                dicts = [{'P': 0, 'n': 1, 'h': 2, 'c': 3, 'N': 4, 'H': 5, 'R': 6, 'C': 7, 'B': 8, 'O': 9, 'M': 10, 'I': 11,'PD': 12, 'BS': 13, 'ES': 14},
+            if self.extended_sublbls:
+                dicts = [{'S': 0, 'R': 1, 'C': 2, 'O': 3, 'M': 4, 'I': 5, 'P':6, 'PD': 7, 'BS': 8, 'ES': 9},
                          {'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
                          {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5},
                          {'V': 0, 'R': 1, 'D': 2, 'E': 3, 'H': 4, 'A': 5, 'G': 6, 'Y': 7, 'W': 8, 'F': 9, 'M': 10,
-                          'K': 11, 'L': 12, 'I': 13, 'C': 14, 'Q': 15, 'S': 16, 'P': 17, 'N': 18, 'T': 19, 'PD': 20,
-                          'BS': 21, 'ES': 22},
-                         ]
+                          'K': 11,
+                          'L': 12,
+                          'I': 13, 'C': 14, 'Q': 15, 'S': 16, 'P': 17, 'N': 18, 'T': 19, 'PD': 20, 'BS': 21,
+                          'ES': 22}]
             elif self.very_simplified:
                 dicts = [{'S': 0, 'O': 1, 'M': 2, 'I': 3, 'PD': 4, 'BS': 5, 'ES': 6},
                          {'EUKARYA': 0, 'POSITIVE': 1, 'ARCHAEA': 2, 'NEGATIVE': 3},
@@ -92,7 +95,7 @@ class SPCSpredictionData:
         else:
             pickle.dump(dicts, open("sp6_dicts.bin", "wb"))
 
-    def get_subregions_labels(self, seq, lbls, glbl_lbl="SP"):
+    def get_subregions_labels(self, seq, lbls, glbl_lbl="SP", v=False):
         kyte_doolittle_hydrophobicity = {"A": 1.8, "C": 2.5, "D": -3.5, "E": -3.5, "F": 2.8, "G": -0.4, "H": -3.2,
                                          "I": 4.5, "K": -3.9,
                                          "L": 3.8, "M": 1.9, "N": -3.5, "P": -1.6, "Q": -3.5, "R": -4.5, "S": -0.8,
@@ -198,7 +201,7 @@ class SPCSpredictionData:
             h_ind = np.argmax(hydro_vals) + start_ind
             return h_ind, last_ind
 
-        possible_sp_letters = ["S", "T", "L", "P"]
+        possible_sp_letters = ["S", "T", "L", "P", "W"]
         #    sptype2letter = {'TAT':'T', 'LIPO':'L', 'PILIN':'P', 'TATLIPO':'T', 'SP':'S'}
         sp_letter = lbls[0]
         modified_lbls = ""
@@ -264,7 +267,7 @@ class SPCSpredictionData:
                 modified_lbls += "C" if not self.very_simplified else lbls[last_ind + 1]
                 modified_lbls += lbls[last_ind + 2:]
             elif glbl_lbl == "PILIN":
-                return lbls.replace("P", "S")
+                return lbls.replace("P", "S") if self.very_simplified else lbls
 
             return modified_lbls
         else:
@@ -334,21 +337,25 @@ class SPCSpredictionData:
         if os.path.exists("/scratch/work/dumitra1"):
             return "/scratch/work/dumitra1/sp_data/"
         elif os.path.exists("/home/alex"):
-            return "sp_data/"
+            if os.path.exists("sp_data"):
+                return "sp_data/"
+            else:
+                return "./"
         else:
             return "/scratch/project2003818/dumitra1/sp_data/"
 
 
 class CSPredsDataset(Dataset):
     def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True, sets=["train", "test"],
-                 test_f_name="", form_sp_reg_data=False, tuned_bert_embs_prefix=""):
+                 test_f_name="", form_sp_reg_data=False, tuned_bert_embs_prefix="", extended_sublbls=False):
+        extended_pref = "extended_" if extended_sublbls else ""
         self.life_grp, self.seqs, self.lbls, self.glbl_lbl = [], [], [], []
         if partitions is not None:
             # when using partitions, the sp6 data partition files will be used in train/testing
             for p in partitions:
                 for s in sets:
-                    d_file = tuned_bert_embs_prefix + "sp6_partitioned_data_sublbls_{}_{}.bin".format(s, p) if form_sp_reg_data else \
-                        tuned_bert_embs_prefix + "sp6_partitioned_data_{}_{}.bin".format(s, p)
+                    d_file = tuned_bert_embs_prefix + "sp6_partitioned_data_sublbls_"+extended_pref+"{}_{}.bin".format(s, p) if form_sp_reg_data else \
+                        tuned_bert_embs_prefix + "sp6_partitioned_data_"+extended_pref+"{}_{}.bin".format(s, p)
 
                     data_dict = pickle.load(open(data_folder + d_file, "rb"))
                     self.seqs.extend(list(data_dict.keys()))
@@ -623,4 +630,19 @@ def get_residue_label_loss_weights():
 
 
 if __name__=="__main__":
-    sp_data = SPCSpredictionData(form_sp_reg_data=True)
+    sp_data = SPCSpredictionData(form_sp_reg_data=True, extended_sublbls=True, simplified=True,very_simplified=False)
+    data_folder ="./"
+    print(sp_data.simplified)
+    for tr_f in [0, 1, 2]:
+        for t_set in ["train", "test"]:
+            print(t_set, tr_f)
+            sp_subregion_data = {}
+            data = pickle.load(
+                open(data_folder + "sp6_partitioned_data_{}_{}.bin".format(t_set, tr_f), "rb"))
+            for seq, (emb, lbls, l_grp, sp_type) in data.items():
+                sp_subregion_data[seq] = [emb, sp_data.get_subregions_labels(seq, lbls, glbl_lbl=sp_type), l_grp,
+                                          sp_type]
+
+            pickle.dump(sp_subregion_data,
+                        open(data_folder + "sp6_partitioned_data_sublbls_extended_{}_{}.bin".format(t_set, tr_f),
+                             "wb"))

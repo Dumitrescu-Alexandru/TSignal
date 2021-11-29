@@ -734,11 +734,7 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
             elif "TEST" in l and "epoch" in l and "mcc" in l:
                 best_ep = int(l.split(":")[2].split("epoch")[-1].replace(" ", ""))
                 avg_last_5 = []
-                if 52 not in ep2mcc:
-                    print("happened")
-                    ep2mcc[52] = 0.9427959762122504
                 for i in range(5):
-                    print(ep2mcc)
                     best_mcc = ep2mcc[best_ep - i]
                     avg_last_5.append(best_mcc)
                 best_mcc = np.mean(avg_last_5)
@@ -1698,6 +1694,11 @@ def pred_lipos():
                     print("ok, wrong")
 
 if __name__ == "__main__":
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_and_tnmnt_repeat_best_experiment/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
     # visualize_validation(run="tune_bert_and_tnmnt_noglobal_folds_", folds=[0, 1],
     #                      folder="tuning_bert_tune_bert_and_tnmnt_nogl/")
     mdl2results = extract_all_param_results(only_cs_position=False,

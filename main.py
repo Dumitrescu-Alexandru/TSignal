@@ -95,6 +95,7 @@ def parse_arguments():
     parser.add_argument("--tuned_bert_embs", default=False, action="store_true")
     parser.add_argument("--tune_bert", default=False, action="store_true")
     parser.add_argument("--frozen_epochs", default=3, type=int)
+    parser.add_argument("--extended_sublbls", default=False, action="store_true")
 
     return parser.parse_args()
 
@@ -219,7 +220,7 @@ if __name__ == "__main__":
                                 no_pos_enc=args.no_pos_enc, linear_pos_enc=args.linear_pos_enc, scale_input=args.scale_input,
                                 test_only_cs=args.test_only_cs, weight_class_loss=args.weight_class_loss, weight_lbl_loss=args.weight_lbl_loss,
                                 account_lipos=args.account_lipos, tuned_bert_embs=args.tuned_bert_embs,
-                                tune_bert=args.tune_bert, frozen_epochs=args.frozen_epochs)
+                                tune_bert=args.tune_bert, frozen_epochs=args.frozen_epochs, extended_sublbls=args.extended_sublbls)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
