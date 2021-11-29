@@ -462,12 +462,12 @@ def modify_sp_subregion_preds_and_retrieve_sptype_pred(predicted_lbls):
         if "RR" in predicted_lbls:
             if "C" in predicted_lbls:
                 # not necessarely correct <- should replace C with the I/O/M that comes right after
-                return glbl_lbl_2ind["TATLIPO"], predicted_lbls.replace("RR", "SS").replace("C", "I")
+                return glbl_lbl_2ind["TATLIPO"], predicted_lbls.replace("RR", "SS").replace("C", "I").replace("S", "T")
             else:
-                return glbl_lbl_2ind["TAT"], predicted_lbls.replace("RR", "SS")
+                return glbl_lbl_2ind["TAT"], predicted_lbls.replace("RR", "SS").replace("S", "T")
         elif "C" in predicted_lbls:
             # not necessarely correct <- should replace C with the I/O/M that comes right after (same as above)
-            return glbl_lbl_2ind["LIPO"], predicted_lbls.replace("C", "I")
+            return glbl_lbl_2ind["LIPO"], predicted_lbls.replace("C", "I").replace("S", "L")
         elif "P" in predicted_lbls:
             return glbl_lbl_2ind["PILIN"], predicted_lbls
         else:
