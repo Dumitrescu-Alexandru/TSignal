@@ -964,10 +964,16 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     sp6_f1_sp2 = get_f1_scores(sp6_recalls_sp2, sp6_precs_sp2)
     sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
 
-    no_of_seqs_sp1 = list(np.array([2040, 44, 142, 356]).repeat(4))
-    no_of_seqs_sp2 = list(np.array([1087, 516, 12]).repeat(4))
-    no_of_seqs_tat = list(np.array([313 ,39, 13]).repeat(4))
-    no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313 ,39, 13])
+    if benchmark:
+        no_of_seqs_sp1 = list(np.array([146, 61, 15, 36]).repeat(4))
+        no_of_seqs_sp2 = list(np.array([257, 120, 9]).repeat(4))
+        no_of_seqs_tat = list(np.array([51 ,18, 9]).repeat(4))
+        no_of_tested_sp_seqs = sum([146, 61, 15, 36]) + sum([257, 120, 9]) + sum([51 ,18, 9])
+    else:
+        no_of_seqs_sp1 = list(np.array([2040, 44, 142, 356]).repeat(4))
+        no_of_seqs_sp2 = list(np.array([1087, 516, 12]).repeat(4))
+        no_of_seqs_tat = list(np.array([313 ,39, 13]).repeat(4))
+        no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313 ,39, 13])
     sp6_summarized = np.sum((np.array(sp6_f1_sp1) * np.array(no_of_seqs_sp1))) / no_of_tested_sp_seqs + \
                         np.sum((np.array(sp6_f1_sp2) * np.array(no_of_seqs_sp2))) / no_of_tested_sp_seqs + \
                         np.sum((np.array(sp6_f1_tat) * np.array(no_of_seqs_tat))) / no_of_tested_sp_seqs
@@ -1425,6 +1431,24 @@ def correct_duplicates_training_data():
             else:
                 pickle.dump(new_seqs_2_info, open("../sp_data/sp6_partitioned_data_{}_{}.bin".format(t_s, tr_f), "wb"))
 
+def count_seqs_lgs(seqs):
+    file_new = "../sp_data/sp6_data/train_set.fasta"
+    id2seq = {}
+    id2lg = {}
+    id2type = {}
+    id2truelbls = {}
+    ids_benchmark_sp5 = []
+    seen_seqs = []
+    count_seqs = {"EUKARYA":{"NO_SP":0, "SP":0}, "NEGATIVE":{"NO_SP":0, "SP":0, "TAT":0, "TATLIPO":0, "PILIN":0, "LIPO":0},
+                  "POSITIVE":{"NO_SP":0, "SP":0, "TAT":0, "TATLIPO":0, "PILIN":0, "LIPO":0}, "ARCHAEA":{"NO_SP":0, "SP":0, "TAT":0, "TATLIPO":0, "PILIN":0, "LIPO":0}}
+    for seq_record in SeqIO.parse(file_new, "fasta"):
+        if str(seq_record.seq[:len(seq_record.seq) // 2]) in seqs and str(seq_record.seq[:len(seq_record.seq) // 2]) not in seen_seqs:
+            seen_seqs.append(seq_record.seq[:len(seq_record.seq) // 2])
+            sp_type = str(seq_record.id.split("|")[2])
+            lg = str(seq_record.id.split("|")[1])
+            count_seqs[lg][sp_type] +=1
+    print(count_seqs)
+
 def extract_id2seq_dict(file="train_set.fasta"):
 
     # for seq_record in SeqIO.parse(file_new, "fasta"):
@@ -1694,6 +1718,42 @@ def pred_lipos():
                     print("ok, wrong")
 
 if __name__ == "__main__":
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_and_tnmnt_noglobal_extendedsublbls_nodrop_folds/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_and_tnmnt_repeat_best_experiment/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_tune_bert_noglobal_extendedsublbls_folds/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_and_tnmnt_folds/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    visualize_validation(run="tune_bert_and_tnmnt_folds_", folds=[0, 1],
+                         folder="tuning_bert_tune_bert_and_tnmnt_folds/")
+    visualize_validation(run="repeat_best_experiment_", folds=[0, 1],
+                         folder="tuning_bert_tune_bert_and_tnmnt_repeat_best_experiment/")
+    visualize_validation(run="tune_bert_and_tnmnt_noglobal_extendedsublbls_folds_", folds=[0, 1],
+                         folder="tuning_bert_tune_bert_noglobal_extendedsublbls_folds/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_noglobal_extendedsublbls_folds/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_tune_bert_and_tnmnt_repeat_best_experiment/",
                                             compare_mdl_plots=False,

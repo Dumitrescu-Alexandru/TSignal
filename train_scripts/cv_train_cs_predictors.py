@@ -797,7 +797,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             {"params": model.classification_head.parameters()},
             {
                 "params": model.ProtBertBFD.parameters(),
-                "lr": lr * 0.1,
+                "lr": lr,
             },
         ]
         # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
