@@ -347,16 +347,15 @@ class SPCSpredictionData:
 
 class CSPredsDataset(Dataset):
     def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True, sets=["train", "test"],
-                 test_f_name="", form_sp_reg_data=False, tuned_bert_embs_prefix="", extended_sublbls=False):
+                 test_f_name="", form_sp_reg_data=False, tuned_bert_embs_prefix="", extended_sublbls=False, random_folds_prefix=""):
         extended_pref = "extended_" if extended_sublbls else ""
         self.life_grp, self.seqs, self.lbls, self.glbl_lbl = [], [], [], []
         if partitions is not None:
             # when using partitions, the sp6 data partition files will be used in train/testing
             for p in partitions:
                 for s in sets:
-                    d_file = tuned_bert_embs_prefix + "sp6_partitioned_data_sublbls_"+extended_pref+"{}_{}.bin".format(s, p) if form_sp_reg_data else \
-                        tuned_bert_embs_prefix + "sp6_partitioned_data_"+extended_pref+"{}_{}.bin".format(s, p)
-
+                    d_file = random_folds_prefix + tuned_bert_embs_prefix + "sp6_partitioned_data_sublbls_"+extended_pref+"{}_{}.bin".format(s, p) if form_sp_reg_data else \
+                        random_folds_prefix + tuned_bert_embs_prefix + "sp6_partitioned_data_"+extended_pref+"{}_{}.bin".format(s, p)
                     data_dict = pickle.load(open(data_folder + d_file, "rb"))
                     self.seqs.extend(list(data_dict.keys()))
                     self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])

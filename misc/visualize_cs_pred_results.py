@@ -1,3 +1,4 @@
+import random
 from io import StringIO
 import requests as r
 
@@ -647,7 +648,8 @@ def remove_from_dictionary(res_dict, test_fld):
 
 
 def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder="results_param_s_2/",
-                              only_cs_position=False, remove_test_seqs=False, return_sptype_f1=False, benchmark=True):
+                              only_cs_position=False, remove_test_seqs=False, return_sptype_f1=False, benchmark=True,
+                              restrict_types=None):
     full_dict_results = {}
     full_sptype_dict = {}
     epochs = []
@@ -659,12 +661,17 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
             except:
                 epochs.append(int(lines[-2].split(":")[-3].split(" ")[-1]))
     avg_epoch = np.mean(epochs)
-    id2seq, _, _, _ = extract_id2seq_dict()
+    id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict()
     unique_bench_seqs = set(id2seq.values())
+    seq2type = {}
+    for id, seq in id2seq.items():
+        seq2type[seq] = id2type[id]
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
         res_dict = pickle.load(open(result_folder + run + "_{}_{}_best.bin".format(tr_folds[0], tr_folds[1]), "rb"))
         if benchmark:
             res_dict = {k:v for k,v in res_dict.items() if k in unique_bench_seqs}
+        if restrict_types is not None:
+            res_dict = {k:v for k,v in res_dict.items() if seq2type[k] in restrict_types}
         if os.path.exists(result_folder + run + "_{}_{}_best_sptype.bin".format(tr_folds[0], tr_folds[1])):
             sptype_dict = pickle.load(open(result_folder + run + "_{}_{}_best_sptype.bin".format(tr_folds[0], tr_folds[1]), "rb"))
             full_sptype_dict.update(sptype_dict)
@@ -951,7 +958,7 @@ def get_f1_scores(rec, prec):
 
 
 def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False, compare_mdl_plots=False,
-                              remove_test_seqs=False, benchmark=True):
+                              remove_test_seqs=False, benchmark=True, restrict_types=None):
     sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
                        0.556, 0.583]
     sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
@@ -1008,7 +1015,8 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat, f1_scores_sptype \
             = extract_mean_test_results(run=u_p, result_folder=result_folder,
                                         only_cs_position=only_cs_position,
-                                        remove_test_seqs=remove_test_seqs, return_sptype_f1=True, benchmark=benchmark)
+                                        remove_test_seqs=remove_test_seqs, return_sptype_f1=True, benchmark=benchmark,
+                                        restrict_types=restrict_types)
         all_recalls_lipo, all_precisions_lipo, \
         all_recalls_tat, all_precisions_tat, = list(np.reshape(np.array(all_recalls_lipo), -1)), list(
             np.reshape(np.array(all_precisions_lipo), -1)), \
@@ -1356,23 +1364,24 @@ def prep_sp1_sp2():
     seqs, ids = [], []
     lines = []
     for seq_record in SeqIO.parse(file_new, "fasta"):
-        if seq_record.id.split("|")[0] in ids_benchmark_sp5 and "ARCHAEA" in seq_record.id:
+        if seq_record.id.split("|")[0] in ids_benchmark_sp5 and seq_record.id.split("|")[2] in ["SP", "NO_SP", "TAT"]:
             seqs.append(seq_record.seq[:len(seq_record.seq) // 2])
             ids.append(seq_record.id)
             lines.append(">"+ids[-1]+"\n")
             lines.append(str(seqs[-1])+"\n")
-    for i in range(len(lines) // 50000 + 1) :
-        with open("sp1_sp2_fastas/deepsig_arch.fasta".format(i), "wt") as f:
-            f.writelines(lines[i * 50000:(i+1) * 50000])
+    for i in range(len(lines) // 1000 + 1) :
+        with open("sp1_sp2_fastas/predTat_{}.fasta".format(i), "wt") as f:
+            f.writelines(lines[i * 1000:(i+1) * 1000])
 
 def ask_uniprot():
-    cID='P0AAK7'
+    cID='Q70UQ6'
 
     baseUrl="http://www.uniprot.org/uniprot/"
-    currentUrl=baseUrl+cID+".fasta"
+    currentUrl=baseUrl+cID+".gff"
     response = r.post(currentUrl)
     cData=''.join(response.text)
-    return int(cData.split("PE=")[1].split(" ")[0])
+    print(cData)
+
 
 def correct_duplicates_training_data():
     sublbls=True
@@ -1484,12 +1493,75 @@ def extract_id2seq_dict(file="train_set.fasta"):
             lg_sptype2count[v + "_" + id2type[k]] += 1
     return id2seq, id2lg, id2type, id2truelbls
 
+def extract_compatible_binaries_predtat(restrict_types=None):
+    ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
+    glbllbl2_ind = {v: k for k, v in ind2glbl_lbl.items()}
+    id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict(file="train_set.fasta")
+    id2seq_b5, id2truelbls_b5, id2lg_b5, id2type_b5 = extract_id2seq_dict(file="benchmark_set_sp5.fasta")
+    for k in id2seq_b5.keys():
+        if k not in id2seq:
+            id2seq[k] = id2seq_b5[k]
+            id2truelbls[k] = id2truelbls_b5[k]
+            id2lg[k] = id2lg_b5[k]
+            id2type[k] = id2type_b5[k]
 
-def extract_compatible_binaries_lipop():
+    with open("sp1_sp2_fastas/predTat_results.txt", "rt") as f:
+        lines = f.readlines()
+    ids = set(id2seq.keys())
+    # print(len(ids), lines[0])
+    # line = lines[0].replace("#", "")
+    # all_ids = set([line.split("_")[0].replace("#", "").replace(" ", "") for line in lines])
+    # print(len(all_ids.intersection(ids)))
+    # exit(1)
+    seq2sptype = {}
+    seq2aalbls = {}
+    sp_letter = ""
+    life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
+    restrict_types = restrict_types if restrict_types is not None else ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
+    for l in lines:
+        id = l.split("|")[0]
+        if id in ids and id2type[id] in restrict_types:
+            if id2type[id] not in ["SP", "TAT", "NO_SP"]:
+                print(id, id2type[id])
+            life_grp.append(id2lg[id] + "|" + id2type[id])
+            seqs.append(id2seq[id])
+            true_lbls.append(id2truelbls[id])
+
+            if "Sec signal peptide" in l:
+                seq2sptype[id2seq[id]] = glbllbl2_ind['SP']
+                sp_letter = "S"
+                cs_point = int(l.split("Most likely cleavage site: ")[-1].split("[")[0].split("-")[-1].replace(" ", ""))
+            elif "Tat signal peptide" in l:
+                seq2sptype[id2seq[id]] = glbllbl2_ind['TAT']
+                sp_letter = "T"
+                cs_point = int(l.split("Most likely cleavage site: ")[-1].split("[")[0].split("-")[-1].replace(" ", ""))
+            else:
+                seq2sptype[id2seq[id]] = glbllbl2_ind['NO_SP']
+                cs_point = None
+            if cs_point is not None:
+                lblseq = cs_point * sp_letter + (len(id2seq[id]) - cs_point) * "O"
+                seq2aalbls[id2seq[id]] = lblseq
+            else:
+                seq2aalbls[id2seq[id]] = "O" * len(id2seq[id])
+            pred_lbls.append(seq2aalbls[id2seq[id]])
+    # all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
+    #     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT",
+    #                sptype_preds=seq2sptype)
+    # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
+    # print([round(i, 2) for i in np.array(all_precisions).reshape(-1)])
+    # print([round(i, 2) for i in np.array(all_f1_scores).reshape(-1)])
+    all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
+                   sptype_preds=seq2sptype)
+    # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
+    # print([round(i, 2) for i in np.array(all_precisions).reshape(-1)])
+    # print([round(i, 2) for i in np.array(all_f1_scores).reshape(-1)])
+    return all_recalls, all_precisions, all_f1_scores
+
+def extract_compatible_binaries_lipop(restrict_types=None):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
-    id2seq, id2truelbls, id2lg, id2type = extract_id2seq_dict(file="train_set.fasta")
-
+    id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict(file="train_set.fasta")
     id2seq_b5, id2truelbls_b5, id2lg_b5, id2type_b5 = extract_id2seq_dict(file="benchmark_set_sp5.fasta")
     for k in id2seq_b5.keys():
         if k not in id2seq:
@@ -1500,56 +1572,75 @@ def extract_compatible_binaries_lipop():
 
     with open("sp1_sp2_fastas/results.txt", "rt") as f:
         lines = f.readlines()
+    ids = set(id2seq.keys())
+    # print(len(ids), lines[0])
+    # line = lines[0].replace("#", "")
+    # all_ids = set([line.split("_")[0].replace("#", "").replace(" ", "") for line in lines])
+    # print(len(all_ids.intersection(ids)))
+    # exit(1)
     seq2sptype = {}
     seq2aalbls = {}
     sp_letter = ""
     life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
+    restrict_types = restrict_types if restrict_types is not None else ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
+
     for l in lines:
         line = l.replace("#", "")
         id = line.split("_")[0].replace(" ", "")
-        life_grp.append(id2lg[id] + "|" + id2type[id])
-        seqs.append(id2seq[id])
-        true_lbls.append(id2truelbls[id])
+        if id in ids and id2type[id] in restrict_types:
+            if id2type[id] not in ["SP", "LIPO", "NO_SP"]:
+                print(id, id2type[id])
+            life_grp.append(id2lg[id] + "|" + id2type[id])
+            seqs.append(id2seq[id])
+            true_lbls.append(id2truelbls[id])
 
-        if "SpI" in line and not "SpII" in line:
-            seq2sptype[id2seq[id]] = glbllbl2_ind['SP']
-            sp_letter = "S"
-        elif "SpII" in line:
-            seq2sptype[id2seq[id]] = glbllbl2_ind['LIPO']
-            sp_letter = "L"
-        else:
-            seq2sptype[id2seq[id]] = glbllbl2_ind['NO_SP']
-        if "cleavage" in line:
-            cs_point = int(line.split("cleavage=")[1].split("-")[0])
-            lblseq = cs_point * sp_letter + (len(id2seq[id]) -cs_point) * "O"
-            seq2aalbls[id2seq[id]] = lblseq
-        else:
-            seq2aalbls[id2seq[id]] = "O" * len(id2seq[id])
-        pred_lbls.append(seq2aalbls[id2seq[id]])
+            if "SpI" in line and not "SpII" in line:
+                seq2sptype[id2seq[id]] = glbllbl2_ind['SP']
+                sp_letter = "S"
+            elif "SpII" in line:
+                seq2sptype[id2seq[id]] = glbllbl2_ind['LIPO']
+                sp_letter = "L"
+            else:
+                seq2sptype[id2seq[id]] = glbllbl2_ind['NO_SP']
+            if "cleavage" in line:
+                cs_point = int(line.split("cleavage=")[1].split("-")[0])
+                lblseq = cs_point * sp_letter + (len(id2seq[id]) -cs_point) * "O"
+                seq2aalbls[id2seq[id]] = lblseq
+            else:
+                seq2aalbls[id2seq[id]] = "O" * len(id2seq[id])
+            pred_lbls.append(seq2aalbls[id2seq[id]])
+    # all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
+    #     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO", sptype_preds=seq2sptype)
+    # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
+    # print([round(i, 2) for i in np.array(all_precisions).reshape(-1)])
+    # print([round(i, 2) for i in np.array(all_f1_scores).reshape(-1)])
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO", sptype_preds=seq2sptype)
-    print(all_recalls)
-    print(all_precisions)
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
+    # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
+    # print([round(i, 2) for i in np.array(all_precisions).reshape(-1)])
+    # print([round(i, 2) for i in np.array(all_f1_scores).reshape(-1)])
+    return all_recalls, all_precisions, all_f1_scores
     tp, fn, fp = 0, 0, 0
     different_types = 0
     crct =0
-    for s, pl, tl, lg in zip(seqs, pred_lbls, true_lbls, life_grp):
-        if "EUKARYA" in lg and "SP" in lg and "NO_SP" not in lg:
-            if -1 <= pl.rfind("S") - tl.rfind("S") <= 1:
-                tp += 1
-            else:
-                fn += 1
-        if "LIPO" in lg and "NO_SP" not in lg and pl[0] != tl[0]:
-            different_types+=1
-        elif "LIPO" in lg and "NO_SP" not in lg:
-            crct +=1
-    print(different_types, crct)
-    print(tp/(tp+fn), tp, fn)
+    # SANITY CHECKS
+    # for s, pl, tl, lg in zip(seqs, pred_lbls, true_lbls, life_grp):
+    #     if "EUKARYA" in lg and "SP" in lg and "NO_SP" not in lg:
+    #         if -1 <= pl.rfind("S") - tl.rfind("S") <= 1:
+    #             tp += 1
+    #         else:
+    #             fn += 1
+    #     if "LIPO" in lg and "NO_SP" not in lg and pl[0] != tl[0]:
+    #         different_types+=1
+    #     elif "LIPO" in lg and "NO_SP" not in lg:
+    #         crct +=1
+    # print(different_types, crct)
+    # print(tp/(tp+fn), tp, fn)
     # pickle.dump(seq2sptype, open("lipoP_0_1_best_sptype.bin", "wb"))
     # pickle.dump(seq2aalbls, open("lipoP_0_1.bin", "wb"))
     # for l in lines:
 
-def extract_compatible_binaries_deepsig():
+def extract_compatible_binaries_deepsig(restrict_types=None):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
     id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict(file="train_set.fasta")
@@ -1562,9 +1653,11 @@ def extract_compatible_binaries_deepsig():
     sp_letter = ""
     life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
     added_seqs = set()
+    restrict_types = restrict_types if restrict_types is not None else ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
+
     for l in lines:
         id = l.split("|")[0]
-        if id in id2seq and id2seq[id] not in added_seqs:
+        if id in id2seq and id2seq[id] not in added_seqs and id2type[id] in restrict_types:
             life_grp.append(id2lg[id] + "|" + id2type[id])
             seqs.append(id2seq[id])
             added_seqs.add(id2seq[id])
@@ -1584,22 +1677,26 @@ def extract_compatible_binaries_deepsig():
     print(len(seqs), len(set(seqs)))
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
-    print(all_recalls, all_precisions)
+    # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
+    # print([round (i, 2) for i in np.array(all_precisions).reshape(-1)])
+    # print([round (i, 2) for i in np.array(all_f1_scores).reshape(-1)])
+    return all_recalls, all_precisions, all_f1_scores
     tp, fn, fp = 0, 0, 0
     different_types = 0
     crct =0
-    for s, pl, tl, lg in zip(seqs, pred_lbls, true_lbls, life_grp):
-        if "EUKARYA" in lg and "SP" in lg and "NO_SP" not in lg:
-            if -1 <= pl.rfind("S") - tl.rfind("S") <= 1:
-                tp += 1
-            else:
-                fn += 1
+    # Just some sanity checks here
+    # for s, pl, tl, lg in zip(seqs, pred_lbls, true_lbls, life_grp):
+    #     if "EUKARYA" in lg and "SP" in lg and "NO_SP" not in lg:
+    #         if -1 <= pl.rfind("S") - tl.rfind("S") <= 1:
+    #             tp += 1
+    #         else:
+    #             fn += 1
         # if "LIPO" in lg and "NO_SP" not in lg and pl[0] != tl[0]:
         #     different_types+=1
         # elif "LIPO" in lg and "NO_SP" not in lg:
         #     crct +=1
-    print(different_types, crct)
-    print(tp/(tp+fn), tp, fn)
+    # print(different_types, crct)
+    # print(tp/(tp+fn), tp, fn)
     # pickle.dump(seq2sptype, open("lipoP_0_1_best_sptype.bin", "wb"))
     # pickle.dump(seq2aalbls, open("lipoP_0_1.bin", "wb"))
     # for l in lines:
@@ -1717,7 +1814,264 @@ def pred_lipos():
                 if v[-1] == "TATLIPO":
                     print("ok, wrong")
 
+def plot_performance():
+    sp1_euk_0tol_ = [0.537, 0.654, 0.693, 0.7]
+    sp1_euk_3tol_ = [0.646, 0.786, 0.779, 0.78]
+    sp1_neg_0tol_ = [0.365, 0.454, 0.493, 0.58]
+    sp1_neg_3tol_ = [0.486, 0.589, 0.606, 0.66]
+    sp1_pos_0tol_ = [0.103, 0.2, 0.486, 0.71]
+    sp1_pos_3tol_ = [0.256, 0.233, 0.541, 0.71]
+    sp1_arch_0tol_ = [0.256, 0.493, 0.533, 0.56]
+    sp1_arch_3tol_ = [0.531, 0.667, 0.667, 0.66]
+    all_sp1s = [sp1_euk_0tol_, sp1_euk_3tol_, sp1_neg_0tol_, sp1_neg_3tol_, sp1_pos_0tol_, sp1_pos_3tol_, sp1_arch_0tol_, sp1_arch_3tol_]
+
+    sp2_neg_0tol_ = [0.811, 0.878, 0.896, 0.88]
+    sp2_neg_3tol_ = [0.852, 0.896, 0.92, 0.89]
+    sp2_pos_0tol_ = [0.66, 0.845, 0.93, 0.9]
+    sp2_pos_3tol_ = [0.762, 0.858, 0.936, 0.91]
+    sp2_arch_0tol_ = [0.571, 0.571, 0.706, 0.67]
+    sp2_arch_3tol_ = [0.571, 0.571, 0.706,0.67]
+    all_sp2s = [sp2_neg_0tol_,sp2_neg_3tol_, sp2_pos_0tol_, sp2_pos_3tol_, sp2_arch_0tol_, sp2_arch_3tol_]
+
+    tat_neg_0tol_ = [0.397, 0.52, 0.556, 0.69]
+    tat_neg_3tol_ = [0.661, 0.693, 0.857, 0.79]
+    tat_pos_0tol_ = [0.244, 0.205, 0.2, 0.63]
+    tat_pos_3tol_ = [0.39, 0.308, 0.8, 0.75]
+    tat_arch_0tol_ = [0.348, 0.3, 0.453, 0.35]
+    tat_arch_3tol_ = [0.522, 0.5, 0.453, 0.47]
+    all_tats = [tat_neg_0tol_, tat_neg_3tol_, tat_pos_0tol_, tat_pos_3tol_, tat_arch_0tol_, tat_arch_3tol_]
+
+    line_w = 0.15
+    x_positions = []
+    names = ["No-Tuning", "Pre-Tuning", "Tuning+training", "SP6"]
+    colors = ["red", "blue", "green", "black"]
+    names_xticks = ["euk", "neg", "pos", "arch"]
+    for i in range(1, 9):
+        x_positions.append([i-1.5*line_w, i-0.5*line_w, i+0.5*line_w, i+line_w*1.5])
+    for ind, (xpos, heights) in enumerate(zip(x_positions, all_sp1s)):
+        for i, (xp, h) in enumerate(zip(xpos, heights)):
+            if ind == 7:
+                plt.bar(xp, h, width=line_w, label=names[i], color=colors[i])
+            else:
+                plt.bar(xp, h, width=line_w, color=colors[i])
+    plt.ylim(0,1)
+    plt.legend()
+    plt.title("Sec/SPI")
+    plt.ylabel("CS-F1 performance")
+    plt.xticks(list(range(1,9)),[names_xticks[i//2] + " tol0" if i%2 ==0 else names_xticks[i//2]+ " tol3" for i in range(8)])
+    plt.show()
+
+    x_positions = []
+    names = ["No-Tuning", "Pre-Tuning", "Tuning+training", "SP6"]
+    colors = ["red", "blue", "green", "black"]
+    names_xticks = ["neg", "pos", "arch"]
+    for i in range(1, 7):
+        x_positions.append([i-1.5*line_w, i-0.5*line_w, i+0.5*line_w, i+line_w*1.5])
+    for ind, (xpos, heights) in enumerate(zip(x_positions, all_sp2s)):
+        for i, (xp, h) in enumerate(zip(xpos, heights)):
+            if ind == 5:
+                plt.bar(xp, h, width=line_w, label=names[i], color=colors[i])
+            else:
+                plt.bar(xp, h, width=line_w, color=colors[i])
+    plt.ylim(0,1)
+    plt.legend()
+    plt.xticks(list(range(1,7)),[names_xticks[i//2] + " tol0" if i%2 ==0 else names_xticks[i//2]+ " tol3" for i in range(6)])
+    plt.title("Sec/SPII")
+    plt.ylabel("CS-F1 performance")
+    plt.show()
+
+    x_positions = []
+    names = ["No-Tuning", "Pre-Tuning", "Tuning+training", "SP6"]
+    colors = ["red", "blue", "green", "black"]
+    names_xticks = ["neg", "pos", "arch"]
+    for i in range(1, 7):
+        x_positions.append([i-1.5*line_w, i-0.5*line_w, i+0.5*line_w, i+line_w*1.5])
+    for ind, (xpos, heights) in enumerate(zip(x_positions, all_tats)):
+        for i, (xp, h) in enumerate(zip(xpos, heights)):
+            if ind == 5:
+                plt.bar(xp, h, width=line_w, label=names[i], color=colors[i])
+            else:
+                plt.bar(xp, h, width=line_w, color=colors[i])
+    plt.ylim(0,1)
+    plt.legend()
+    plt.xticks(list(range(1,7)),[names_xticks[i//2] + " tol0" if i%2 ==0 else names_xticks[i//2]+ " tol3" for i in range(6)])
+    plt.title("TAT")
+    plt.ylabel("CS-F1 performance")
+    plt.show()
+
+    # for pf in plot_for:
+    #     total = lgandsptype2count_total[pf]
+    #     totals.append(total)
+    #     heights.extend([lgandsptype2counts[0][pf] /total, lgandsptype2counts[1][pf] /total, lgandsptype2counts[2][pf] /total])
+    # plt.bar([x_positions[i*3] for i in range(8)], [heights[i*3] for i in range(8)], width=line_w, label="partition 1")
+    # plt.bar([x_positions[i*3+1] for i in range(8)], [heights[i*3+1] for i in range(8)], width=line_w, label="partition 2")
+    # plt.bar([x_positions[i*3+2] for i in range(8)], [heights[i*3+2] for i in range(8)], width=line_w, label="partition 3")
+    # plt.legend()
+    # plt.xticks(list(range(1,9)),[plot_for[i] + "\n" + str(totals[i]) for i in range(8)])
+    # plt.xlabel("Life group, SP/NO-SP; No. of datapoints")
+    # plt.ylabel("Percentage from that life group")
+    # plt.show()
+
+def plot_comparative_performance_sp1_mdls():
+    tnmt_f1 = [[0.693,0.733,0.759,0.779],[0.636,0.727,0.764,0.782],[0.692,0.769,0.769,0.769],[0.552,0.655,0.69,0.69]]
+    tnmt_rec = [[0.719,0.76,0.788,0.808],[0.556,0.635,0.667,0.683],[0.6,0.667,0.667,0.667],[0.444,0.528,0.556,0.556]]
+    tnmt_prec = [[0.669,0.707,0.732,0.752],[0.745,0.851,0.894,0.915],[0.818,0.909,0.909,0.909],[0.727,0.864,0.909,0.909]]
+
+    all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"])
+    all_recalls, all_precisions, f1_predtat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP"])
+    all_recalls, all_precisions, f1_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP"])
+
+    all_f1s = [tnmt_f1, f1_predtat, f1_lipop, f1_deepsig]
+
+    names = ["TNMT", "PredTAT", "LipoP", "DeepSig"]
+    colors = ["red", "blue", "green", "black"]
+    titles = ["eukarya", "negative bacteria", "positive bacteria", "archaea"]
+    x_positions = []
+
+
+    # non_restricted deepsig/TNMT comparison
+    # all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=None)
+    # tnmt_f1 = [[0.693, 0.733, 0.759, 0.779], [0.493, 0.563, 0.592, 0.606], [0.486, 0.541, 0.541, 0.541], [0.533, 0.633, 0.667, 0.667]]
+    # line_w = 0.15
+    # offsets = [-1.5 * line_w, - 0.5 * line_w, + 0.5 * line_w, line_w * 1.5]
+    # colors = ['blue', 'black']
+    # all_f1s = [tnmt_f1, f1_deepsig]
+    # names = ["TNMT", "DeepSig"]
+    #
+    # for ind in range(4):
+    #     ax = plt.subplot(111)
+    #     for j in range(2,4):
+    #         ax.bar([i + offsets[j] for i in range(1,5)], all_f1s[j-2][ind], color=colors[j-2], label=names[j-2], width=line_w)
+    #     box = ax.get_position()
+    #     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    #     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    #     ax.set_xticks(list(range(1,5)))
+    #     ax.set_xticklabels(['tolerance {}'.format(i) for i in range(4)])
+    #     ax.set_title(titles[ind])
+    #     ax.set_ylabel("F1 score")
+    #     plt.show()
+
+    line_w = 0.15
+    offsets = [-1.5 * line_w, - 0.5 * line_w, + 0.5 * line_w, line_w * 1.5]
+    for ind in range(4):
+        ax = plt.subplot(111)
+        for j in range(4):
+            ax.bar([i + offsets[j] for i in range(1,5)], all_f1s[j][ind], color=colors[j], label=names[j], width=line_w)
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        ax.set_xticks(list(range(1,5)))
+        ax.set_xticklabels(['tolerance {}'.format(i) for i in range(4)])
+        ax.set_title(titles[ind])
+        ax.set_ylabel("F1 score")
+        plt.show()
+
+def create_random_split_fold_data():
+    all_data = []
+    for p in [0, 1, 2]:
+        for t in ["train", "test"]:
+            data = pickle.load(open("../sp_data/sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
+            extract_data = [[k, v[1], v[2], v[3]] for k,v in data.items()]
+            print("sp_data/sp6_partitioned_data_{}_{}.bin".format(t, p), len(extract_data))
+            all_data.extend(extract_data)
+    indices = random.sample(list(range(len(all_data))), len(all_data))
+    indices_per_fold = [[], [], []]
+    no_of_dp_per_fold = len(indices) // 3
+    for i in range(3):
+        if i == 2:
+            train_indices = indices[2 * no_of_dp_per_fold:]
+        else:
+            train_indices = indices[i * no_of_dp_per_fold:(i+1) * no_of_dp_per_fold]
+        test_indices = set(random.sample(train_indices, len(train_indices) // 10))
+        train_indices = list(set(train_indices) - test_indices)
+        test_indices = list(test_indices)
+        train_dict = {all_data[ind][0]:[[1], all_data[ind][1], all_data[ind][2], all_data[ind][3]] for ind in train_indices}
+        test_dict = {all_data[ind][0]:[[1], all_data[ind][1], all_data[ind][2], all_data[ind][3]] for ind in test_indices}
+        pickle.dump(train_dict, open("../sp_data/random_folds_sp6_partitioned_data_train_{}.bin".format(i), "wb"))
+        pickle.dump(test_dict, open("../sp_data/random_folds_sp6_partitioned_data_test_{}.bin".format(i), "wb"))
+
 if __name__ == "__main__":
+    create_random_split_fold_data()
+    exit(1)
+    plot_comparative_performance_sp1_mdls()
+    exit(1)
+    # prep_sp1_sp2()
+    # exit(1)
+    extract_compatible_binaries_predtat()
+    # exit(1)
+    extract_compatible_binaries_lipop()
+    # exit(1)
+    extract_compatible_binaries_deepsig()
+    # exit(1)
+    # Compare results only on SP/NO_SP
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True,
+                                            restrict_types=None)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True,
+                                            restrict_types=["SP", "NO_SP", "TAT"])
+    exit(1)
+    # plot_performance()
+    # visualize_validation(run="non_tuned_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 1],
+    #                      folder="separate-glbl_non_tuned_trimmed_d/")
+    # visualize_validation(run="trimmed_tuned_bert_embs_", folds=[0, 1],
+    #                      folder="separate-glbl_trimmed_tuned_bert_embs/")
+    # visualize_validation(run="repeat_best_experiment_highBertLr_", folds=[0, 1],
+    #                      folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/")
+    # SEPARATE GLBL NO TUNED
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="separate-glbl_non_tuned_trimmed_d/acc_lipos/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    # SEPARATE BERT-TUNING
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    # BEST MODEL
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # visualize_validation(run="tune_bert_and_tnmnt_noglobal_extendedsublbls_highBertLr_folds_", folds=[0, 1],
+    #                      folder="tuning_bert_tune_bert_tune_bert_and_tnmnt_noglobal_extendedsublbls_highBertLr/")
+
+    visualize_validation(run="trimmed_tuned_bert_embs_", folds=[0, 1],
+                         folder="separate-glbl_trimmed_tuned_bert_embs/")
+    visualize_validation(run="tune_bert_and_tnmnt_folds_", folds=[0, 1],
+                         folder="tuning_bert_tune_bert_and_tnmnt_folds/")
+    visualize_validation(run="repeat_best_experiment_highBertLr_", folds=[0, 1],
+                         folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_tune_bert_and_tnmnt_noglobal_extendedsublbls_highBertLr/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_tune_bert_and_tnmnt_noglobal_extendedsublbls_nodrop_folds/",
                                             compare_mdl_plots=False,
@@ -1968,7 +2322,7 @@ if __name__ == "__main__":
 
 
     # exit(1)
-    # extract_compatible_binaries_lipop()
+    extract_compatible_binaries_lipop()
     # exit(1)
 
 
