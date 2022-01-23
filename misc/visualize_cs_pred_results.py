@@ -2051,18 +2051,18 @@ def compute_diversity_within_partition(std=None):
         for j in range(3):
             for lg in ["EUKARYA", "NEGATIVE", "POSITIVE", "ARCHAEA"]:
                 for sp_type in list(life_grp2sp_types2embeddings[lg].keys()):
-
-                    dists = euclidian_distance(np.stack(fold2life_grp2sp_types2embeddings[i][lg][sp_type]), np.stack(fold2life_grp2sp_types2embeddings[j][lg][sp_type]))
-                    if i != j:
-                        dists = dists.reshape(-1)
-                    else:
-                        all_non_identical_dists = []
-                        for k in range(dists.shape[0]):
-                            all_non_identical_dists.extend(dists[k, k+1:])
-                        dists = np.array(all_non_identical_dists)
-                    std_ = std[lg][sp_type]
-                    div = np.mean( list(np.exp(- (d_**2)/(2*std_**2) ) for d_ in dists)) ** (-1)
-                    print("{}-{} on folds {}/{} has diversity {}:".format(lg, sp_type, i, j, div))
+                    if sp_type != "NO_SP":
+                        dists = euclidian_distance(np.stack(fold2life_grp2sp_types2embeddings[i][lg][sp_type]), np.stack(fold2life_grp2sp_types2embeddings[j][lg][sp_type]))
+                        if i != j:
+                            dists = dists.reshape(-1)
+                        else:
+                            all_non_identical_dists = []
+                            for k in range(dists.shape[0]):
+                                all_non_identical_dists.extend(dists[k, k+1:])
+                            dists = np.array(all_non_identical_dists)
+                        std_ = std[lg][sp_type]
+                        div = np.mean( list(np.exp(- (d_**2)/(2*std_**2) ) for d_ in dists)) ** (-1)
+                        print("{}-{} on folds {}/{} has diversity {}:".format(lg, sp_type, i, j, div))
 
 if __name__ == "__main__":
     compute_diversity_within_partition()
