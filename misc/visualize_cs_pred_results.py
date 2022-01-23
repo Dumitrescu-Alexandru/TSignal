@@ -1,3 +1,4 @@
+from sklearn.metrics.pairwise import euclidean_distances as euclidian_distance
 import random
 from io import StringIO
 import requests as r
@@ -1364,13 +1365,13 @@ def prep_sp1_sp2():
     seqs, ids = [], []
     lines = []
     for seq_record in SeqIO.parse(file_new, "fasta"):
-        if seq_record.id.split("|")[0] in ids_benchmark_sp5 and seq_record.id.split("|")[2] in ["SP", "NO_SP", "TAT"]:
+        if seq_record.id.split("|")[0] in ids_benchmark_sp5 and seq_record.id.split("|")[2] in ["SP", "NO_SP"]:
             seqs.append(seq_record.seq[:len(seq_record.seq) // 2])
             ids.append(seq_record.id)
             lines.append(">"+ids[-1]+"\n")
             lines.append(str(seqs[-1])+"\n")
     for i in range(len(lines) // 1000 + 1) :
-        with open("sp1_sp2_fastas/predTat_{}.fasta".format(i), "wt") as f:
+        with open("sp1_sp2_fastas/pred_signal{}.fasta".format(i), "wt") as f:
             f.writelines(lines[i * 1000:(i+1) * 1000])
 
 def ask_uniprot():
@@ -1701,58 +1702,58 @@ def extract_compatible_binaries_deepsig(restrict_types=None):
     # pickle.dump(seq2aalbls, open("lipoP_0_1.bin", "wb"))
     # for l in lines:
 
-def extract_compatible_phobius_binaries():
+def extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"]):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
-    file = "sp1_sp2_fastas/phobius_results.txt"
-    life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
+    file = "sp1_sp2_fastas/results_phobius.txt"
+    life_grp, seqs, true_lbls, pred_lbls, added_seqs = [], [], [], [], []
     seq2sptype = {}
     seq2aalbls = {}
+    id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict(file="train_set.fasta")
     with open(file, "rt") as f:
         lines = f.readlines()
     count = 0
     retain_nextl_flag = False
-    id2seq, id2truelbls, id2lg, id2type = extract_id2seq_dict(file="train_set.fasta")
     sp_start, sp_end = -1, -1
     first_seq = True
+    id2info = {}
     for l in lines:
-        if retain_nextl_flag:
-            id_, lg, sp_t = l.split(" ")[-1].split("|")[:3]
-            retain_id = id_
-            life_grp.append(lg + "|" + sp_t)
-            true_lbls.append(id2truelbls[id_])
-            seqs.append(id2seq[id_])
-            retain_nextl_flag = False
-
-        if "//" in l or l == len(lines) - 1:
-            retain_nextl_flag = True
-            if first_seq:
-                first_seq = False
+        if "ID" in l:
+            id = l.split(" ")[-1]
+            if id.split("|")[0] in id2seq and id.split("|")[2] in restrict_types:
+                id2info[id.split("|")[0]] = []
+        else:
+            if id.split("|")[0] in id2info:
+                id2info[id.split("|")[0]].append(l)
+    for k, v in id2info.items():
+        actual_id = k
+        if id2seq[actual_id] not in added_seqs:
+            life_grp.append(id2lg[actual_id] + "|" + id2type[actual_id])
+            seqs.append(id2seq[actual_id])
+            added_seqs.append(id2seq[actual_id])
+            true_lbls.append(id2truelbls[actual_id])
+            if "SIGNAL" in v[0]:
+                seq2sptype[id2seq[actual_id]] = glbllbl2_ind['SP']
+                cs_position = int(v[0].replace("\n", "").split(" ")[-1])
+                predicted = "S" * cs_position + "I" * (len(seqs[-1]) - cs_position)
             else:
-                if sp_end != -1:
-                    seq2sptype[id2seq[retain_id]] = glbllbl2_ind[id2type[retain_id]] if id2type[retain_id] != "NO_SP" else glbllbl2_ind["SP"]
-                    predicted_sequence = id2truelbls[retain_id][0] * sp_end if id2type[retain_id] != "NO_SP" else "S" * sp_end
-                    predicted_sequence = predicted_sequence + "O" * (len(id2seq[retain_id]) - sp_end)
-                    pred_lbls.append(predicted_sequence)
-                    sp_end = -1
-                else:
-                    seq2sptype[id2seq[retain_id]] = glbllbl2_ind['NO_SP']
-                    predicted_sequence = "O" * len(id2seq[retain_id])
-                    pred_lbls.append(predicted_sequence)
-
-        if "SIGNAL" in l:
-            sp_end = int(' '.join(l.split()).split(" ")[3])
-    common_sp6_phob_seqs = extract_phobius_trained_data()
-    remove_inds = [i for i in range(len(seqs)) if seqs[i] in common_sp6_phob_seqs]
-    remove_inds = []
-    len_ = len(seqs)
-    life_grp = [life_grp[i] for i in range(len(seqs)) if i not in remove_inds]
-    true_lbls = [true_lbls[i] for i in range(len(seqs)) if i not in remove_inds]
-    pred_lbls = [pred_lbls[i] for i in range(len(seqs)) if i not in remove_inds]
-    seqs = [seqs[i] for i in range(len_) if i not in remove_inds]
+                predicted  = "I" * len(seqs[-1])
+                seq2sptype[id2seq[actual_id]] = glbllbl2_ind['NO_SP']
+            pred_lbls.append(predicted)
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
-    print(all_recalls, all_precisions)
+    return all_recalls, all_precisions, all_f1_scores
+    # common_sp6_phob_seqs = extract_phobius_trained_data()
+    # remove_inds = [i for i in range(len(seqs)) if seqs[i] in common_sp6_phob_seqs]
+    # remove_inds = []
+    # len_ = len(seqs)
+    # life_grp = [life_grp[i] for i in range(len(seqs)) if i not in remove_inds]
+    # true_lbls = [true_lbls[i] for i in range(len(seqs)) if i not in remove_inds]
+    # pred_lbls = [pred_lbls[i] for i in range(len(seqs)) if i not in remove_inds]
+    # seqs = [seqs[i] for i in range(len_) if i not in remove_inds]
+    # all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
+    #     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
+    # print(all_recalls, all_precisions)
 
 def extract_phobius_trained_data():
     folder = "/home/alex/Desktop/work/phobius_data"
@@ -1914,17 +1915,20 @@ def plot_performance():
 
 def plot_comparative_performance_sp1_mdls():
     tnmt_f1 = [[0.693,0.733,0.759,0.779],[0.636,0.727,0.764,0.782],[0.692,0.769,0.769,0.769],[0.552,0.655,0.69,0.69]]
+    tnmt_f1 = [[0.631, 0.731, 0.756, 0.769], [0.65, 0.833, 0.883, 0.883], [0.867, 0.933, 0.933, 0.933],[0.551, 0.667, 0.696, 0.754]]
     tnmt_rec = [[0.719,0.76,0.788,0.808],[0.556,0.635,0.667,0.683],[0.6,0.667,0.667,0.667],[0.444,0.528,0.556,0.556]]
     tnmt_prec = [[0.669,0.707,0.732,0.752],[0.745,0.851,0.894,0.915],[0.818,0.909,0.909,0.909],[0.727,0.864,0.909,0.909]]
 
     all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"])
     all_recalls, all_precisions, f1_predtat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP"])
     all_recalls, all_precisions, f1_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP"])
+    all_recalls, all_precisions, f1_phobius = extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"])
 
-    all_f1s = [tnmt_f1, f1_predtat, f1_lipop, f1_deepsig]
 
-    names = ["TNMT", "PredTAT", "LipoP", "DeepSig"]
-    colors = ["red", "blue", "green", "black"]
+    all_f1s = [tnmt_f1, f1_predtat, f1_lipop, f1_deepsig, f1_phobius]
+
+    names = ["TNMT", "PredTAT", "LipoP", "DeepSig", "Phobius"]
+    colors = ["red", "blue", "green", "black", "purple"]
     titles = ["eukarya", "negative bacteria", "positive bacteria", "archaea"]
     x_positions = []
 
@@ -1952,10 +1956,10 @@ def plot_comparative_performance_sp1_mdls():
     #     plt.show()
 
     line_w = 0.15
-    offsets = [-1.5 * line_w, - 0.5 * line_w, + 0.5 * line_w, line_w * 1.5]
+    offsets = [-2 * line_w, - 1 * line_w,0, 1 * line_w, line_w * 2]
     for ind in range(4):
         ax = plt.subplot(111)
-        for j in range(4):
+        for j in range(5):
             ax.bar([i + offsets[j] for i in range(1,5)], all_f1s[j][ind], color=colors[j], label=names[j], width=line_w)
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
@@ -1990,12 +1994,88 @@ def create_random_split_fold_data():
         pickle.dump(train_dict, open("../sp_data/random_folds_sp6_partitioned_data_train_{}.bin".format(i), "wb"))
         pickle.dump(test_dict, open("../sp_data/random_folds_sp6_partitioned_data_test_{}.bin".format(i), "wb"))
 
+def compute_diversity(data):
+    return
+
+def compute_maximum_feature_wise_diversity():
+    life_grp2sp_types2embeddings = {'EUKARYA': {"SP": [], "NO_SP": []},
+                                    'NEGATIVE': {"SP": [], "NO_SP": [], "LIPO": [], "TAT": []},
+                                    'POSITIVE': {"SP": [], "NO_SP": [], "LIPO": [], "TAT": []},
+                                    'ARCHAEA': {"SP": [], "NO_SP": [], "LIPO": [], "TAT": []}}
+    lifegrp2_sptype2_max_feat_wise_std = {'EUKARYA': {"SP": -1, "NO_SP": -1},
+                                    'NEGATIVE': {"SP": -1, "NO_SP": -1, "LIPO": -1, "TAT": -1},
+                                    'POSITIVE': {"SP": -1, "NO_SP": -1, "LIPO": -1, "TAT": -1},
+                                    'ARCHAEA': {"SP": -1, "NO_SP": -1, "LIPO": -1, "TAT": -1}}
+    desired_sp_types = ["SP", "NO_SP", "TAT", "LIPO"]
+    data_folder = "/scratch/work/dumitra1/sp_data/" if os.path.exists('/scratch/work') else "../sp_data/"
+
+    for fold in range(3):
+        fold_data = pickle.load(open(data_folder + "sp6_partitioned_data_sublbls_test_{}.bin".format(fold), "rb"))
+        fold_data.update(pickle.load(open(data_folder + "sp6_partitioned_data_sublbls_train_{}.bin".format(fold), "rb")))
+        for k,v in fold_data.items():
+            if v[-1] in desired_sp_types:
+                life_grp2sp_types2embeddings[v[-2]][v[-1]].append(v[0].reshape(-1))
+    for lg in ['EUKARYA', 'NEGATIVE', 'POSITIVE', 'ARCHAEA']:
+        for sp_type in list(life_grp2sp_types2embeddings[lg].keys()):
+            max_std = max(np.std(np.stack(life_grp2sp_types2embeddings[lg][sp_type]), axis=0))
+            lifegrp2_sptype2_max_feat_wise_std[lg][sp_type] = max_std * 70
+            print(max_std)
+    return life_grp2sp_types2embeddings
+
+def compute_diversity_within_partition(std=None):
+    if std is None:
+        std = {'EUKARYA': {'SP': 47.25394785404205, 'NO_SP': 39.85664486885071},
+         'NEGATIVE': {'SP': 39.905853271484375, 'NO_SP': 41.696882247924805, 'LIPO': 38.223400712013245,
+                      'TAT': 50.940147042274475},
+         'POSITIVE': {'SP': 46.76344096660614, 'NO_SP': 42.55532145500183, 'LIPO': 41.33163273334503,
+                      'TAT': 45.166996717453},
+         'ARCHAEA': {'SP': 43.09800326824188, 'NO_SP': 39.40081000328064, 'LIPO': 45.83507776260376,
+                     'TAT': 46.772186160087585}}
+        # uncomment to recompute max(feature-wise stds) * 70 (media seq length)
+        # std = compute_maximum_feature_wise_diversity()
+    life_grp2sp_types2embeddings = {'EUKARYA':{"SP":[] ,"NO_SP":[]},
+                                    'NEGATIVE':{"SP":[], "NO_SP":[], "LIPO":[], "TAT":[]},
+                                    'POSITIVE':{"SP":[], "NO_SP":[], "LIPO":[], "TAT":[]},
+                                    'ARCHAEA':{"SP":[], "NO_SP":[], "LIPO":[], "TAT":[]}}
+    fold2life_grp2sp_types2embeddings = {0:life_grp2sp_types2embeddings.copy(), 1:life_grp2sp_types2embeddings.copy(),
+                                         2:life_grp2sp_types2embeddings.copy()}
+    desired_sp_types = ["SP", "NO_SP", "TAT", "LIPO"]
+    data_folder = "/scratch/work/dumitra1/sp_data/" if os.path.exists('/scratch/work') else "../sp_data/"
+    for fold in range(3):
+        fold_data = pickle.load(open(data_folder + "sp6_partitioned_data_sublbls_test_{}.bin".format(fold), "rb"))
+        fold_data.update(pickle.load(open(data_folder + "sp6_partitioned_data_sublbls_train_{}.bin".format(fold), "rb")))
+        for k,v in fold_data.items():
+            if v[-1] in desired_sp_types:
+                fold2life_grp2sp_types2embeddings[fold][v[-2]][v[-1]].append(v[0].reshape(-1))
+    for i in range(3):
+        for j in range(3):
+            for lg in ["EUKARYA", "NEGATIVE", "POSITIVE", "ARCHAEA"]:
+                for sp_type in list(life_grp2sp_types2embeddings[lg].keys()):
+
+                    dists = euclidian_distance(np.stack(fold2life_grp2sp_types2embeddings[i][lg][sp_type]), np.stack(fold2life_grp2sp_types2embeddings[j][lg][sp_type]))
+                    if i != j:
+                        dists = dists.reshape(-1)
+                    else:
+                        all_non_identical_dists = []
+                        for k in range(dists.shape[0]):
+                            all_non_identical_dists.extend(dists[k, k+1:])
+                        dists = np.array(all_non_identical_dists)
+                    std_ = std[lg][sp_type]
+                    div = np.mean( list(np.exp(- (d_**2)/(2*std_**2) ) for d_ in dists)) ** (-1)
+                    print("{}-{} on folds {}/{} has diversity {}:".format(lg, sp_type, i, j, div))
+
 if __name__ == "__main__":
-    create_random_split_fold_data()
-    exit(1)
+    compute_diversity_within_partition()
+    # prep_sp1_sp2()
+    # exit(1)
+    # extract_compatible_phobius_binaries()
+    # exit(1)
+
+    # exit(1)
+    # create_random_split_fold_data()
+    # exit(1)
     plot_comparative_performance_sp1_mdls()
     exit(1)
-    # prep_sp1_sp2()
     # exit(1)
     extract_compatible_binaries_predtat()
     # exit(1)
