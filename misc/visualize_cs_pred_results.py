@@ -2006,7 +2006,7 @@ def compute_maximum_feature_wise_diversity():
                                     'NEGATIVE': {"SP": -1, "NO_SP": -1, "LIPO": -1, "TAT": -1},
                                     'POSITIVE': {"SP": -1, "NO_SP": -1, "LIPO": -1, "TAT": -1},
                                     'ARCHAEA': {"SP": -1, "NO_SP": -1, "LIPO": -1, "TAT": -1}}
-    desired_sp_types = ["SP", "NO_SP", "TAT", "LIPO"]
+    desired_sp_types = ["SP", "TAT", "LIPO"]
     data_folder = "/scratch/work/dumitra1/sp_data/" if os.path.exists('/scratch/work') else "../sp_data/"
 
     for fold in range(3):
