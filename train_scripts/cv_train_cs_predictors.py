@@ -726,7 +726,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
-                        random_folds=False):
+                        random_folds=False, train_on_subset=1.):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -744,7 +744,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=form_sp_reg_data,
                                 tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=extended_sublbls,
-                                random_folds_prefix=random_folds_prefix)
+                                random_folds_prefix=random_folds_prefix, train_on_subset=train_on_subset)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)

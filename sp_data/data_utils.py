@@ -347,7 +347,8 @@ class SPCSpredictionData:
 
 class CSPredsDataset(Dataset):
     def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True, sets=["train", "test"],
-                 test_f_name="", form_sp_reg_data=False, tuned_bert_embs_prefix="", extended_sublbls=False, random_folds_prefix=""):
+                 test_f_name="", form_sp_reg_data=False, tuned_bert_embs_prefix="", extended_sublbls=False, random_folds_prefix="",
+                 train_on_subset=1.):
         extended_pref = "extended_" if extended_sublbls else ""
         self.life_grp, self.seqs, self.lbls, self.glbl_lbl = [], [], [], []
         if partitions is not None:
@@ -357,10 +358,13 @@ class CSPredsDataset(Dataset):
                     d_file = random_folds_prefix + tuned_bert_embs_prefix + "sp6_partitioned_data_sublbls_"+extended_pref+"{}_{}.bin".format(s, p) if form_sp_reg_data else \
                         random_folds_prefix + tuned_bert_embs_prefix + "sp6_partitioned_data_"+extended_pref+"{}_{}.bin".format(s, p)
                     data_dict = pickle.load(open(data_folder + d_file, "rb"))
-                    self.seqs.extend(list(data_dict.keys()))
-                    self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
-                    self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
-                    self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
+                    if train_on_subset != 1. and s == 'train':
+                        self.extract_subset(data_dict, train_on_subset, lbl2inds, glbl_lbl_2ind)
+                    else:
+                        self.seqs.extend(list(data_dict.keys()))
+                        self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
+                        self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
+                        self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
         else:
             # parameter for a specific test
             data_dict = pickle.load(open(data_folder + test_f_name, "rb"))
@@ -376,6 +380,27 @@ class CSPredsDataset(Dataset):
         return {"seq": self.seqs[item], "lbl": self.lbls[item], "lg": self.life_grp[item],
                 "glbl_lbl": self.glbl_lbl[item]}
 
+    def extract_subset(self, data_dict, train_on_subset, lbl2inds, glbl_lbl_2ind):
+        lg_and_sptyp2_inds = {}
+        seqs = []
+        lbls = []
+        life_grps = []
+        glbl_lbls = []
+        for ind, (k, (emb, label, life_grp, glbl_lbl)) in enumerate(data_dict.items()):
+            seqs.append(k)
+            lbls.append(label)
+            life_grps.append(life_grp)
+            glbl_lbls.append(glbl_lbl)
+            if life_grp + glbl_lbl in lg_and_sptyp2_inds:
+                lg_and_sptyp2_inds[life_grp + glbl_lbl].append(ind)
+            else:
+                lg_and_sptyp2_inds[life_grp + glbl_lbl] = [ind]
+        for lg_sp_type, indices in lg_and_sptyp2_inds.items():
+            samples = random.sample(indices, max(int(len(indices) * train_on_subset), 1) )
+            self.seqs.extend([seqs[smpl] for smpl in samples])
+            self.lbls.extend([[lbl2inds[l] for l in lbls[smpl]]  for smpl in samples])
+            self.life_grp.extend([life_grps[smpl] for smpl in samples])
+            self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbls[smpl]] for smpl in samples])
 
 class SPbinaryData:
     def __init__(self, threshold_pos=0.9, threshold_neg=0.15, limit_seq=100, data="mammal"):
