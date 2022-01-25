@@ -2050,7 +2050,8 @@ def compute_diversity_within_partition(std=None):
                 #     ind_l, ind_r = v[-3].rfind("S")-3, v[-3].rfind("S")
                 # else:
                 #     ind_l, ind_r = 0, 3
-                fold2life_grp2sp_types2embeddings[fold][v[-2]][v[-1]].append(v[0][ind_l:ind_r].reshape(-1))
+                fold2life_grp2sp_types2embeddings[fold][v[-2]][v[-1]].append(v[0].reshape(-1))
+                # fold2life_grp2sp_types2embeddings[fold][v[-2]][v[-1]].append(v[0][ind_l:ind_r].reshape(-1))
     for i in range(3):
         for j in range(3):
             for lg in ["EUKARYA", "NEGATIVE", "POSITIVE", "ARCHAEA"]:
