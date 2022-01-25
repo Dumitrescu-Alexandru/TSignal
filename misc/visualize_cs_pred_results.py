@@ -104,8 +104,8 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             predictions[grp2_ind[lg]] += np.array([0, 0, 0, 0, 0, 0, 1, 1, 1, 1])
     if v:
         print(" count_tol_fn, count_complete_fn, count_otherSPpred", count_tol_fn, count_complete_fn, count_otherSPpred)
-    print(sp_type, "count, count2", count, count2 )
-    print(cnt1, cnt2)
+    # print(sp_type, "count, count2", count, count2 )
+    # print(cnt1, cnt2)
     all_recalls = []
     all_precisions = []
     all_f1_scores = []
@@ -2046,7 +2046,11 @@ def compute_diversity_within_partition(std=None):
         fold_data.update(pickle.load(open(data_folder + "sp6_partitioned_data_sublbls_train_{}.bin".format(fold), "rb")))
         for k,v in fold_data.items():
             if v[-1] in desired_sp_types:
-                fold2life_grp2sp_types2embeddings[fold][v[-2]][v[-1]].append(v[0].reshape(-1))
+                # if "S" in v[-3]:
+                #     ind_l, ind_r = v[-3].rfind("S")-3, v[-3].rfind("S")
+                # else:
+                #     ind_l, ind_r = 0, 3
+                fold2life_grp2sp_types2embeddings[fold][v[-2]][v[-1]].append(v[0][ind_l:ind_r].reshape(-1))
     for i in range(3):
         for j in range(3):
             for lg in ["EUKARYA", "NEGATIVE", "POSITIVE", "ARCHAEA"]:
@@ -2064,8 +2068,112 @@ def compute_diversity_within_partition(std=None):
                         div = np.mean( list(np.exp(- (d_**2)/(2*std_**2) ) for d_ in dists)) ** (-1)
                         print("{}-{} on folds {}/{} has diversity {}:".format(lg, sp_type, i, j, div))
 
+def visualize_data_amount2_results(benchmark_ds=False):
+    subfolds = ["02", "04", "06", "08", "1"]
+    id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict()
+    lg2f1_tol0_sp1 = {'EUKARYA':[], 'NEGATIVE':[], 'POSITIVE':[], 'ARCHAEA':[]}
+    lg2f1_tol3_sp1 = {'EUKARYA':[], 'NEGATIVE':[], 'POSITIVE':[], 'ARCHAEA':[]}
+    lg2f1_tol0_sp2 = {'NEGATIVE':[], 'POSITIVE':[], 'ARCHAEA':[]}
+    lg2f1_tol3_sp2 = {'NEGATIVE':[], 'POSITIVE':[], 'ARCHAEA':[]}
+    lg2f1_tol0_tat = {'NEGATIVE':[], 'POSITIVE':[], 'ARCHAEA':[]}
+    lg2f1_tol3_tat = {'NEGATIVE':[], 'POSITIVE':[], 'ARCHAEA':[]}
+
+    for sf in subfolds:
+        result_dict = {}
+        sptype_dict = {}
+        for folds in [[0, 1]]:
+            result_dict.update(pickle.load(open("train_subset_results/best_model_subtrain_{}_random_folds_{}_{}_best.bin".format(sf,folds[0],folds[1]), "rb")))
+            sptype_dict.update(pickle.load(open("train_subset_results/best_model_subtrain_{}_random_folds_{}_{}_best_sptype.bin".format(sf,folds[0],folds[1]), "rb")))
+        # print(list(sptype_dict.keys())[0])
+        # print(list(result_dict.keys())[0])
+        if benchmark_ds:
+            unique_bench_seqs = set(id2seq.values())
+            result_dict = {k:v for k,v in result_dict.items() if k in unique_bench_seqs}
+        life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin",
+                                                                                       dict_=result_dict)
+        mccs, mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+                                               sp_type="SP")
+        # LIPO is SEC/SPII
+        mccs_lipo, mccs2_lipo = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+                                                         sp_type="LIPO")
+        # TAT is TAT/SPI
+        mccs_tat, mccs2_tat = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+                                                       sp_type="TAT")
+        # print(mccs)
+        all_recalls, all_precisions, _, _, _, f1_scores_sp1 = \
+            get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
+                       sptype_preds=sptype_dict)
+        all_recalls, all_precisions, _, _, _, f1_scores_sp2 = \
+            get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO",
+                       sptype_preds=sptype_dict)
+        all_recalls, all_precisions, _, _, _, f1_scores_tat = \
+            get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT",
+                       sptype_preds=sptype_dict)
+        lg2f1_tol0_sp1['EUKARYA'].append(f1_scores_sp1[0][0])
+        lg2f1_tol3_sp1['EUKARYA'].append(f1_scores_sp1[0][3])
+        lg2f1_tol0_sp1['NEGATIVE'].append(f1_scores_sp1[1][0])
+        lg2f1_tol3_sp1['NEGATIVE'].append(f1_scores_sp1[1][3])
+        lg2f1_tol0_sp1['POSITIVE'].append(f1_scores_sp1[2][0])
+        lg2f1_tol3_sp1['POSITIVE'].append(f1_scores_sp1[2][3])
+        lg2f1_tol0_sp1['ARCHAEA'].append(f1_scores_sp1[3][0])
+        lg2f1_tol3_sp1['ARCHAEA'].append(f1_scores_sp1[3][3])
+
+        lg2f1_tol0_sp2['NEGATIVE'].append(f1_scores_sp2[0][0])
+        lg2f1_tol3_sp2['NEGATIVE'].append(f1_scores_sp2[0][3])
+        lg2f1_tol0_sp2['POSITIVE'].append(f1_scores_sp2[1][0])
+        lg2f1_tol3_sp2['POSITIVE'].append(f1_scores_sp2[1][3])
+        lg2f1_tol0_sp2['ARCHAEA'].append(f1_scores_sp2[2][0])
+        lg2f1_tol3_sp2['ARCHAEA'].append(f1_scores_sp2[2][3])
+
+        lg2f1_tol0_tat['NEGATIVE'].append(f1_scores_tat[0][0])
+        lg2f1_tol3_tat['NEGATIVE'].append(f1_scores_tat[0][3])
+        lg2f1_tol0_tat['POSITIVE'].append(f1_scores_tat[1][0])
+        lg2f1_tol3_tat['POSITIVE'].append(f1_scores_tat[1][3])
+        lg2f1_tol0_tat['ARCHAEA'].append(f1_scores_tat[2][0])
+        lg2f1_tol3_tat['ARCHAEA'].append(f1_scores_tat[2][3])
+
+    plt.title("SEC/SPI results")
+    plt.xlabel("Percentage of dataset used for training")
+    plt.ylabel("F1 score")
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp1['EUKARYA'], linestyle='solid', color='blue', label='Eukaryotes tol 0')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp1['EUKARYA'], linestyle='dashed', color='blue', label='Eukaryotes tol 3')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp1['NEGATIVE'], linestyle='solid', color='red', label='Negative tol 0')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp1['NEGATIVE'], linestyle='dashed', color='red', label='Negative tol 3')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp1['POSITIVE'], linestyle='solid', color='orange', label='Positive tol 0')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp1['POSITIVE'], linestyle='dashed', color='orange', label='Positive tol 3')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp1['ARCHAEA'], linestyle='solid', color='green', label='Archaea tol 0')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp1['ARCHAEA'], linestyle='dashed', color='green', label='Archaea tol 3')
+    plt.legend()
+    plt.show()
+
+    plt.title("SEC/SPII results")
+    plt.xlabel("Percentage of dataset used for training")
+    plt.ylabel("F1 score")
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp2['NEGATIVE'], linestyle='solid', color='red', label='Negative tol 0')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp2['NEGATIVE'], linestyle='dashed', color='red', label='Negative tol 3')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp2['POSITIVE'], linestyle='solid', color='orange', label='Positive tol 0')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp2['POSITIVE'], linestyle='dashed', color='orange', label='Positive tol 3')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp2['ARCHAEA'], linestyle='solid', color='green', label='Archaea tol 0')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp2['ARCHAEA'], linestyle='dashed', color='green', label='Archaea tol 3')
+    plt.legend()
+    plt.show()
+
+    plt.title("TAT results")
+    plt.xlabel("Percentage of dataset used for training")
+    plt.ylabel("F1 score")
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_tat['NEGATIVE'], linestyle='solid', color='red', label='Negative tol 0')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_tat['NEGATIVE'], linestyle='dashed', color='red', label='Negative tol 3')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_tat['POSITIVE'], linestyle='solid', color='orange', label='Positive tol 0')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_tat['POSITIVE'], linestyle='dashed', color='orange', label='Positive tol 3')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_tat['ARCHAEA'], linestyle='solid', color='green', label='Archaea tol 0')
+    plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_tat['ARCHAEA'], linestyle='dashed', color='green', label='Archaea tol 3')
+    plt.legend()
+    plt.show()
+
 if __name__ == "__main__":
     compute_diversity_within_partition()
+    exit(1)
+    visualize_data_amount2_results()
     # prep_sp1_sp2()
     # exit(1)
     # extract_compatible_phobius_binaries()
