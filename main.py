@@ -19,9 +19,9 @@ def create_param_set_cs_predictors():
     #               'glbl_lbl_version':[1,2]}
     # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
 
-    parameters = {"train_folds": [[0,1],[0,2],[1,2]], "nlayers": [3,5,8],"nheads":[8,16],
-                  "lr": [0.00001], 'use_glbl_lbls':[1], 'glbl_lbl_version':[2], 'patience':[30],
-                  'dropout':[0,0.3,0.5]}
+    parameters = {"train_folds": [[0,1],[0,2],[1,2]], "nlayers": [3],"nheads":[16],
+                  "lr": [0.00001], 'dropout':[0.1], 'random_folds':[True], 'train_on_subset':[0.2, 0.4, 0.6, 1],
+                  "run_number":[0,1]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
     group_params = list(ParameterGrid(parameters))
@@ -153,6 +153,8 @@ def modify_param_search_args(args):
         run_name += "wrmpLrSched_{}_".format(param_set['lr_sched_warmup'])
     if "run_number" in param_set:
         run_name += "run_no_{}_".format(param_set['run_number'])
+    if 'train_on_subset' in param_set:
+        run_name += "subset_train_{}_".format(param_set['train_on_subset'])
     if 'train_folds' in param_set:
         args.train_folds = param_set['train_folds']
     if 'validate_partition' in param_set:

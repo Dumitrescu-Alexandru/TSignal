@@ -8,4 +8,4 @@
 
 module load anaconda
 
-python main.py --param_set_search_number $SLURM_ARRAY_TASK_ID --batch_size 32 --run_name data_v2_param_search --train_cs_predictor --add_lg_info --patience 30
+python main.py --param_set_search_number $SLURM_ARRAY_TASK_ID --batch_size 32 --run_name data_perc_runs --train_cs_predictor --add_lg_info --patience 50 --simplified --very_simplified --validate_on_mcc  --tune_bert --frozen_epochs 15

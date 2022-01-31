@@ -2032,7 +2032,7 @@ def compute_diversity_within_partition(std=None):
          'ARCHAEA': {'SP': 43.09800326824188, 'NO_SP': 39.40081000328064, 'LIPO': 45.83507776260376,
                      'TAT': 46.772186160087585}}
         # uncomment to recompute max(feature-wise stds) * 70 (media seq length)
-        # std = compute_maximum_feature_wise_diversity()
+        std = compute_maximum_feature_wise_diversity()
     life_grp2sp_types2embeddings = {'EUKARYA':{"SP":[] ,"NO_SP":[]},
                                     'NEGATIVE':{"SP":[], "NO_SP":[], "LIPO":[], "TAT":[]},
                                     'POSITIVE':{"SP":[], "NO_SP":[], "LIPO":[], "TAT":[]},
@@ -2082,7 +2082,7 @@ def visualize_data_amount2_results(benchmark_ds=False):
     for sf in subfolds:
         result_dict = {}
         sptype_dict = {}
-        for folds in [[0, 1]]:
+        for folds in [[0, 1], [0,2], [1,2]]:
             result_dict.update(pickle.load(open("train_subset_results/best_model_subtrain_{}_random_folds_{}_{}_best.bin".format(sf,folds[0],folds[1]), "rb")))
             sptype_dict.update(pickle.load(open("train_subset_results/best_model_subtrain_{}_random_folds_{}_{}_best_sptype.bin".format(sf,folds[0],folds[1]), "rb")))
         # print(list(sptype_dict.keys())[0])
@@ -2172,9 +2172,9 @@ def visualize_data_amount2_results(benchmark_ds=False):
     plt.show()
 
 if __name__ == "__main__":
-    compute_diversity_within_partition()
-    exit(1)
     visualize_data_amount2_results()
+    exit(1)
+    compute_diversity_within_partition()
     # prep_sp1_sp2()
     # exit(1)
     # extract_compatible_phobius_binaries()
