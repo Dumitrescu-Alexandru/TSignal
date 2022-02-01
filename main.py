@@ -10,7 +10,7 @@ import logging
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
-    # parameters = { "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
+    # parameters = { "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],fparam_set_search_number
     #               "run_number":list(range(5))}
     # parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
     #               "run_number":list(range(5))}
@@ -20,17 +20,30 @@ def create_param_set_cs_predictors():
     # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
 
     parameters = {"train_folds": [[0,1],[0,2],[1,2]], "nlayers": [3],"nheads":[16],
-                  "lr": [0.00001], 'dropout':[0.1], 'random_folds':[True], 'train_on_subset':[0.2, 0.4, 0.6, 1],
-                  "run_number":[0,1]}
+                  "lr": [0.00001], 'dropout':[0.1], 'random_folds':[True], 'train_on_subset':[0.2,0.4,0.6,0.8,1],
+                  "run_number":[2,3]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
     group_params = list(ParameterGrid(parameters))
     # add 5 without-glbl label runs. See if glbl label actually helps the TAT/LIPO metrics
     grpid_2_params = {}
-    for i in range(len(group_params)):
-        grpid_2_params[i] = group_params[i]
-    # start_id = len(group_params)
+    leftover_runs = {0: {'dropout': 0.1, 'lr': 1e-05, 'nheads': 16, 'nlayers': 3, 'random_folds': True, 'run_number': 0,
+         'train_folds': [0, 1], 'train_on_subset': 0.8},
+     1: {'dropout': 0.1, 'lr': 1e-05, 'nheads': 16, 'nlayers': 3, 'random_folds': True, 'run_number': 0,
+         'train_folds': [0, 2], 'train_on_subset': 0.8},
+     2: {'dropout': 0.1, 'lr': 1e-05, 'nheads': 16, 'nlayers': 3, 'random_folds': True, 'run_number': 0,
+         'train_folds': [1, 2], 'train_on_subset': 0.8},
+     3: {'dropout': 0.1, 'lr': 1e-05, 'nheads': 16, 'nlayers': 3, 'random_folds': True, 'run_number': 1,
+         'train_folds': [0, 1], 'train_on_subset': 0.8},
+     4: {'dropout': 0.1, 'lr': 1e-05, 'nheads': 16, 'nlayers': 3, 'random_folds': True, 'run_number': 1,
+         'train_folds': [0, 2], 'train_on_subset': 0.8},
+     5: {'dropout': 0.1, 'lr': 1e-05, 'nheads': 16, 'nlayers': 3, 'random_folds': True, 'run_number': 1,
+         'train_folds': [1, 2], 'train_on_subset': 0.8}}
 
+    for i in range(len(leftover_runs.keys()), len(group_params) + len(leftover_runs.keys())):
+        grpid_2_params[i] = group_params[i-len(leftover_runs)]
+    # start_id = len(group_params)
+    grpid_2_params.update(leftover_runs)
     pickle.dump(grpid_2_params, open("param_groups_by_id_cs.bin", "wb"))
 
 def create_parameter_set():
