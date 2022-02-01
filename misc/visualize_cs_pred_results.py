@@ -2171,7 +2171,71 @@ def visualize_data_amount2_results(benchmark_ds=False):
     plt.legend()
     plt.show()
 
+def rename_files():
+    folder = "train_subset_results/first_run"
+    for file in os.listdir(folder):
+        # if "data_perc" not in file:
+        perc = file.split("subset_train")[1].split("_")[1]
+        if "." not in perc and perc != "1":
+            perc_ind = file.find("subset_train_") + len("subset_train_")
+            new_name = file[:perc_ind] + perc[0] + "." + perc[1] + file[perc_ind+2]
+            os.rename(folder + "/" + file, folder + "/" + new_name)
+
+            # folds_and_filtype = file.split("folds")[1]
+            # subtrain = file.split("subtrain")[1].split("_")[1]
+            # new_name = "data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_4_subset_train_{}_trFlds{}".format(subtrain, folds_and_filtype)
+            # os.rename(folder+"/"+file, folder+"/"+new_name)
+
+def plot_perf_over_data_perc():
+    subsets = [0.2, 0.4, 0.6, 0.8, 1]
+    subset_2_f1 = {s:[] for s in subsets}
+    subset_2_prec = {s:[] for s in subsets}
+    subset_2_rec = {s:[] for s in subsets}
+    # [0.7568873852102465, 0.8506524891251813, 0.8941517641372644, 0.9139681005316579],
+    # [0.7568873852102465, 0.8506524891251813, 0.8941517641372644, 0.9139681005316579]
+    for subset in subsets:
+        for run in range(4):
+            print("Computing run {} for subset {}".format(run, subset))
+            aa_pred_dict = {}
+            glbl_lbl_dict = {}
+            for tr_f in [[0,1],[0,2],[1,2]]:
+                aa_pred_file = "data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_{}_subset_train_{}_trFlds_{}_{}_best.bin".format(run,str(subset), *tr_f)
+                print(aa_pred_file)
+                glbl_lbl_file = "data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_{}_subset_train_{}_trFlds_{}_{}_best_sptype.bin".format(run,str(subset), *tr_f)
+                aa_pred_dict.update(pickle.load(open("train_subset_results/"+aa_pred_file, "rb")))
+                glbl_lbl_dict.update(pickle.load(open("train_subset_results/"+glbl_lbl_file, "rb")))
+
+            life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(
+                filename="w_lg_w_glbl_lbl_100ep.bin",
+                dict_=aa_pred_dict)
+
+            all_recalls, all_precisions, _, _, _, f1_scores = \
+                get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
+                           sptype_preds=glbl_lbl_dict)
+            # print(f1_scores)
+            subset_2_f1[subset].append(f1_scores)
+    # print(subset_2_f1[0.2])
+
+def checkthis_():
+    a = pickle.load(open("train_subset_results/data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_0_subset_train_0.2_trFlds_0_1_best.bin", "rb"))
+    b = pickle.load(open("train_subset_results/data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_1_subset_train_0.2_trFlds_0_1_best.bin", "rb"))
+    for k in a.keys():
+        if a[k] != b[k]:
+            print(k)
+            print(a[k])
+            print(b[k])
+            print("\n")
+
+
 if __name__ == "__main__":
+    checkthis_()
+    exit(1)
+    plot_perf_over_data_perc()
+    exit(1)
+    rename_files()
+    exit(1)
+
+
     visualize_data_amount2_results()
     exit(1)
     compute_diversity_within_partition()

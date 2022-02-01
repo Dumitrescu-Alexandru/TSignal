@@ -433,7 +433,6 @@ class SPbinaryData:
         self.form_cv_indices()
 
     def form_cv_indices(self):
-        np.random.seed(123)
         data_file_header = "_sp6" if self.data == "sp6data" else ""
         sp6data = self.data == "sp6data"
         if os.path.exists(self.data_folder + "train_datasets_per_fold{}.bin".format(data_file_header)):

@@ -19,7 +19,6 @@ sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights
 from models.transformer_nmt import TransformerModel
-torch.manual_seed(123)
 
 def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
