@@ -2187,14 +2187,14 @@ def rename_files():
             # os.rename(folder+"/"+file, folder+"/"+new_name)
 
 def plot_perf_over_data_perc():
-    subsets = [0.2, 0.4, 0.6, 0.8, 1]
+    subsets = [0.25, 0.5, 0.75, 1]
     subset_2_f1 = {s:[] for s in subsets}
     subset_2_prec = {s:[] for s in subsets}
     subset_2_rec = {s:[] for s in subsets}
     # [0.7568873852102465, 0.8506524891251813, 0.8941517641372644, 0.9139681005316579],
     # [0.7568873852102465, 0.8506524891251813, 0.8941517641372644, 0.9139681005316579]
     for subset in subsets:
-        for run in range(4):
+        for run in range(3):
             print("Computing run {} for subset {}".format(run, subset))
             aa_pred_dict = {}
             glbl_lbl_dict = {}
@@ -2214,11 +2214,23 @@ def plot_perf_over_data_perc():
                            sptype_preds=glbl_lbl_dict)
             # print(f1_scores)
             subset_2_f1[subset].append(f1_scores)
-    # print(subset_2_f1[0.2])
+    sp1_plot = True
+    for subset, f1 in subset_2_f1.items():
+        all_euk, all_neg, all_pos, all_archaea = [], [], [] ,[]
+        for run_f1 in f1:
+            if sp1_plot:
+                eukaryote, negative, positive, archaea = run_f1
+                all_euk.append(eukaryote)
+            else:
+                negative, positive, archaea = run_f1
+            all_neg.append(negative)
+            all_pos.append(positive)
+            all_archaea.append(archaea)
+        print(subset, all_euk)
 
 def checkthis_():
-    a = pickle.load(open("train_subset_results/data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_0_subset_train_0.2_trFlds_0_1_best.bin", "rb"))
-    b = pickle.load(open("train_subset_results/data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_1_subset_train_0.2_trFlds_0_1_best.bin", "rb"))
+    a = pickle.load(open("train_subset_results/data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_0_subset_train_0.25_trFlds_0_1_best.bin", "rb"))
+    b = pickle.load(open("train_subset_results/data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_1_subset_train_0.25_trFlds_0_1_best.bin", "rb"))
     for k in a.keys():
         if a[k] != b[k]:
             print(k)
@@ -2228,8 +2240,8 @@ def checkthis_():
 
 
 if __name__ == "__main__":
-    checkthis_()
-    exit(1)
+    # checkthis_()
+    # exit(1)
     plot_perf_over_data_perc()
     exit(1)
     rename_files()

@@ -154,6 +154,7 @@ def modify_param_search_args(args):
     if "run_number" in param_set:
         run_name += "run_no_{}_".format(param_set['run_number'])
     if 'train_on_subset' in param_set:
+        args.train_on_subset = param_set['train_on_subset']
         run_name += "subset_train_{}_".format(param_set['train_on_subset'])
     if 'train_folds' in param_set:
         args.train_folds = param_set['train_folds']
