@@ -263,8 +263,9 @@ class TransformerModel(nn.Module):
         padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
         return self.glbl_generator(padded_src_glbl.transpose(2, 1))
 
-    def forward_only_decoder(self, src, tgt, inp_seqs):
-        src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, _ = self.input_encoder(src, inp_seqs=inp_seqs)
+    def forward_only_decoder(self, src, tgt, inp_seqs, tgt_mask=None):
+        if tgt_mask is None:
+            src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, _ = self.input_encoder(src, inp_seqs=inp_seqs)
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
         padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input, no_pos_enc=self.no_pos_enc)
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]

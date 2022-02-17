@@ -131,13 +131,19 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     if glbl_labels is not None:
         tgt_mask = (generate_square_subsequent_mask(1))
         if tune_bert:
-            out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
+            if model.classification_head.train_only_decoder:
+                out = model.classification_head.forward_only_decoder(ys, memory.to(device), tgt_mask.to(device))
+            else:
+                out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
         else:
             out = model.decode(ys, memory.to(device), tgt_mask.to(device))
 
-        out = out.transpose(0, 1)
         if tune_bert:
-            prob = model.classification_head.generator(out[:, -1])
+            if model.classification_head.train_only_decoder:
+                prob = out
+            else:
+                out = out.transpose(0, 1)
+                prob = model.classification_head.generator(out[:, -1])
         else:
             prob = model.generator(out[:, -1])
         _, next_words = torch.max(prob, dim=1)
@@ -172,10 +178,14 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
                 all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
             if tune_bert:
-                out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
-                out = out.transpose(0, 1)
-                prob = model.classification_head.generator(out[:, -1])
-                all_outs.append(out[:, -1])
+                if model.classification_head.train_only_decoder:
+                    prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs, tgt_mask.to(device))
+                    prob = prob[-1]
+                else:
+                    out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
+                    out = out.transpose(0, 1)
+                    prob = model.classification_head.generator(out[:, -1])
+                    all_outs.append(out[:, -1])
             else:
                 out = model.decode(ys, memory.to(device), tgt_mask.to(device))
                 out = out.transpose(0, 1)
