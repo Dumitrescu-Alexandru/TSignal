@@ -23,14 +23,14 @@ from models.transformer_nmt import TransformerModel
 def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
                form_sp_reg_data=False, version2_agregation="max", input_drop=False, no_pos_enc=False,
-               linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix="", tune_bert=False):
+               linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix="", tune_bert=False,train_only_decoder=False):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
                              glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
                              version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
                              linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                             tuning_bert=tune_bert)
+                             tuning_bert=tune_bert, train_only_decoder=train_only_decoder)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -91,7 +91,10 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             input_ids = torch.tensor(inputs['input_ids'], device=model.device)
             attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
             memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
-            memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
+            if not model.classification_head.train_only_decoder:
+                memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
+            else:
+                memory = memory_bfd
         else:
             memory = model.encode(src)
         if second_model is not None:
@@ -100,6 +103,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             memory_2nd_mdl = None
         if tune_bert and model.classification_head.glbl_lbl_version and model.classification_head.use_glbl_lbls or \
                 not tune_bert and model.glbl_lbl_version == 3 and model.use_glbl_lbls:
+            # when tuning BERT model + TSignal and having a separate classifier for ths SP type which (should) be based
+            # on the embeddings comming from the BERT model
             if test_only_cs:
                 batch_size = len(src)
                 glbl_labels = torch.zeros(batch_size, 6)
@@ -725,7 +730,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
-                        random_folds=False, train_on_subset=1.):
+                        random_folds=False, train_on_subset=1., train_only_decoder=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -767,7 +772,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                            glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False,
                            version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
                            linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                                         tune_bert=tune_bert)
+                                         tune_bert=tune_bert,train_only_decoder=train_only_decoder)
         model = ProtBertClassifier(hparams)
         model.classification_head = classification_head
         model.to(device)

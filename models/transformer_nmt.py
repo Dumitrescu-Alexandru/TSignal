@@ -187,8 +187,9 @@ class TransformerModel(nn.Module):
                  data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
                  version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False,
-                 tuned_bert_embs_prefix="", tuning_bert=False):
+                 tuned_bert_embs_prefix="", tuning_bert=False,train_only_decoder=False):
         super().__init__()
+        self.train_only_decoder = train_only_decoder
         self.add_lg_info = lg2ind is not None
         self.form_sp_reg_data = form_sp_reg_data
         self.model_type = 'Transformer'
@@ -262,6 +263,14 @@ class TransformerModel(nn.Module):
         padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
         return self.glbl_generator(padded_src_glbl.transpose(2, 1))
 
+    def forward_only_decoder(self, src, tgt, inp_seqs):
+        src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, _ = self.input_encoder(src, inp_seqs=inp_seqs)
+        padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
+        padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input, no_pos_enc=self.no_pos_enc)
+        # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
+        outs = self.decode(tgt, padded_src, tgt_mask)
+        return self.generator(outs)
+
     def forward(self, src: Tensor, tgt: list, inp_seqs=None) -> Tensor:
         """
         Args:
@@ -270,6 +279,8 @@ class TransformerModel(nn.Module):
         Returns:
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
+        if self.train_only_decoder:
+            return self.forward_only_decoder(src, tgt, inp_seqs)
         if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             return self.forward_glb_lbls(src, tgt)
         if inp_seqs is not None:

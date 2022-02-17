@@ -2030,7 +2030,7 @@ def plot_sp6_vs_tnmt():
 
     line_w = 0.3
     offsets = [-line_w*0.5, line_w*0.5]
-    sptypes=["Sec/SPI", "Sec/SPII", "TAT"]
+    sptypes=["Sec/SPI", "Sec/SPII", "Tat/SP1"]
     for ind in range(3):
         upper_lim = 17 if ind == 0 else 13
         lower_lim = 0 if ind == 0 else 1
@@ -2039,7 +2039,7 @@ def plot_sp6_vs_tnmt():
             ax[ind].bar([i + offsets[j] for i in range(1, upper_lim)], all_f1s[j],  label=names[j],
                    width=line_w)
         box = ax[ind].get_position()
-        ax[ind].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.18, box.width * 0.73, box.height * 0.82])
+        ax[ind].set_position([box.x0 + box.width * 0.1, box.y0 + box.height * 0.1, box.width * 0.73, box.height * 0.82])
         ax[ind].set_yticks([0, 0.5, 1])
 
         # ax[ind].set_position([box.x0, box.y0, box.width * 0.8, box.height])
@@ -2047,11 +2047,13 @@ def plot_sp6_vs_tnmt():
         ax[ind].set_xticks(list(range(1, upper_lim)))
         if ind == 2:
             handles, labels = ax[ind].get_legend_handles_labels()
-        ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=10)
+        ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=8)
         # ax[ind].set_title("SPI performance", fontsize=11)
-        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), rotation=0, fontsize=11)
-        ax[ind].yaxis.set_label_coords(-0.24, 0.05)
-
+        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), rotation=0, fontsize=8)
+        ax[ind].yaxis.set_label_coords(-0.23, 0.2)
+        ax[ind].set_yticklabels([0,0.5,1],fontsize=8)
+        if ind == 0:
+            ax[ind].set_title("Weighted F1 scores for TSignal/SignalP6: 0.7987/0.7976", fontsize=8, y=1.1)
     fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.77, 0.5))
     plt.show()
 
@@ -2583,6 +2585,15 @@ def plot_ece_over_tolerance(lg_and_tol2_lg):
     plt.yscale("log")
     plt.show()
 if __name__ == "__main__":
+    plot_sp6_vs_tnmt()
+    exit(1)
+    # BEST MODEL
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     # SEPARATE GLBL NO TUNED
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="separate-glbl_non_tuned_trimmed_d/acc_lipos/",
