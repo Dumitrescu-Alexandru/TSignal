@@ -253,17 +253,66 @@ def get_cs_preds_by_tol(tl, pl):
     return correct_by_tol
 
 
+def plot_all_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_acc, ece):
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    fig, ax = plt.subplots(2, 2)
+    for i in range(4):
+        accs = [acc_to_perc[0] for acc_to_perc in resulted_perc_by_acc[i]]
+        total_counts_per_acc_ = list(total_counts_per_acc[i])
+        percs = [acc_to_perc[1] for acc_to_perc in resulted_perc_by_acc[i]]
+        bars_width = accs[0] - accs[1]
+        # ax[i//2, i%2].set_title(name[i], fontsize=11)
+        if i == 0:
+            box = ax[i//2, i%2].get_position()
+            ax[i//2, i%2].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 0.85, box.height * 0.75])
+
+            ax[i//2, i%2].bar(accs, accs, width=bars_width, alpha=0.5, linewidth=2, edgecolor="black", color='blue',
+                    label='Perfect\ncalibration')
+            ax[i//2, i%2].bar(accs, percs, width=bars_width, alpha=0.5, color='red', label="Model's\ncalibration")
+            ax[i//2, i%2].set_xticks([round(accs[j*2+1],2) for j in range(len(accs)//2)])
+            ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[j * 2 + 1], 2)), str(total_counts_per_acc_[j * 2 + 1])) for j in
+               range(len(accs) // 2 )],fontsize=6)
+            ax[i // 2, i % 2].set_xlim([0,1])
+            ax[i // 2, i % 2].set_title("tol {}, ece: {}".format(i, ece[i]), fontsize=8)
+            # ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[i], 2)), str(total_counts_per_acc[i])) for i in
+            #             range(len(accs)//2 - 2)], fontsize=8)
+            ax[i//2, i%2].set_yticks([0, 0.5, 1])
+            ax[i//2, i%2].set_yticklabels([0, 0.5, 1], fontsize=6)
+        else:
+            box = ax[i//2, i%2].get_position()
+            horizontal_offset = - 0.2 * box.width if i == 1 or i == 3 else 0
+            vertical_offset = 0.35 * box.height if i == 1 else 0.18 * box.height
+            ax[i//2, i%2].set_position([box.x0 + horizontal_offset, box.y0 + vertical_offset, box.width * 0.85, box.height * 0.75])
+            ax[i // 2, i % 2].bar(accs, accs, width=bars_width, alpha=0.5, linewidth=2, edgecolor="black", color='blue')
+            ax[i // 2, i % 2].bar(accs, percs, width=bars_width, alpha=0.5, color='red')
+            ax[i//2, i%2].set_xticks([round(accs[j*2+1],2) for j in range(len(accs)//2)])
+            ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[j * 2 + 1], 2)), str(total_counts_per_acc_[j * 2 + 1])) for j in
+               range(len(accs) // 2 )],fontsize=6)
+            ax[i // 2, i % 2].set_xlim([0,1])
+            ax[i // 2, i % 2].set_title("tol {}, ece: {}".format(i, ece[i]), fontsize=8)
+            ax[i//2, i%2].set_yticks([0, 0.5, 1])
+            ax[i//2, i%2].set_yticklabels([0, 0.5, 1], fontsize=6)
+
+        if i > 1:
+            ax[i//2, i%2].set_xlabel("Confidence/No of samples", fontsize=8)
+        if i == 0 or i == 2:
+            ax[i//2, i%2].set_ylabel("Accuracy", fontsize=8)
+    fig.legend(loc='center left', bbox_to_anchor=(0.78, 0.5), fontsize=8)
+    plt.show()
+
 def plot_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_acc):
-    import matplotlib
-    fig = matplotlib.pyplot.gcf()
+
+    import matplotlib as mpl
+    fig = mpl.pyplot.gcf()
+    mpl.rcParams['figure.dpi'] = 100
     fig.set_size_inches(12, 8)
-    fig.savefig('test2png.png', dpi=100)
 
     accs = [acc_to_perc[0] for acc_to_perc in resulted_perc_by_acc]
     total_counts_per_acc = list(total_counts_per_acc)
     percs = [acc_to_perc[1] for acc_to_perc in resulted_perc_by_acc]
     bars_width = accs[0] - accs[1]
-    plt.title(name)
+    plt.title(name, fontsize=26)
     plt.bar(accs, accs, width=bars_width, alpha=0.5, linewidth=2, edgecolor="black", color='blue',
             label='Perfect calibration')
     plt.bar(accs, percs, width=bars_width, alpha=0.5, color='red', label="Model's calibration",
@@ -276,7 +325,7 @@ def plot_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_acc):
 
 
 def get_prob_calibration_and_plot(probabilities_file="", life_grp=None, seqs=None, true_lbls=None, pred_lbls=None,
-                                  bins=15, plot=True, sp2probs=None):
+                                  bins=15, plot=True, sp2probs=None, plot_together=True):
     # initialize bins
     bin_limmits = np.linspace(0, 1, bins)
     correct_calibration_accuracies = [(bin_limmits[i] + bin_limmits[i + 1]) / 2 for i in range(bins - 1)]
@@ -311,11 +360,25 @@ def get_prob_calibration_and_plot(probabilities_file="", life_grp=None, seqs=Non
             if pl[0] == "S":
                 binary_sp_calibration_by_grp[lg]['correct'][coresp_acc] += 1
         if tl[0] == pl[0] == "S":
+            # in order to extract lower confidence probabilities, move left and right from the cleave site prediction
+            # in a [-3, 3] window. See if 1-SP_conf_pred (which should be approx = CS pred) correlates with the
+            # accuracy of the CS prediction
+            # TODO it may be possible for cleavage site predictions to continue predicting S (sp signal) even after
+            #  the predominant-sp probability is finished. And retrieve those as [0,0.5] probabilities
+            for i in range(-3, 4):
+                bin_cs = get_bin(1-all_sp_probs[pl.rfind("S") + 1], bin_limmits)
+                coresp_acc_cs = correct_calibration_accuracies[bin_cs]
+                # if 0.5  <= 1- all_sp_probs[pl.rfind("S") + 1] <= 0.8:
+                #     print(1-np.array(all_sp_probs[pl.rfind("S")-3:pl.rfind("S")+3]))
+                # print(coresp_acc_cs)
             correct_preds_by_tol = get_cs_preds_by_tol(tl, pl)
             for tol in range(4):
-                cs_by_lg_and_tol_accs[lg][tol]['correct'][coresp_acc] += correct_preds_by_tol[tol]
-                cs_by_lg_and_tol_accs[lg][tol]['total'][coresp_acc] += 1
+                cs_by_lg_and_tol_accs[lg][tol]['correct'][coresp_acc_cs] += correct_preds_by_tol[tol]
+                cs_by_lg_and_tol_accs[lg][tol]['total'][coresp_acc_cs] += 1
+        elif pl[0] == "S" and tl[0] != "S":
+            binary_sp_calibration_by_grp[lg]['total'][coresp_acc] += 1
     binary_ece, cs_ece = [], [[], [], [], []]
+    lg_and_tol2_lg = {}
     for lg_ind, lg in enumerate(['EUKARYA', 'NEGATIVE', 'POSITIVE', 'ARCHAEA']):
         correct_binary_preds, total_binary_preds = binary_sp_calibration_by_grp[lg]['correct'].values(), \
                                                    binary_sp_calibration_by_grp[lg]['total'].values()
@@ -327,29 +390,39 @@ def get_prob_calibration_and_plot(probabilities_file="", life_grp=None, seqs=Non
             current_binary_ece.append(
                 np.abs(correct_calibration_accuracies[ind] - actual_acc) * (ttl / sum(total_binary_preds)))
         binary_ece.append(round(sum(current_binary_ece), 3))
-        if plot:
+        if plot:# and not plot_together:
             print("Binary preds for {} with ECE {}: ".format(lg, sum(current_binary_ece)), results, total_binary_preds)
             plot_reliability_diagrams(results, "Binary sp pred results for {} with ECE {}".format(lg, round(
                 sum(current_binary_ece), 3)), total_binary_preds)
+        all_results, all_titles, all_total_cs_preds= [], [], []
+        all_cs_ece = []
         for tol in range(4):
             correct_cs_preds, total_cs_preds = cs_by_lg_and_tol_accs[lg][tol]['correct'].values(), \
                                                cs_by_lg_and_tol_accs[lg][tol]['total'].values()
             results = []
+            # this is the binary sp ece
             current_cs_ece = []
+            # this will be computed according to the 1-noSP probability at the cleavage site
+            # current_actual_cs_ece = []
             for ind, (crct, ttl) in enumerate(zip(correct_cs_preds, total_cs_preds)):
                 results.append((correct_calibration_accuracies[ind], crct / ttl if ttl != 0 else 0))
                 actual_acc = crct / ttl if ttl != 0 else 0
                 current_cs_ece.append(
                     np.abs(correct_calibration_accuracies[ind] - actual_acc) * (ttl / sum(total_binary_preds)))
             cs_ece[lg_ind].append(round(sum(current_cs_ece), 3))
-            if plot:
+            lg_and_tol2_lg["{}_{}".format(lg, tol)] = sum(current_cs_ece)
+            if plot and not plot_together:
                 plot_reliability_diagrams(results, "CS pred results for tol {} for {} with ECE {}".format(tol, lg,
-                                                                                                          round(
-                                                                                                              sum(current_cs_ece),
-                                                                                                              3)),
-                                          total_cs_preds)
+                                      round(sum(current_cs_ece),3)),total_cs_preds)
                 print("Cs preds for {} for tol {}:".format(lg, tol), results)
-
+            if plot_together:
+                all_results.append(results)
+                all_titles.append("{}{}: {}".format(lg[0], tol, round(sum(current_cs_ece),3)))
+                all_total_cs_preds.append(total_cs_preds)
+            all_cs_ece.append(current_cs_ece)
+        if plot_together:
+            plot_all_reliability_diagrams(all_results, all_titles, all_total_cs_preds, ece=[round(sum(all_cs_ece[j]),3) for j in range(4)])
+    return lg_and_tol2_lg
 
 def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_fold=2, dict_=None):
     seq2preds = pickle.load(open(filename, "rb")) if dict_ is None else dict_
@@ -985,15 +1058,15 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     sp6_summarized = np.sum((np.array(sp6_f1_sp1) * np.array(no_of_seqs_sp1))) / no_of_tested_sp_seqs + \
                         np.sum((np.array(sp6_f1_sp2) * np.array(no_of_seqs_sp2))) / no_of_tested_sp_seqs + \
                         np.sum((np.array(sp6_f1_tat) * np.array(no_of_seqs_tat))) / no_of_tested_sp_seqs
-    sp6_recalls_sp1 = [str(round(sp6_r_sp1, 2)) for sp6_r_sp1 in sp6_recalls_sp1]
-    sp6_recalls_sp2 = [str(round(sp6_r_sp2, 2)) for sp6_r_sp2 in sp6_recalls_sp2]
-    sp6_recalls_tat = [str(round(sp6_r_tat, 2)) for sp6_r_tat in sp6_recalls_tat]
-    sp6_precs_sp1 = [str(round(sp6_prec_sp1, 2)) for sp6_prec_sp1 in sp6_precs_sp1]
-    sp6_precs_sp2 = [str(round(sp6_p_sp2, 2)) for sp6_p_sp2 in sp6_precs_sp2]
-    sp6_precs_tat = [str(round(sp6_p_tat, 2)) for sp6_p_tat in sp6_precs_tat]
-    sp6_f1_sp1 = [str(round(sp6_f1_sp1_, 2)) for sp6_f1_sp1_ in sp6_f1_sp1]
-    sp6_f1_sp2 = [str(round(sp6_f1_sp2_, 2)) for sp6_f1_sp2_ in sp6_f1_sp2]
-    sp6_f1_tat = [str(round(sp6_f1_tat_, 2)) for sp6_f1_tat_ in sp6_f1_tat]
+    sp6_recalls_sp1 = [str(round(sp6_r_sp1, 3)) for sp6_r_sp1 in sp6_recalls_sp1]
+    sp6_recalls_sp2 = [str(round(sp6_r_sp2, 3)) for sp6_r_sp2 in sp6_recalls_sp2]
+    sp6_recalls_tat = [str(round(sp6_r_tat, 3)) for sp6_r_tat in sp6_recalls_tat]
+    sp6_precs_sp1 = [str(round(sp6_prec_sp1, 3)) for sp6_prec_sp1 in sp6_precs_sp1]
+    sp6_precs_sp2 = [str(round(sp6_p_sp2, 3)) for sp6_p_sp2 in sp6_precs_sp2]
+    sp6_precs_tat = [str(round(sp6_p_tat, 3)) for sp6_p_tat in sp6_precs_tat]
+    sp6_f1_sp1 = [str(round(sp6_f1_sp1_, 3)) for sp6_f1_sp1_ in sp6_f1_sp1]
+    sp6_f1_sp2 = [str(round(sp6_f1_sp2_, 3)) for sp6_f1_sp2_ in sp6_f1_sp2]
+    sp6_f1_tat = [str(round(sp6_f1_tat_, 3)) for sp6_f1_tat_ in sp6_f1_tat]
     files = os.listdir(result_folder)
     unique_params = set()
     for f in files:
@@ -1330,7 +1403,7 @@ def visualize_training_variance(mdl2results, mdl2results_hps=None):
 
 def extract_calibration_probs_for_mdl(model="parameter_search_patience_60use_glbl_lbls_use_glbl_lbls_versio"
                                             "n_1_weight_0.1_lr_1e-05_nlayers_3_nhead_16_lrsched_none_trFlds_",
-                                      folder='huge_param_search/patience_60/'):
+                                      folder='huge_param_search/patience_60/', plot=True):
     all_lg, all_seqs, all_tl, all_pred_lbls, sp2probs = [], [], [], [], {}
     for tr_f in [[0, 1], [0, 2], [1, 2]]:
         prob_file = "{}{}_{}_best_sp_probs.bin".format(model, tr_f[0], tr_f[1])
@@ -1341,7 +1414,8 @@ def extract_calibration_probs_for_mdl(model="parameter_search_patience_60use_glb
         all_tl.extend(true_lbls)
         all_pred_lbls.extend(pred_lbls)
         sp2probs.update(pickle.load(open(folder + prob_file, "rb")))
-    get_prob_calibration_and_plot("", all_lg, all_seqs, all_tl, all_pred_lbls, sp2probs=sp2probs)
+
+    return get_prob_calibration_and_plot("", all_lg, all_seqs, all_tl, all_pred_lbls, sp2probs=sp2probs, plot=plot)
 
 
 def duplicate_Some_logs():
@@ -1913,6 +1987,106 @@ def plot_performance():
     # plt.ylabel("Percentage from that life group")
     # plt.show()
 
+def plot_sp6_vs_tnmt():
+    tnmt_f1 = [[0.693, 0.733, 0.759, 0.779 ], [0.493, 0.563, 0.592, 0.606 ], [0.486, 0.541, 0.541, 0.541],
+               [0.533, 0.633, 0.667, 0.667]]
+    tnmt_f1_sp2 = [[0.896 , 0.911 , 0.911 , 0.92] , [0.93 , 0.936 , 0.936 , 0.936] , [0.706 , 0.706 , 0.706 , 0.706]]
+    tnmt_f1_tat = [[0.556 , 0.714 , 0.794 , 0.857] , [0.2 , 0.5 , 0.8 , 0.8] , [0.435 , 0.435 , 0.435 , 0.435]]
+    sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
+                       0.556, 0.583]
+    sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
+    sp6_recalls_tat = [0.706, 0.765, 0.784, 0.804, 0.556, 0.556, 0.667, 0.667, 0.333, 0.444, 0.444, 0.444]
+    sp6_precs_sp1 = [0.661, 0.685, 0.715, 0.733, 0.534, 0.562, 0.575, 0.603, 0.632, 0.632, 0.632, 0.632, 0.643, 0.714,
+                     0.714, 0.75]
+    sp6_precs_sp2 = [0.913, 0.913, 0.917, 0.925, 0.929, 0.938, 0.938, 0.938, 0.583, 0.583, 0.583, 0.583]
+    sp6_precs_tat = [0.679, 0.736, 0.755, 0.774, 0.714, 0.714, 0.857, 0.857, 0.375, 0.5, 0.5, 0.5]
+    sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
+    sp6_f1_sp2 = get_f1_scores(sp6_recalls_sp2, sp6_precs_sp2)
+    sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
+    print(sp6_f1_sp1, sp6_f1_sp2, sp6_f1_tat)
+    tnmt_rec = [[0.719, 0.76, 0.788, 0.808], [0.556, 0.635, 0.667, 0.683], [0.6, 0.667, 0.667, 0.667],
+                [0.444, 0.528, 0.556, 0.556]]
+    tnmt_prec = [[0.669, 0.707, 0.732, 0.752], [0.745, 0.851, 0.894, 0.915], [0.818, 0.909, 0.909, 0.909],
+                 [0.727, 0.864, 0.909, 0.909]]
+
+    all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"])
+    all_recalls, all_precisions, f1_predtat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP"])
+    all_recalls, all_precisions, f1_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP"])
+    all_recalls, all_precisions, f1_phobius = extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"])
+    all_f1s = [tnmt_f1, f1_predtat, f1_lipop, f1_deepsig, f1_phobius]
+    all_f1s_sp1 = [np.array(tnmt_f1).reshape(-1), np.array([sp6_f1_sp1[i*4:(i+1)*4] for i in range(4)]).reshape(-1)]
+    all_f1s_sp2 = [np.array(tnmt_f1_sp2).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
+    all_f1s_tat = [np.array(tnmt_f1_tat).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
+    all_sptypes_all_f1s = [all_f1s_sp1, all_f1s_sp2, all_f1s_tat]
+
+    names = ["TSignal", "SignalP6", "LipoP", "DeepSig", "Phobius"]
+    colors = ["c", "orage", "green", "black", "purple"]
+    titles = ["e", "n", "p", "a"]
+    x_positions = []
+
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    fig, ax = plt.subplots(3, 1)
+
+    line_w = 0.3
+    offsets = [-line_w*0.5, line_w*0.5]
+    sptypes=["Sec/SPI", "Sec/SPII", "TAT"]
+    for ind in range(3):
+        upper_lim = 17 if ind == 0 else 13
+        lower_lim = 0 if ind == 0 else 1
+        all_f1s = all_sptypes_all_f1s[ind]
+        for j in range(2):
+            ax[ind].bar([i + offsets[j] for i in range(1, upper_lim)], all_f1s[j],  label=names[j],
+                   width=line_w)
+        box = ax[ind].get_position()
+        ax[ind].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.18, box.width * 0.73, box.height * 0.82])
+        ax[ind].set_yticks([0, 0.5, 1])
+
+        # ax[ind].set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        # ax[ind].legend(loc='center left', bbox_to_anchor=(1, 0.5, ), fontsize=26)
+        ax[ind].set_xticks(list(range(1, upper_lim)))
+        if ind == 2:
+            handles, labels = ax[ind].get_legend_handles_labels()
+        ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=10)
+        # ax[ind].set_title("SPI performance", fontsize=11)
+        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), rotation=0, fontsize=11)
+        ax[ind].yaxis.set_label_coords(-0.24, 0.05)
+
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.77, 0.5))
+    plt.show()
+
+    all_f1s = [np.array(tnmt_f1_sp2).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
+    line_w = 0.15
+    offsets = [-line_w*0.5, line_w*0.5]
+    ax = plt.subplot(111)
+    for j in range(2):
+        ax.bar([i + offsets[j] for i in range(1, 13)], all_f1s[j],  label=names[j],
+               width=line_w)
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=26)
+    ax.set_xticks(list(range(1, 13)))
+    ax.set_xticklabels(['{}\ntol {}'.format(titles[1 + i//4], i%4) for i in range(12)])
+    ax.set_title("SPII Performance", fontsize=26)
+    ax.set_ylabel("F1 score")
+    plt.show()
+
+    all_f1s = [np.array(tnmt_f1_tat).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
+    line_w = 0.15
+    offsets = [-line_w*0.5, line_w*0.5]
+    ax = plt.subplot(111)
+    for j in range(2):
+        ax.bar([i + offsets[j] for i in range(1, 13)], all_f1s[j],  label=names[j],
+               width=line_w)
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=26)
+    ax.set_xticks(list(range(1, 13)))
+    ax.set_xticklabels(['{}\ntol {}'.format(titles[1 + i//4], i%4) for i in range(12)])
+    ax.set_title("TAT Performance", fontsize=26)
+    ax.set_ylabel("F1 score")
+    plt.show()
+
 def plot_comparative_performance_sp1_mdls():
     tnmt_f1 = [[0.693,0.733,0.759,0.779],[0.636,0.727,0.764,0.782],[0.692,0.769,0.769,0.769],[0.552,0.655,0.69,0.69]]
     tnmt_f1 = [[0.631, 0.731, 0.756, 0.769], [0.65, 0.833, 0.883, 0.883], [0.867, 0.933, 0.933, 0.933],[0.551, 0.667, 0.696, 0.754]]
@@ -1925,11 +2099,13 @@ def plot_comparative_performance_sp1_mdls():
     all_recalls, all_precisions, f1_phobius = extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"])
 
 
-    all_f1s = [tnmt_f1, f1_predtat, f1_lipop, f1_deepsig, f1_phobius]
+    # all_f1s = [tnmt_f1, f1_predtat, f1_lipop, f1_deepsig, f1_phobius]
+    all_f1s = [tnmt_f1, f1_deepsig, f1_phobius, f1_lipop, f1_predtat]
 
-    names = ["TNMT", "PredTAT", "LipoP", "DeepSig", "Phobius"]
+    # names = ["TSignal", "PredTAT", "LipoP", "DeepSig", "Phobius"]
+    names = ["TSignal", "DeepSig", "Phobius", "LipoP", "PredTAT"]
     colors = ["red", "blue", "green", "black", "purple"]
-    titles = ["eukarya", "negative bacteria", "positive bacteria", "archaea"]
+    titles = ["eukarya", "negative", "positive", "archaea"]
     x_positions = []
 
 
@@ -1954,21 +2130,41 @@ def plot_comparative_performance_sp1_mdls():
     #     ax.set_title(titles[ind])
     #     ax.set_ylabel("F1 score")
     #     plt.show()
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    from matplotlib.pyplot import figure
+
 
     line_w = 0.15
     offsets = [-2 * line_w, - 1 * line_w,0, 1 * line_w, line_w * 2]
+    # ax = plt.subplot(111)
+    fig, ax = plt.subplots(4, 1)
+    fig.set_size_inches(18.5, 5, forward=True)
+
     for ind in range(4):
-        ax = plt.subplot(111)
         for j in range(5):
-            ax.bar([i + offsets[j] for i in range(1,5)], all_f1s[j][ind], color=colors[j], label=names[j], width=line_w)
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        ax.set_xticks(list(range(1,5)))
-        ax.set_xticklabels(['tolerance {}'.format(i) for i in range(4)])
-        ax.set_title(titles[ind])
-        ax.set_ylabel("F1 score")
-        plt.show()
+            ax[ind].bar([i + offsets[j] for i in range(1,5)], all_f1s[j][ind], color=colors[j], label=names[j], width=line_w)
+        box = ax[ind].get_position()
+        ax[ind].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.1, box.width * 0.7, box.height * 0.9])
+        if ind == 3:
+            # ax[ind].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=14)
+            handles, labels = ax[ind].get_legend_handles_labels()
+
+        if ind != 3:
+            ax[ind].set_xticks([])
+        else:
+            ax[ind].set_xticks(list(range(1,5)))
+            ax[ind].set_xticklabels(['tol {}'.format(i) for i in range(4)], fontsize=11)
+        ax[ind].set_yticks([0, 0.5, 1])
+        # ax.set_yticklabels(labels=ax.get_yticklabels(),fontsize=12)
+        # plt.yticks(fontsize=10)
+        # if ind == 0:
+        #     ax[ind].set_title("F1 score", fontsize=14)
+        ax[ind].set_ylabel(titles[ind] + "\nF1", fontsize=11, rotation=0)
+        ax[ind].yaxis.set_label_coords(-0.26, 0)
+
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.75, 0.5))
+    plt.show()
 
 def create_random_split_fold_data():
     all_data = []
@@ -2133,7 +2329,7 @@ def visualize_data_amount2_results(benchmark_ds=False):
         lg2f1_tol0_tat['ARCHAEA'].append(f1_scores_tat[2][0])
         lg2f1_tol3_tat['ARCHAEA'].append(f1_scores_tat[2][3])
 
-    plt.title("SEC/SPI results")
+    plt.title("SEC/SPI results", fontsize=26)
     plt.xlabel("Percentage of dataset used for training")
     plt.ylabel("F1 score")
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp1['EUKARYA'], linestyle='solid', color='blue', label='Eukaryotes tol 0')
@@ -2144,10 +2340,10 @@ def visualize_data_amount2_results(benchmark_ds=False):
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp1['POSITIVE'], linestyle='dashed', color='orange', label='Positive tol 3')
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp1['ARCHAEA'], linestyle='solid', color='green', label='Archaea tol 0')
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp1['ARCHAEA'], linestyle='dashed', color='green', label='Archaea tol 3')
-    plt.legend()
+    plt.legend(fontsize=26)
     plt.show()
 
-    plt.title("SEC/SPII results")
+    plt.title("SEC/SPII results", fontsize=26)
     plt.xlabel("Percentage of dataset used for training")
     plt.ylabel("F1 score")
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp2['NEGATIVE'], linestyle='solid', color='red', label='Negative tol 0')
@@ -2156,10 +2352,10 @@ def visualize_data_amount2_results(benchmark_ds=False):
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp2['POSITIVE'], linestyle='dashed', color='orange', label='Positive tol 3')
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_sp2['ARCHAEA'], linestyle='solid', color='green', label='Archaea tol 0')
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_sp2['ARCHAEA'], linestyle='dashed', color='green', label='Archaea tol 3')
-    plt.legend()
+    plt.legend(fontsize=26)
     plt.show()
 
-    plt.title("TAT results")
+    plt.title("TAT results",fontsize=26)
     plt.xlabel("Percentage of dataset used for training")
     plt.ylabel("F1 score")
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_tat['NEGATIVE'], linestyle='solid', color='red', label='Negative tol 0')
@@ -2168,7 +2364,7 @@ def visualize_data_amount2_results(benchmark_ds=False):
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_tat['POSITIVE'], linestyle='dashed', color='orange', label='Positive tol 3')
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol0_tat['ARCHAEA'], linestyle='solid', color='green', label='Archaea tol 0')
     plt.plot([0.2,0.4,0.6, 0.8, 1], lg2f1_tol3_tat['ARCHAEA'], linestyle='dashed', color='green', label='Archaea tol 3')
-    plt.legend()
+    plt.legend(fontsize=26)
     plt.show()
 
 def rename_files():
@@ -2193,8 +2389,15 @@ def plot_perf_over_data_perc():
     subset_2_rec = {s:[] for s in subsets}
     # [0.7568873852102465, 0.8506524891251813, 0.8941517641372644, 0.9139681005316579],
     # [0.7568873852102465, 0.8506524891251813, 0.8941517641372644, 0.9139681005316579]
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    fig, ax = plt.subplots(2, 2)
+    # print(ax)
+    # print(ax[0])
+    # print(ax[0, 0])
+    # exit(1)
     for subset in subsets:
-        for run in range(3):
+        for run in range(6):
             print("Computing run {} for subset {}".format(run, subset))
             aa_pred_dict = {}
             glbl_lbl_dict = {}
@@ -2215,8 +2418,12 @@ def plot_perf_over_data_perc():
             # print(f1_scores)
             subset_2_f1[subset].append(f1_scores)
     sp1_plot = True
+    all_euk_mean_tol0, all_neg_mean_tol0, all_pos_mean_tol0, all_archaea_mean_tol0 = [], [], [] ,[]
+    all_euk_std_tol0, all_neg_std_tol0, all_pos_std_tol0, all_archaea_std_tol0 = [], [], [], []
+    all_euk_mean_tol3, all_neg_mean_tol3, all_pos_mean_tol3, all_archaea_mean_tol3 = [], [], [] ,[]
+    all_euk_std_tol3, all_neg_std_tol3, all_pos_std_tol3, all_archaea_std_tol3 = [], [], [], []
     for subset, f1 in subset_2_f1.items():
-        all_euk, all_neg, all_pos, all_archaea = [], [], [] ,[]
+        all_euk, all_neg, all_pos, all_archea = [], [],[],[]
         for run_f1 in f1:
             if sp1_plot:
                 eukaryote, negative, positive, archaea = run_f1
@@ -2225,8 +2432,124 @@ def plot_perf_over_data_perc():
                 negative, positive, archaea = run_f1
             all_neg.append(negative)
             all_pos.append(positive)
-            all_archaea.append(archaea)
-        print(subset, all_euk)
+            all_archea.append(archaea)
+        if sp1_plot:
+            all_euk_mean_tol0.append(np.mean([all_euk_[0] for all_euk_ in all_euk]))
+            all_euk_std_tol0.append(np.std([all_euk_[0] for all_euk_ in all_euk]))
+            all_euk_mean_tol3.append(np.mean([all_euk_[3] for all_euk_ in all_euk]))
+            all_euk_std_tol3.append(np.std([all_euk_[3] for all_euk_ in all_euk]))
+        all_neg_mean_tol0.append(np.mean([all_neg_[0] for all_neg_ in all_neg]))
+        all_neg_std_tol0.append(np.std([all_neg_[0] for all_neg_ in all_neg]))
+        all_neg_mean_tol3.append(np.mean([all_neg_[3] for all_neg_ in all_neg]))
+        all_neg_std_tol3.append(np.std([all_neg_[3] for all_neg_ in all_neg]))
+        # print(subset, all_euk_std_tol0)
+        all_pos_mean_tol0.append(np.mean([all_pos_[0] for all_pos_ in all_pos]))
+        all_pos_std_tol0.append(np.std([all_pos_[0] for all_pos_ in all_pos]))
+        all_pos_mean_tol3.append(np.mean([all_pos_[3] for all_pos_ in all_pos]))
+        all_pos_std_tol3.append(np.std([all_pos_[3] for all_pos_ in all_pos]))
+
+        all_archaea_mean_tol0.append(np.mean([all_archea_[0] for all_archea_ in all_archea]))
+        all_archaea_std_tol0.append(np.std([all_archea_[0] for all_archea_ in all_archea]))
+        all_archaea_mean_tol3.append(np.mean([all_archea_[3] for all_archea_ in all_archea]))
+        all_archaea_std_tol3.append(np.std([all_archea_[3] for all_archea_ in all_archea]))
+    if sp1_plot:
+        all_euk_mean_tol0 = np.array(all_euk_mean_tol0)
+        all_euk_mean_tol3 = np.array(all_euk_mean_tol3)
+        all_euk_std_tol0 = np.array(all_euk_std_tol0)
+        all_euk_std_tol3 = np.array(all_euk_std_tol3)
+        ax[0,0].plot(subsets, all_euk_mean_tol0, '-', label='e0', color='blue')
+        ax[0,0].fill_between(subsets, all_euk_mean_tol0 - 2 * all_euk_std_tol0, all_euk_mean_tol0 + 2 * all_euk_std_tol0, alpha=0.2, color='blue')
+        ax[0,0].plot(subsets, all_euk_mean_tol3, '--',label='e3', color='blue')
+        ax[0,0].fill_between(subsets, all_euk_mean_tol3 - 2 * all_euk_std_tol3, all_euk_mean_tol3 + 2 * all_euk_std_tol3, alpha=0.2, color='blue')
+        # ax[0,0].title("Performance over data percentage", fontsize=26)
+        # ax[0,0].set_xlabel("Percentage of training data used")
+        # ax[0,0].set_ylabel("F1 score")
+        box = ax[0,0].get_position()
+        ax[0,0].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
+        ax[0,0].set_ylabel("F1\nscore", rotation=0, fontsize=11)
+        ax[0, 0].yaxis.set_label_coords(-0.5, 0.35)
+        ax[0, 0].set_yticks([0, 0.5, 1])
+        ax[0, 0].set_xticks([0.25, 0.5, 0.75, 1])
+
+        # ax[0,0].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=11)
+    all_neg_mean_tol0 = np.array(all_neg_mean_tol0)
+    all_neg_mean_tol3 = np.array(all_neg_mean_tol3)
+    all_neg_std_tol0 = np.array(all_neg_std_tol0)
+    all_neg_std_tol3 = np.array(all_neg_std_tol3)
+    # fig, ax = plt.subplots()
+    # plt.title("Performance over data percentage", fontsize=26)
+    # ax[0,1].set_xlabel("Percentage of training data used")
+    # ax[0,1].set_ylabel("F1 score")
+
+    ax[0,1].plot(subsets, all_neg_mean_tol0, '-', label='n0', color='orange')
+    ax[0,1].fill_between(subsets, all_neg_mean_tol0 - 2 * all_neg_std_tol0, all_neg_mean_tol0 + 2 * all_neg_std_tol0,
+                    alpha=0.2, color='orange')
+    ax[0,1].plot(subsets, all_neg_mean_tol3, '--', label='n3', color='orange')
+    ax[0,1].fill_between(subsets, all_neg_mean_tol3 - 2 * all_neg_std_tol3, all_neg_mean_tol3 + 2 * all_neg_std_tol3,
+                    alpha=0.2, color='orange')
+    box = ax[0,1].get_position()
+    ax[0,1].set_yticks([0, 0.5, 1])
+
+    ax[0,1].set_position([box.x0 - box.width * 0.1, box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
+    ax[0,1].set_xticks([0.25, 0.5, 0.75, 1])
+
+    all_pos_mean_tol0 = np.array(all_pos_mean_tol0)
+    all_pos_mean_tol3 = np.array(all_pos_mean_tol3)
+    all_pos_std_tol0 = np.array(all_pos_std_tol0)
+    all_pos_std_tol3 = np.array(all_pos_std_tol3)
+    # fig, ax = plt.subplots()
+    # plt.title("Performance over data percentage", fontsize=26)
+    # ax[1,0].set_xlabel("Percentage of training data used")
+    # ax[1,0].set_ylabel("F1 score")
+    ax[1,0].plot(subsets, all_pos_mean_tol0, '-', label='p0', color='purple')
+    ax[1,0].fill_between(subsets, all_pos_mean_tol0 - 2 * all_pos_std_tol0, all_pos_mean_tol0 + 2 * all_pos_std_tol0,
+                    alpha=0.2, color='purple')
+    ax[1,0].plot(subsets, all_pos_mean_tol3, '--', label='p3', color='purple')
+    ax[1,0].fill_between(subsets, all_pos_mean_tol3 - 2 * all_pos_std_tol3, all_pos_mean_tol3 + 2 * all_pos_std_tol3,
+                    alpha=0.2, color='purple')
+    ax[1, 0].set_ylabel("F1\nscore", rotation=0, fontsize=11)
+    ax[1, 0].yaxis.set_label_coords(-0.5, 0.35)
+    ax[1, 0].set_xticks([0.25, 0.5, 0.75, 1])
+
+    box = ax[1,0].get_position()
+    ax[1,0].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.2, box.width * 0.7, box.height * 0.85])
+    ax[1,0].set_xlabel("data percentage", fontsize=11)
+    ax[1,0].set_yticks([0, 0.5, 1])
+    # plt.show()
+    all_archaea_mean_tol0 = np.array(all_archaea_mean_tol0)
+    all_archaea_mean_tol3 = np.array(all_archaea_mean_tol3)
+    all_archaea_std_tol0 = np.array(all_archaea_std_tol0)
+    all_archaea_std_tol3 = np.array(all_archaea_std_tol3)
+    # fig, ax = plt.subplots()
+    # plt.title("Performance over data percentage", fontsize=26)
+    # ax[1,1].set_xlabel("Percentage of training data used")
+    # ax[1,1].set_ylabel("F1 score")
+
+    ax[1,1].plot(subsets, all_archaea_mean_tol0, '-', label='a0', color='red')
+    ax[1,1].fill_between(subsets, all_archaea_mean_tol0 - 2 * all_archaea_std_tol0, all_archaea_mean_tol0 + 2 * all_archaea_std_tol0,
+                    alpha=0.2, color='red')
+
+    ax[1,1].plot(subsets, all_archaea_mean_tol3, '--', label='a3', color='red')
+    ax[1,1].fill_between(subsets, all_archaea_mean_tol3 - 2 * all_archaea_std_tol3, all_archaea_mean_tol3 + 2 * all_archaea_std_tol3,
+                    alpha=0.2, color='red')
+    box = ax[1,1].get_position()
+    ax[1,1].set_position([box.x0 - box.width * 0.1, box.y0 + box.height * 0.2, box.width * 0.7, box.height * 0.85])
+    ax[1,1].set_xlabel("data percentage", fontsize=11)
+    ax[1,1].set_yticks([0, 0.5, 1])
+    ax[1,1].set_xticks([0.25, 0.5, 0.75, 1])
+
+
+    all_handles, all_labels = [], []
+    for ind in range(2):
+        for ind_ in  range(2):
+            handles, labels = ax[ind, ind_].get_legend_handles_labels()
+            all_handles.extend(handles)
+            all_labels.extend(labels)
+
+    fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.8, 0.5))
+    # fig.text(0.5, 0.04, 'common X', ha='center')
+    # fig.text(0.04, 0.5, 'common Y', va='center', rotation='vertical')
+    plt.show()
 
 def checkthis_():
     a = pickle.load(open("train_subset_results/data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_0_subset_train_0.25_trFlds_0_1_best.bin", "rb"))
@@ -2239,17 +2562,86 @@ def checkthis_():
             print("\n")
 
 
+def plot_ece_over_tolerance(lg_and_tol2_lg):
+    colors = {'EUKARYA':'blue', 'NEGATIVE':'orange', 'POSITIVE':'red', 'ARCHAEA':'purple'}
+    fig, ax = plt.subplots()
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=26)
+    for lg in ['EUKARYA', 'NEGATIVE', 'POSITIVE', 'ARCHAEA']:
+        ece_values = []
+        for tol in range(4):
+            ece_values.append(lg_and_tol2_lg["{}_{}".format(lg, tol)])
+        ax.plot(list(range(4)), ece_values, label=lg, color=colors[lg])
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=26)
+    plt.xticks(list(range(4)))
+    plt.title("ECE values over tolerance levels", fontsize=26)
+    plt.xlabel("Tolerance")
+    plt.ylabel("log(ECE)")
+    plt.yscale("log")
+    plt.show()
 if __name__ == "__main__":
-    # checkthis_()
+    # SEPARATE GLBL NO TUNED
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="separate-glbl_non_tuned_trimmed_d/acc_lipos/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # SEPARATE BERT-TUNING
+    # mdl2results = extract_all_param_results(only_fcs_position=False,
+    #                                         result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
     # exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    lg_and_tol2_lg = extract_calibration_probs_for_mdl(model="repeat_best_experiment_highBertLr_",
+                                                       folder='tuning_bert_tune_bert_repeat_best_experiment_highBertLr/',
+                                                       plot=True)
     plot_perf_over_data_perc()
     exit(1)
+    plot_sp6_vs_tnmt()
+    exit(1)
+    plot_comparative_performance_sp1_mdls()
+    exit(1)
+    plot_ece_over_tolerance(lg_and_tol2_lg)
+    exit(1)
+
+    plot_sp6_vs_tnmt()
+    exit(1)
+    # plot_comparative_performance_sp1_mdls()
+    # exit(1)
+
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+
+
+    plot_comparative_performance_sp1_mdls()
+    exit(1)
+
+    plot_perf_over_data_perc()
+    exit(1)
+    exit(1)
+
+    # checkthis_()
+    # exit(1)
+
     rename_files()
     exit(1)
 
 
-    visualize_data_amount2_results()
-    exit(1)
+
     compute_diversity_within_partition()
     # prep_sp1_sp2()
     # exit(1)
@@ -2269,6 +2661,8 @@ if __name__ == "__main__":
     extract_compatible_binaries_deepsig()
     # exit(1)
     # Compare results only on SP/NO_SP
+    visualize_data_amount2_results()
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
                                             compare_mdl_plots=False,
