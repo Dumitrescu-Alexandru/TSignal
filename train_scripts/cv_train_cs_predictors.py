@@ -989,7 +989,21 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
 
         if validate_on_mcc:
-            patiente_metric = np.mean(sp_pred_mccs2)
+            no_of_seqs_sp1 = list(np.array([2040, 44, 142, 356]).repeat(4))
+            no_of_seqs_sp2 = list(np.array([1087, 516, 12]).repeat(4))
+            no_of_seqs_tat = list(np.array([313, 39, 13]).repeat(4))
+            no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
+            summary = np.nansum(
+                (np.array(all_f1_scores).reshape(-1) * np.array(no_of_seqs_sp1))) / no_of_tested_sp_seqs + \
+                      np.nansum((np.array(all_f1_scores_lipo).reshape(-1) * np.array(
+                          no_of_seqs_sp2))) / no_of_tested_sp_seqs + \
+                      np.nansum(
+                          (np.array(all_f1_scores_tat).reshape(-1) * np.array(no_of_seqs_tat))) / no_of_tested_sp_seqs
+            # print(sp_pred_mccs, sp_pred_mccs2)
+            # print(all_f1_scores, all_f1_scores_tat, all_f1_scores_lipo)
+            # print(summary)
+            # patiente_metric = np.mean(sp_pred_mccs2)
+            patiente_metric = summary
             if separate_save_sptype_preds:
                 current_sptype_f1 = sptype_f1[0] * 0.5 + sptype_f1[1] * 0.2 + sptype_f1[2] * 0.2  + sptype_f1[3] * 0.1
         else:

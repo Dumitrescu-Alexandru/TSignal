@@ -2585,6 +2585,45 @@ def plot_ece_over_tolerance(lg_and_tol2_lg):
     plt.yscale("log")
     plt.show()
 if __name__ == "__main__":
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder_repeat/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+
+    visualize_validation(run="repeat_only_decoder_", folds=[0, 2],
+                         folder="tuning_bert_only_decoder_repeat/")
+    visualize_validation(run="only_decoder_", folds=[0, 2],
+                         folder="tuning_bert_only_decoder/")
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="merge_tuning_bert_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder_repeat/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder_15_epchs/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     plot_sp6_vs_tnmt()
     exit(1)
     # BEST MODEL
