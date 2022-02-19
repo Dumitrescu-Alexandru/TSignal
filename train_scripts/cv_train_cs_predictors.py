@@ -1064,7 +1064,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         print("VALIDATION: avg mcc on epoch {}: {}".format(e, np.mean(sp_pred_mccs2)))
         if validate_on_mcc:
             print("VALIDATION: avg f1 score on epoch {}: {}".format(e,patiente_metric))
-
+            logging.info("VALIDATION: avg f1 score on epoch {}: {}".format(e,patiente_metric))
         if (valid_loss < best_valid_loss and eps == -1 and not validate_on_mcc) or (eps != -1 and e == eps - 1) or \
                 (patiente_metric > best_valid_mcc_and_recall and eps == -1 and validate_on_mcc):
             best_epoch = e
