@@ -21,7 +21,7 @@ def create_param_set_cs_predictors():
 
     parameters = {"train_folds": [[0,1],[0,2],[1,2]], "nlayers": [3],"nheads":[16],
                   "lr": [0.00001], 'dropout':[0.1], 'random_folds':[True], 'train_on_subset':[0.25,0.5,0.75,1],
-                  "run_number":[3, 4, 5]}
+                  "run_number":[0, 1, 2]}
     # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
     #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
     group_params = list(ParameterGrid(parameters))

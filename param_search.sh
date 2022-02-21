@@ -8,4 +8,4 @@
 
 module load anaconda/2020-05-tf2
 
-python main.py --param_set_search_number $SLURM_ARRAY_TASK_ID --batch_size 32 --run_name data_perc_runs --train_cs_predictor --add_lg_info --patience 50 --simplified --very_simplified --validate_on_mcc  --tune_bert --frozen_epochs 15
+python main.py --train_cs_predictor --param_set_search_number $SLURM_ARRAY_TASK_ID --run_name random_folds_run --lr 0.00001 --batch_size 32 --simplified --train_folds 0 1 --nlayers 3 --nheads 16  --add_lg_info --very_simplified --patience 50 --validate_on_mcc --tune_bert --frozen_epochs 3 --dropout 0.1 --train_only_decoder --random_folds

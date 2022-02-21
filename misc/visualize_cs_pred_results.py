@@ -1032,7 +1032,7 @@ def get_f1_scores(rec, prec):
 
 
 def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False, compare_mdl_plots=False,
-                              remove_test_seqs=False, benchmark=True, restrict_types=None):
+                              remove_test_seqs=False, benchmark=True, restrict_types=None, return_results=False):
     sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
                        0.556, 0.583]
     sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
@@ -1154,7 +1154,6 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
               " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][6]]), " & ",
               round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
-
     print("\n\nPrec table SEC/SPI\n\n")
     print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_sp1), " & \\\\ \\hline")
     for mdl_ind in best_to_worst_mdls:
@@ -1988,10 +1987,16 @@ def plot_performance():
     # plt.show()
 
 def plot_sp6_vs_tnmt():
-    tnmt_f1 = [[0.693, 0.733, 0.759, 0.779 ], [0.493, 0.563, 0.592, 0.606 ], [0.486, 0.541, 0.541, 0.541],
-               [0.533, 0.633, 0.667, 0.667]]
-    tnmt_f1_sp2 = [[0.896 , 0.911 , 0.911 , 0.92] , [0.93 , 0.936 , 0.936 , 0.936] , [0.706 , 0.706 , 0.706 , 0.706]]
-    tnmt_f1_tat = [[0.556 , 0.714 , 0.794 , 0.857] , [0.2 , 0.5 , 0.8 , 0.8] , [0.435 , 0.435 , 0.435 , 0.435]]
+    # enc+dec arch
+    # tnmt_f1 = [[0.693, 0.733, 0.759, 0.779 ], [0.493, 0.563, 0.592, 0.606 ], [0.486, 0.541, 0.541, 0.541],
+    #            [0.533, 0.633, 0.667, 0.667]]
+    # tnmt_f1_sp2 = [[0.896 , 0.911 , 0.911 , 0.92] , [0.93 , 0.936 , 0.936 , 0.936] , [0.706 , 0.706 , 0.706 , 0.706]]
+    # tnmt_f1_tat = [[0.556 , 0.714 , 0.794 , 0.857] , [0.2 , 0.5 , 0.8 , 0.8] , [0.435 , 0.435 , 0.435 , 0.435]]
+    # only dec arch
+    tnmt_f1 = [[0.692, 0.737, 0.769, 0.782 ], [0.462, 0.564, 0.59, 0.59 ], [0.526, 0.684, 0.684, 0.684],
+               [0.606, 0.697, 0.667, 0.727]]
+    tnmt_f1_sp2 = [[0.906 , 0.912 , 0.914 ,  0.917] , [0.927 , 0.933 , 0.933 , 0.933] , [0.75 , 0.75 , 0.75 , 0.75]]
+    tnmt_f1_tat = [[0.613 , 0.79 , 0.806 , 0.855] , [0.634 , 0.732 ,  0.829 ,  0.829] , [ 0.3 , 0.5 , 0.7 , 0.7]]
     sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
                        0.556, 0.583]
     sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
@@ -2053,7 +2058,7 @@ def plot_sp6_vs_tnmt():
         ax[ind].yaxis.set_label_coords(-0.23, 0.2)
         ax[ind].set_yticklabels([0,0.5,1],fontsize=8)
         if ind == 0:
-            ax[ind].set_title("Weighted F1 scores for TSignal/SignalP6: 0.7987/0.7976", fontsize=8, y=1.1)
+            ax[ind].set_title("Weighted F1 scores for TSignal/SignalP6: 0.8132/0.7976", fontsize=8, y=1.1)
     fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.77, 0.5))
     plt.show()
 
@@ -2090,8 +2095,12 @@ def plot_sp6_vs_tnmt():
     plt.show()
 
 def plot_comparative_performance_sp1_mdls():
+    # enc-dec model
     tnmt_f1 = [[0.693,0.733,0.759,0.779],[0.636,0.727,0.764,0.782],[0.692,0.769,0.769,0.769],[0.552,0.655,0.69,0.69]]
     tnmt_f1 = [[0.631, 0.731, 0.756, 0.769], [0.65, 0.833, 0.883, 0.883], [0.867, 0.933, 0.933, 0.933],[0.551, 0.667, 0.696, 0.754]]
+    # i still didnt train on random data < - < this is not the correct analysis, i need to redo the random folds
+    # tnmt_f1 = [[0.631, 0.731, 0.756, 0.769], [0.65, 0.833, 0.883, 0.883], [0.867, 0.933, 0.933, 0.933],[0.551, 0.667, 0.696, 0.754]]
+    # tnmt_f1 = [[ 0.692,0.737, 0.769, 0.782], [0.61, 0.746, 0.78, 0.78], [0.69, 0.897, 0.897, 0.897],[0.551, 0.667, 0.696, 0.754]]
     tnmt_rec = [[0.719,0.76,0.788,0.808],[0.556,0.635,0.667,0.683],[0.6,0.667,0.667,0.667],[0.444,0.528,0.556,0.556]]
     tnmt_prec = [[0.669,0.707,0.732,0.752],[0.745,0.851,0.894,0.915],[0.818,0.909,0.909,0.909],[0.727,0.864,0.909,0.909]]
 
@@ -2584,7 +2593,195 @@ def plot_ece_over_tolerance(lg_and_tol2_lg):
     plt.ylabel("log(ECE)")
     plt.yscale("log")
     plt.show()
+
+def extract_performance_over_tolerance():
+    all_mdl_2results = []
+    sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
+    tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
+
+    for run_no in range(1,6):
+        run_results_folder = "tuning_bert_repeat{}_only_decoder/".format(run_no) if run_no != 1 else "tuning_bert_only_decoder/"
+        mdl2results = extract_all_param_results(only_cs_position=False,
+                                                result_folder=run_results_folder,
+                                                compare_mdl_plots=False,
+                                                remove_test_seqs=False,
+                                                benchmark=False)
+        mdl_ind = 0
+        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
+        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][6]]))
+        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][7]]))
+        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-4])]))
+        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][8]]))
+        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][9]]))
+        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-3])]))
+        tat_f1s.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
+        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        mcc1_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][0]]))
+        mcc2_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][1][1:]]))
+        mcc1_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][2]]))
+        mcc2_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
+        mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
+        mcc2_tat.append([mcc for mcc in mdl2results[mdl_ind][5]])
+
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    import matplotlib.gridspec as gridspec
+    fig, ax = plt.subplots(2, 2)
+
+    names = ["e", "n", "p", "a"]
+    sp1_f1s = np.stack(sp1_f1s)
+    sp1_mean_f1s = np.mean(np.stack(sp1_f1s), axis=0)
+    sp1_mean_f1s = np.mean(np.stack(sp1_f1s), axis=0)
+    sp2_mean_f1s = np.mean(np.stack(sp2_f1s), axis=0)
+    sp2_mean_f1s = np.mean(np.stack(sp2_f1s), axis=0)
+    tat_mean_f1s = np.mean(np.stack(tat_f1s), axis=0)
+    tat_mean_f1s = np.mean(np.stack(tat_f1s), axis=0)
+
+    sp1_std_f1s = np.std(np.stack(sp1_f1s), axis=0)
+    sp1_std_f1s = np.std(np.stack(sp1_f1s), axis=0)
+    sp2_std_f1s = np.std(np.stack(sp2_f1s), axis=0)
+    sp2_std_f1s = np.std(np.stack(sp2_f1s), axis=0)
+    tat_std_f1s = np.std(np.stack(tat_f1s), axis=0)
+    tat_std_f1s = np.std(np.stack(tat_f1s), axis=0)
+
+    euk_means_sp1, neg_means_sp1, pos_means_sp1, arch_means_sp1 = sp1_mean_f1s[:4], sp1_mean_f1s[4:8], sp1_mean_f1s[8:12], sp1_mean_f1s[12:]
+    neg_means_sp2, pos_means_sp2, arch_means_sp2 = sp2_mean_f1s[:4], sp2_mean_f1s[4:8], sp2_mean_f1s[8:]
+    neg_means_tat, pos_means_tat, arch_means_tat = tat_mean_f1s[:4], tat_mean_f1s[4:8], tat_mean_f1s[8:]
+
+    euk_std_sp1, neg_std_sp1, pos_std_sp1, arch_std_sp1 = sp1_std_f1s[:4], sp1_std_f1s[4:8], sp1_std_f1s[8:12], sp1_std_f1s[12:]
+    neg_std_sp2, pos_std_sp2, arch_std_sp2 = sp2_std_f1s[:4], sp2_std_f1s[4:8], sp2_std_f1s[8:]
+    neg_std_tat, pos_std_tat, arch_std_tat = tat_std_f1s[:4], tat_std_f1s[4:8], tat_std_f1s[8:]
+
+
+    tolerances = list(range(4))
+    ax[0, 0].plot(tolerances, euk_means_sp1, '-', label='e', color='blue')
+    ax[0, 0].fill_between(tolerances, euk_means_sp1 - 2 * euk_std_sp1, euk_means_sp1 + 2 * euk_std_sp1, alpha=0.2, color='blue')
+    ax[0, 0].set_yticks([0, 0.5, 1])
+    ax[0, 0].set_xticks([0, 1, 2, 3])
+    ax[0, 0].set_xticklabels(["tol 0", "tol 1", "tol 2", "tol 3"])
+    box = ax[0, 0].get_position()
+    ax[0, 0].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
+    ax[0, 0].yaxis.set_label_coords(-0.5, 0.35)
+    ax[0, 0].set_ylabel("F1\nscore", rotation=0, fontsize=11)
+
+    ax[0, 1].plot(tolerances, neg_means_sp1, '-', label='n', color='orange')
+    ax[0, 1].fill_between(tolerances, neg_means_sp1 - 2 * neg_std_sp1, neg_means_sp1 + 2 * neg_std_sp1, alpha=0.2, color='blue')
+    ax[0, 1].set_yticks([0, 0.5, 1])
+    ax[0, 1].set_xticks([0, 1, 2, 3])
+    ax[0, 1].set_xticklabels(["tol 0", "tol 1", "tol 2", "tol 3"])
+    box = ax[0, 1].get_position()
+    ax[0, 1].set_position([box.x0, box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
+
+    ax[1, 0].plot(tolerances, pos_means_sp1, '-', label='p', color='purple')
+    ax[1, 0].fill_between(tolerances, pos_means_sp1 - 2 * pos_std_sp1, pos_means_sp1 + 2 * pos_std_sp1, alpha=0.2, color='purple')
+    ax[1, 0].set_yticks([0, 0.5, 1])
+    ax[1, 0].set_xticks([0, 1, 2, 3])
+    ax[1, 0].set_xticklabels(["tol 0", "tol 1", "tol 2", "tol 3"])
+    box = ax[1, 0].get_position()
+    ax[1, 0].set_position([box.x0 + box.width * 0.15 , box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
+    ax[1, 0].set_ylabel("F1\nscore", rotation=0, fontsize=11)
+    ax[1, 0].yaxis.set_label_coords(-0.5, 0.35)
+
+    ax[1, 1].plot(tolerances, arch_means_sp1, '-', label='a', color='red')
+    ax[1, 1].fill_between(tolerances, arch_means_sp1 - 2 * arch_std_sp1, arch_means_sp1 + 2 * arch_std_sp1, alpha=0.2, color='red')
+    ax[1, 1].set_yticks([0, 0.5, 1])
+    ax[1, 1].set_xticks([0, 1, 2, 3])
+    ax[1, 1].set_xticklabels(["tol 0", "tol 1", "tol 2", "tol 3"])
+    box = ax[1, 1].get_position()
+    ax[1, 1].set_position([box.x0 , box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
+
+    all_handles, all_labels = [], []
+    for ind in range(2):
+        for ind_ in range(2):
+            handles, labels = ax[ind, ind_].get_legend_handles_labels()
+            all_handles.extend(handles)
+            all_labels.extend(labels)
+
+    fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.83, 0.5))
+    plt.show()
+
+    # ax[0].plot(subsets, all_euk_mean_tol3, '--',label='e3', color='blue')
+    # ax[0].fill_between(subsets, all_euk_mean_tol3 - 2 * all_euk_std_tol3, all_euk_mean_tol3 + 2 * all_euk_std_tol3, alpha=0.2, color='blue')
 if __name__ == "__main__":
+    extract_performance_over_tolerance()
+
+    exit(1)
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_best_model_random_folds/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True,
+    #                                         restrict_types=["SP", "NO_SP"])
+    # exit(1)
+    # plot_comparative_performance_sp1_mdls()
+    # exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_random_folds_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True,
+                                            restrict_types=["SP", "NO_SP"])
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat2_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+                                            # ,restrict_types=["SP", "NO_SP"])
+    exit(1)
+    lg_and_tol2_lg = extract_calibration_probs_for_mdl(model="repeat2_only_decoder_",
+                                                       folder='tuning_bert_repeat2_only_decoder/',
+                                                       plot=True)
+
+    plot_sp6_vs_tnmt()
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat2_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+                                            # ,restrict_types=["SP", "NO_SP"])
+    exit(1)
+    #BEST MODEL YET
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_repeat2_only_decoder/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    plot_sp6_vs_tnmt()
+    exit(1)
+    plot_comparative_performance_sp1_mdls()
+    exit(1)
+    lg_and_tol2_lg = extract_calibration_probs_for_mdl(model="repeat2_only_decoder_",
+                                                       folder='tuning_bert_repeat2_only_decoder/',
+                                                       plot=True)
+    # plot_sp6_vs_tnmt()
+    exit(1)
+    plot_perf_over_data_perc()
+    exit(1)
+
+    plot_ece_over_tolerance(lg_and_tol2_lg)
+    exit(1)
+
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat2_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat_val_on_f1s/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat2_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_repeat3_only_decoder/",
                                             compare_mdl_plots=False,
