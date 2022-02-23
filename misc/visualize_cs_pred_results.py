@@ -2099,8 +2099,8 @@ def plot_comparative_performance_sp1_mdls():
     tnmt_f1 = [[0.693,0.733,0.759,0.779],[0.636,0.727,0.764,0.782],[0.692,0.769,0.769,0.769],[0.552,0.655,0.69,0.69]]
     tnmt_f1 = [[0.631, 0.731, 0.756, 0.769], [0.65, 0.833, 0.883, 0.883], [0.867, 0.933, 0.933, 0.933],[0.551, 0.667, 0.696, 0.754]]
     # i still didnt train on random data < - < this is not the correct analysis, i need to redo the random folds
-    # tnmt_f1 = [[0.631, 0.731, 0.756, 0.769], [0.65, 0.833, 0.883, 0.883], [0.867, 0.933, 0.933, 0.933],[0.551, 0.667, 0.696, 0.754]]
-    # tnmt_f1 = [[ 0.692,0.737, 0.769, 0.782], [0.61, 0.746, 0.78, 0.78], [0.69, 0.897, 0.897, 0.897],[0.551, 0.667, 0.696, 0.754]]
+    # the ones below are the correct values
+    tnmt_f1 = [[0.677, 0.748, 0.773, 0.799],[0.689, 0.84, 0.891, 0.908], [0.759, 0.897, 0.897, 0.897], [0.554, 0.677, 0.738, 0.769]]
     tnmt_rec = [[0.719,0.76,0.788,0.808],[0.556,0.635,0.667,0.683],[0.6,0.667,0.667,0.667],[0.444,0.528,0.556,0.556]]
     tnmt_prec = [[0.669,0.707,0.732,0.752],[0.745,0.851,0.894,0.915],[0.818,0.909,0.909,0.909],[0.727,0.864,0.909,0.909]]
 
@@ -2174,7 +2174,7 @@ def plot_comparative_performance_sp1_mdls():
         ax[ind].set_ylabel(titles[ind] + "\nF1", fontsize=11, rotation=0)
         ax[ind].yaxis.set_label_coords(-0.26, 0)
 
-    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.75, 0.5))
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.78, 0.5))
     plt.show()
 
 def create_random_split_fold_data():
@@ -2413,11 +2413,10 @@ def plot_perf_over_data_perc():
             aa_pred_dict = {}
             glbl_lbl_dict = {}
             for tr_f in [[0,1],[0,2],[1,2]]:
-                aa_pred_file = "data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_{}_subset_train_{}_trFlds_{}_{}_best.bin".format(run,str(subset), *tr_f)
-                print(aa_pred_file)
-                glbl_lbl_file = "data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_{}_subset_train_{}_trFlds_{}_{}_best_sptype.bin".format(run,str(subset), *tr_f)
-                aa_pred_dict.update(pickle.load(open("train_subset_results/"+aa_pred_file, "rb")))
-                glbl_lbl_dict.update(pickle.load(open("train_subset_results/"+glbl_lbl_file, "rb")))
+                aa_pred_file = "random_folds_run_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_{}_subset_train_{}_trFlds_{}_{}_best.bin".format(run,str(subset), *tr_f)
+                glbl_lbl_file = "random_folds_run_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_{}_subset_train_{}_trFlds_{}_{}_best_sptype.bin".format(run,str(subset), *tr_f)
+                aa_pred_dict.update(pickle.load(open("tuning_bert_random_folds_only_decoder/"+aa_pred_file, "rb")))
+                glbl_lbl_dict.update(pickle.load(open("tuning_bert_random_folds_only_decoder/"+glbl_lbl_file, "rb")))
 
             life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(
                 filename="w_lg_w_glbl_lbl_100ep.bin",
@@ -2702,17 +2701,48 @@ def extract_performance_over_tolerance():
 
     # ax[0].plot(subsets, all_euk_mean_tol3, '--',label='e3', color='blue')
     # ax[0].fill_between(subsets, all_euk_mean_tol3 - 2 * all_euk_std_tol3, all_euk_mean_tol3 + 2 * all_euk_std_tol3, alpha=0.2, color='blue')
-if __name__ == "__main__":
-    extract_performance_over_tolerance()
 
+def plot_compare_pos_nopos():
+    nopos_bench = [0.563, 0.679, 0.728, 0.752, 0.346, 0.506, 0.531, 0.556, 0.364, 0.409, 0.5, 0.545, 0.4, 0.615, 0.646, 0.646, 68.333]
+    nopos_nobench = [0.725, 0.853, 0.894, 0.918, 0.614, 0.722, 0.744, 0.764, 0.464, 0.594, 0.669, 0.717, 0.469, 0.667, 0.691, 0.691, 68.333]
+    pos_bench = [0.692, 0.737, 0.769, 0.782, 0.462, 0.564, 0.59, 0.59, 0.526, 0.684, 0.684, 0.684, 0.606, 0.697, 0.697, 0.727, 73.333]
+    pos_nobench = [0.8, 0.869, 0.907, 0.928, 0.759, 0.807, 0.82, 0.828, 0.664, 0.728, 0.756, 0.763, 0.659, 0.732, 0.732, 0.756]
+    fig, ax = plt.subplots(2, 2)
+
+
+if __name__ == "__main__":
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder_no_pos_enc/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat2_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder_no_pos_enc/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
+    plot_comparative_performance_sp1_mdls()
     exit(1)
     # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_best_model_random_folds/",
+    #                                         result_folder="tuning_bert_one_random_fold_run_only_dec/",
     #                                         compare_mdl_plots=False,
     #                                         remove_test_seqs=False,
     #                                         benchmark=True,
     #                                         restrict_types=["SP", "NO_SP"])
     # exit(1)
+    plot_perf_over_data_perc()
+    exit(1)
+    extract_performance_over_tolerance()
+
+    exit(1)
     # plot_comparative_performance_sp1_mdls()
     # exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,

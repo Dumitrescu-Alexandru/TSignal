@@ -65,7 +65,7 @@ def generate_square_subsequent_mask(sz):
     return mask
 
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
-                  test_only_cs=False, glbl_lbls=None, tune_bert=False):
+                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -166,7 +166,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         ys = current_ys
         start_ind = 1
     model.eval()
-    if not tune_bert:
+    if not tune_bert and not train_oh:
         model.glbl_generator.eval()
     all_probs = []
     for i in range(start_ind, max(seq_lens) + 1):
@@ -402,14 +402,14 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=Fa
 
 def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False,
               form_sp_reg_data=False, second_model=None, test_only_cs=False, glbl_lbls=None,
-              tune_bert=False):
+              tune_bert=False, train_oh=False):
     model.eval()
     if form_sp_reg_data:
         tgt_tokens, probs, sp_probs, \
         all_sp_probs, all_seq_sp_logits, sp_type_probs = greedy_decode(model, src, start_symbol=bos_id, lbl2ind=lbl2ind,
                                                                        tgt=tgt, form_sp_reg_data=form_sp_reg_data,
                                                                        second_model=second_model, test_only_cs=test_only_cs,
-                                                                       glbl_lbls=glbl_lbls, tune_bert=tune_bert)
+                                                                       glbl_lbls=glbl_lbls, tune_bert=tune_bert, train_oh=train_oh)
         return tgt_tokens, probs, sp_probs, \
                all_sp_probs, all_seq_sp_logits, sp_type_probs
     if use_beams_search:
@@ -420,7 +420,8 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_b
         all_seq_sp_logits = None, None, None
     else:
         tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = greedy_decode(model, src, start_symbol=bos_id,
-                                                                                     lbl2ind=lbl2ind, tgt=tgt, tune_bert=tune_bert)
+                                                                                     lbl2ind=lbl2ind, tgt=tgt, tune_bert=tune_bert,
+                                                                                     train_oh=train_oh)
     return tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits
 
 
@@ -543,7 +544,8 @@ def clean_sec_sp2_preds(seq, preds, sp_type, ind2glbl_lbl):
 def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1], sets=["train"], epoch=-1,
              dataset_loader=None,use_beams_search=False, form_sp_reg_data=False, simplified=False, second_model=None,
              very_simplified=False, test_only_cs=False, glbl_lbl_2ind=None, account_lipos=False,
-             tuned_bert_embs_prefix="", tune_bert=False, extended_sublbls=False, random_folds_prefix=""):
+             tuned_bert_embs_prefix="", tune_bert=False, extended_sublbls=False, random_folds_prefix="",
+             train_oh=False):
     if glbl_lbl_2ind is not None:
         ind2glbl_lbl = {v:k for k,v in glbl_lbl_2ind.items()}
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
@@ -585,12 +587,12 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
             predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, sp_type_probs = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
                           form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False, second_model=second_model,
-                          test_only_cs=test_only_cs, glbl_lbls=glbl_lbls, tune_bert=tune_bert)
+                          test_only_cs=test_only_cs, glbl_lbls=glbl_lbls, tune_bert=tune_bert, train_oh=train_oh)
         else:
             predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
                           form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False,
-                          second_model=second_model, tune_bert=tune_bert)
+                          second_model=second_model, tune_bert=tune_bert, train_oh=train_oh)
             sp_type_probs = [""] * len(predicted_tokens)
         true_targets = padd_add_eos_tkn(tgt, lbl2ind)
         # if not use_beams_search:
@@ -960,7 +962,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             validate_partitions = list(test_partition)
             _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model , sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
                          epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified,very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
-                         tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=extended_sublbls, random_folds_prefix=random_folds_prefix)
+                         tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=extended_sublbls, random_folds_prefix=random_folds_prefix, train_oh=train_oh)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -982,7 +984,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
                          simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
                          tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
-                         random_folds_prefix=random_folds_prefix)
+                         random_folds_prefix=random_folds_prefix, train_oh=train_oh)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -1044,7 +1046,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
                          simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
                          tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
-                         random_folds_prefix=random_folds_prefix)
+                         random_folds_prefix=random_folds_prefix, train_oh=train_oh)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
@@ -1098,7 +1100,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
                  form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified,
                  glbl_lbl_2ind=sp_data.glbl_lbl_2ind, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                 tune_bert=tune_bert, extended_sublbls=extended_sublbls,random_folds_prefix=random_folds_prefix)
+                 tune_bert=tune_bert, extended_sublbls=extended_sublbls,random_folds_prefix=random_folds_prefix,
+                 train_oh=train_oh)
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
             get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False, return_class_prec_rec=True)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
@@ -1112,13 +1115,13 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                      sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model,
                      very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind, account_lipos=account_lipos,
                      tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
-                     random_folds_prefix=random_folds_prefix)
+                     random_folds_prefix=random_folds_prefix, train_oh=train_oh)
         if test_only_cs:
             evaluate(model, sp_data.lbl2ind, run_name=run_name + "_onlycs_best", partitions=test_partition,
                      sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
                      second_model=second_model, very_simplified=very_simplified, test_only_cs=test_only_cs, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
                      tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
-                     random_folds_prefix=random_folds_prefix)
+                     random_folds_prefix=random_folds_prefix, train_oh=train_oh)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
                 get_cs_and_sp_pred_results(filename=run_name + "_onlycs_best.bin".format(e), v=False,
                                            return_class_prec_rec=True)
@@ -1134,7 +1137,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                      form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model,
                      very_simplified=very_simplified,
                      glbl_lbl_2ind=sp_data.glbl_lbl_2ind, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                     tune_bert=tune_bert,use_beams_search=True, random_folds_prefix=random_folds_prefix)
+                     tune_bert=tune_bert,use_beams_search=True, random_folds_prefix=random_folds_prefix,
+                     train_oh=train_oh)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
                 get_cs_and_sp_pred_results(filename="best_beam_" + run_name + ".bin".format(e), v=False)
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
