@@ -2703,14 +2703,157 @@ def extract_performance_over_tolerance():
     # ax[0].fill_between(subsets, all_euk_mean_tol3 - 2 * all_euk_std_tol3, all_euk_mean_tol3 + 2 * all_euk_std_tol3, alpha=0.2, color='blue')
 
 def plot_compare_pos_nopos():
-    nopos_bench = [0.563, 0.679, 0.728, 0.752, 0.346, 0.506, 0.531, 0.556, 0.364, 0.409, 0.5, 0.545, 0.4, 0.615, 0.646, 0.646, 68.333]
-    nopos_nobench = [0.725, 0.853, 0.894, 0.918, 0.614, 0.722, 0.744, 0.764, 0.464, 0.594, 0.669, 0.717, 0.469, 0.667, 0.691, 0.691, 68.333]
-    pos_bench = [0.692, 0.737, 0.769, 0.782, 0.462, 0.564, 0.59, 0.59, 0.526, 0.684, 0.684, 0.684, 0.606, 0.697, 0.697, 0.727, 73.333]
+    nopos_bench = [0.563, 0.679, 0.728, 0.752, 0.346, 0.506, 0.531, 0.556, 0.364, 0.409, 0.5, 0.545, 0.4, 0.615, 0.646, 0.646]
+    nopos_nobench = [0.725, 0.853, 0.894, 0.918, 0.614, 0.722, 0.744, 0.764, 0.464, 0.594, 0.669, 0.717, 0.469, 0.667, 0.691, 0.691]
+    pos_bench = [0.692, 0.737, 0.769, 0.782, 0.462, 0.564, 0.59, 0.59, 0.526, 0.684, 0.684, 0.684, 0.606, 0.697, 0.697, 0.727]
     pos_nobench = [0.8, 0.869, 0.907, 0.928, 0.759, 0.807, 0.82, 0.828, 0.664, 0.728, 0.756, 0.763, 0.659, 0.732, 0.732, 0.756]
-    fig, ax = plt.subplots(2, 2)
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    fig, ax = plt.subplots(2, 1)
+    line_w = 0.3
+    x_positions = []
+    names = ["with pe", "w/o pe"]
+    datasets = ["benchmark\ndataset\n(CS F1 score)", 'whole\ndataset\n(CS F1 score)']
+    colors = ["red", "blue", "green", "black"]
+    names_xticks = ["e", "n", "p", "a"]
+    xticklbls = []
+    for lg in names_xticks:
+        for tol in range(4):
+            xticklbls.append(lg+str(tol))
+    no_pos_enc = [nopos_bench, nopos_nobench]
+    pos_enc = [pos_bench, pos_nobench]
 
+    for i in range(2):
+        box = ax[i].get_position()
+        ax[i].set_position([box.x0 + box.width *0.14, box.y0, box.width * 0.68, box.height * 0.75])
+        x_pos_nopos = np.array(list(range(len(nopos_bench)))) + line_w/2
+        x_pos_pos = np.array(list(range(len(nopos_bench)))) - line_w/2
+        if i == 0:
+            ax[i].bar(x_pos_nopos, no_pos_enc[i], width=line_w, color='blue',
+                                  label="positional\nencoding")
+            ax[i].bar(x_pos_pos, pos_enc[i], width=line_w, color='red',
+                                  label="w/o positional\nencoding")
+        else:
+            ax[i].bar(x_pos_nopos, no_pos_enc[i], width=line_w, color='blue')
+            ax[i].bar(x_pos_pos, pos_enc[i], width=line_w, color='red')
+        ax[i].set_ylim(0, 1)
+        ax[i].set_xticks(list(range(16)))
+        ax[i].set_xticklabels(xticklbls, fontsize=8)
+        ax[i].set_yticks([0, 0.5, 1])
+        ax[i].set_yticklabels([0, 0.5, 1], fontsize=8)
+        ax[i].set_ylabel(datasets[i], fontsize=8, rotation=0)
+        ax[i].yaxis.set_label_coords(-0.27, 0.35)
+
+        # ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[i], 2)), str(total_counts_per_acc[i])) for i in
+        #             range(len(accs)//2 - 2)], fontsize=8)
+        # ax[i // 2, i % 2].set_yticks([0.5, 1])
+        # ax[i // 2, i % 2].set_yticklabels([0.5, 1], fontsize=6)
+    fig.legend(loc='center left', bbox_to_anchor=(0.76, 0.5), fontsize=8)
+    ax[0].set_title("Sec/SPI performance increase when using\nadditional positional encodings", fontsize=8)
+    plt.show()
+
+
+def compare_experiment_results():
+    separate_bert_tuning = [0.781, 0.843, 0.885, 0.903, 0.701, 0.764, 0.772, 0.782, 0.517, 0.55, 0.57, 0.584, 0.593, 0.642, 0.642, 0.667  ]
+    tuning_bert_together = [0.799, 0.853, 0.894, 0.915, 0.772, 0.796, 0.807, 0.812, 0.717, 0.746, 0.768, 0.775, 0.543, 0.617, 0.667, 0.667  ]
+    no_bert_tuning = [0.675, 0.749, 0.829, 0.863, 0.615, 0.676, 0.704, 0.714, 0.439, 0.516, 0.542, 0.568, 0.487, 0.564, 0.59, 0.615  ]
+    tuning_bert_only_enc = [0.8  , 0.869, 0.907, 0.928, 0.759, 0.807, 0.82 , 0.828, 0.664, 0.728, 0.756, 0.763, 0.659, 0.732, 0.732, 0.756 ]
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    fig, ax = plt.subplots(1, 1)
+    line_w = 0.4
+    x_positions = []
+    names = ["with pe", "w/o pe"]
+    datasets = ["benchmark\ndataset\n(CS F1 score)", 'whole\ndataset\n(CS F1 score)']
+    colors = ["red", "blue", "green", "black"]
+    names_xticks = ["e", "n", "p", "a"]
+    xticklbls = []
+    for lg in names_xticks:
+        for tol in range(4):
+            xticklbls.append(lg+str(tol))
+
+    box = ax.get_position()
+    ax.set_position([box.x0 + box.width * 0.05, box.y0, box.width * 0.8, box.height * 0.95])
+    x_pos_notuning = np.array(list(range(len(separate_bert_tuning)))) + line_w * 0.75
+    x_pos_notuning *= 2
+    x_pos_tune_sep = np.array(list(range(len(separate_bert_tuning)))) + line_w * 0.25
+    x_pos_tune_sep *= 2
+    x_pos_tune_together = np.array(list(range(len(separate_bert_tuning)))) - line_w * 0.25
+    x_pos_tune_together *= 2
+    x_pos_tune_together_onlyEnc = np.array(list(range(len(separate_bert_tuning)))) - line_w * 0.75
+    x_pos_tune_together_onlyEnc *= 2
+    ax.bar(x_pos_tune_together_onlyEnc, tuning_bert_only_enc, width=line_w, color='black',
+                          label="only dec\ntuning")
+    ax.bar(x_pos_tune_together, tuning_bert_together, width=line_w, color='red',
+                          label="tuning")
+    ax.bar(x_pos_tune_sep, separate_bert_tuning, width=line_w, color='purple',
+                          label="separate\ntuning")
+    ax.bar(x_pos_notuning, no_bert_tuning, width=line_w, color='blue',
+                          label="no tuning")
+    ax.set_ylim(0, 1)
+    ax.set_xticks(np.array(list(range(16)))*2)
+    ax.set_xticklabels(xticklbls, fontsize=8)
+    ax.set_yticks([0, 0.5, 1])
+    ax.set_yticklabels([0, 0.5, 1], fontsize=8)
+    ax.set_ylabel("F1\nscore", fontsize=8, rotation=0)
+    ax.yaxis.set_label_coords(-0.18, 0.45)
+
+        # ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[i], 2)), str(total_counts_per_acc[i])) for i in
+        #             range(len(accs)//2 - 2)], fontsize=8)
+        # ax[i // 2, i % 2].set_yticks([0.5, 1])
+        # ax[i // 2, i % 2].set_yticklabels([0.5, 1], fontsize=6)
+    fig.legend(loc='center left', bbox_to_anchor=(0.8, 0.5), fontsize=8)
+    ax.set_title("Sec/SPI F1 performance comparison between\nexperiments; whole data test", fontsize=8)
+    plt.show()
 
 if __name__ == "__main__":
+    plot_compare_pos_nopos()
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="one_hot_new/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="oh_training/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
+
+    compare_experiment_results()
+    # SEPARATE BERT TUNING
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat_tuningBertSeparately/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+                                            # ,restrict_types=["SP", "NO_SP"])
+    # BERT TUNING + TSIGNAL TUNING; PRIOR BEST MODEL
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat_val_on_f1s/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+                                            # ,restrict_types=["SP", "NO_SP"])
+    # NO BERT TUNING
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat_notuningBert/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+                                            # ,restrict_types=["SP", "NO_SP"])
+    # BEST MODEL W BEST RESULTS <- ADD ONLY AN ENCODER ON TOP
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat2_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+                                            # ,restrict_types=["SP", "NO_SP"])
+
+    exit(1)
+    plot_compare_pos_nopos()
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_only_decoder_no_pos_enc/",
                                             compare_mdl_plots=False,

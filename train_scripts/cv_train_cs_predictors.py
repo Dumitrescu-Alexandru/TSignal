@@ -742,7 +742,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
-                        random_folds=False, train_on_subset=1., train_only_decoder=False):
+                        random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -786,6 +786,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                            linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                          tune_bert=tune_bert,train_only_decoder=train_only_decoder)
         model = ProtBertClassifier(hparams)
+        if remove_bert_layers != 0:
+            model.ProtBertBFD.encoder.layer = model.ProtBertBFD.encoder.layer[:-remove_bert_layers]
         model.classification_head = classification_head
         model.to(device)
         if frozen_epochs > 0:
@@ -1167,8 +1169,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         # print("here", some_output[0])
         # print()
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
-    print(ind2lbl)
-    print(torch.softmax(some_output[1][:,0,:], dim=1))
+    # print(ind2lbl)
+    # print(torch.softmax(some_output[1][:,0,:], dim=1))
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
