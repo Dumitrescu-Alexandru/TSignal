@@ -85,8 +85,6 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     retain_grads = []
     if saliency_map:
         def hook_(self, grad_inp, grad_out):
-            print(grad_inp)
-            print(grad_out)
             retain_grads.append(grad_out)
 
         model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
@@ -1245,7 +1243,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     def visualize_importance(outs, grads, seqs_):
         batch_s = len(seqs_)
         for ind, (seq_, pred_) in enumerate(zip(seqs_, outs[1])):
-            pred_string = "".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred])
+            pred_string = "".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred_])
             if "S" in pred_string:
                 print(torch.sum(torch.abs(grads[ind * batch_s][ind]), dim=-1))
                 cs_pred = pred_string.rfind("S") + 1
