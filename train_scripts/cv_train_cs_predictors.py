@@ -1271,7 +1271,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     def visualize_importance(outs, grads, seqs_, ind2lbl_, batch_index_, sp_pred_inds_CS_spType_):
         predicted_SPs = []
         for ind_, elem in enumerate(sp_pred_inds_CS_spType_):
-            predicted_SPs.append(int(elem.split("_")))
+            predicted_SPs.append(int(elem.split("_")[0]))
             corresponding_grads[elem] = ind_
         for pred_sp_ind in predicted_SPs:
             seq_, pred_ = seqs_[pred_sp_ind], outs[1][pred_sp_ind]
@@ -1310,7 +1310,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # model = load_model(model_f_name, dict_file=None)
     model.load_state_dict(load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True).state_dict())
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=5, shuffle=True,
+                                                 batch_size=10, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
     print(len(dataset_loader))
     seqs, some_output = [], []
