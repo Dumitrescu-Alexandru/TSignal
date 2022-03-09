@@ -247,7 +247,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     all_outs.append(out[:, -1])
                 # print("doing the backward pass...")
                 for batch_ind in range(prob.shape[0]):
-                    max_ind = torch.argmax(prob[batch_ind])
+                    max_ind = torch.argmax(prob[batch_ind]).item()
                     if ind2lbl[max_ind] in ["S", "T", "L"] :
                         if i == start_ind:
                             sp_predicted_batch_elements.append(batch_ind)
