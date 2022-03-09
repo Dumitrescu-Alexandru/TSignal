@@ -1240,16 +1240,33 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             pos_fp_info.extend(false_positives)
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False):
+    gather_10 = [0, 0, 0]
+    sp_type_letters = ["S","L","T"]
+    seq_preds_grad_CSgrad =  []
     def visualize_importance(outs, grads, seqs_, ind2lbl_):
         batch_s = len(seqs_)
         for ind, (seq_, pred_) in enumerate(zip(seqs_, outs[1])):
             pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
-            if "S" in pred_string:
-                print(torch.sum(torch.abs(grads[ind * batch_s][0][ind]), dim=-1))
-                cs_pred = pred_string.rfind("S") + 1
-                print(torch.sum(torch.abs(grads[ind * batch_s + cs_pred][0][ind]), dim=-1))
+            if "S" in pred_string and gather_10[0] < 10 or "L" in pred_string and gather_10[1] < 10 or "T" in pred_string and gather_10[2] < 10:
+                if "S" in pred_string:
+                    cs_pred = pred_string[:1].rfind("S") + 1
+                elif "L" in pred_string:
+                    cs_pred = pred_string[:1].rfind("L") + 1
+                elif "T" in pred_string:
+                    cs_pred = pred_string[:1].rfind("T") + 1
+                seq_preds_grad_CSgrad.append((seq_, pred_string,
+                                              torch.sum(torch.abs(grads[ind * batch_s + ind][0][ind]), dim=-1).detach().cpu().numpy(),
+                                              torch.sum(torch.abs(grads[ind * batch_s + cs_pred + ind][0][ind]), dim=-1).detach().cpu().numpy()))
+                sp_l_index = int("SSS" in pred_string) + int("L" in pred_string) * 2 + int("T" in pred_string) * 3
+                gather_10[sp_l_index]  += 1
+            if sum(gather_10) >= 30:
+                pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds.bin", "wb"))
+                print("Finished extracting. Exiting.")
+                exit(0)
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
+    # hard-code this for now to check some sequences
+    test_file = "sp6_partitioned_data_sublbls_train_1.bin"
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file)
     hparams.train_enc_dec_sp6 = True
