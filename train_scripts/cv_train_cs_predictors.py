@@ -219,6 +219,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
                 all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
             if tune_bert:
+                memory.requires_grad=True
                 if model.classification_head.train_only_decoder:
                     prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs,
                                                                           tgt_mask.to(device))
