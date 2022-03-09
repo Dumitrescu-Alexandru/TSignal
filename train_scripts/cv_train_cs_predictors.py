@@ -84,6 +84,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     glbl_labels = None
     retain_grads = []
     sp_predicted_batch_elements = []
+    sp_predicted_batch_elements_extracated_cs = []
     sp_pred_inds_CS_spType = []
     if saliency_map:
         def hook_(self, grad_inp, grad_out):
@@ -256,12 +257,14 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                             model.classification_head.zero_grad()
                             prob[batch_ind, max_ind].backward(retain_graph=True)
                             sp_pred_inds_CS_spType.append(str(batch_ind) + "_spType")
-                    elif ind2lbl[max_ind] not in ["S", "T", "L"] and batch_ind in sp_predicted_batch_elements:
+                    elif ind2lbl[max_ind] not in ["S", "T", "L"] and batch_ind in sp_predicted_batch_elements \
+                            and batch_ind not in sp_predicted_batch_elements_extracated_cs:
                         model.zero_grad()
                         model.ProtBertBFD.zero_grad()
                         model.classification_head.zero_grad()
                         prob[batch_ind, max_ind].backward(retain_graph=True)
                         sp_pred_inds_CS_spType.append(str(batch_ind) + "_csPred")
+                        sp_predicted_batch_elements_extracated_cs.append(batch_ind)
                 # print("did the backward pass")
             else:
                 out = model.decode(ys, memory.to(device), tgt_mask.to(device))
