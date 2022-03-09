@@ -245,6 +245,9 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 # print("doing the backward pass...")
                 for batch_ind in range(prob.shape[0]):
                     max_ind = torch.argmax(prob[batch_ind])
+                    model.zero_grad()
+                    model.ProtBertBFD.zero_grad()
+                    model.classification_head.zero_grad()
                     prob[batch_ind,max_ind].backward(retain_graph=True)
                 # print("did the backward pass")
             else:
