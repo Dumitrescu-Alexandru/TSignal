@@ -1269,7 +1269,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
     # hard-code this for now to check some sequences
-    test_file = "sp6_partitioned_data_sublbls_train_1.bin"
+    test_file = "sp6_partitioned_data_sublbls_test_1.bin"
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file)
     hparams.train_enc_dec_sp6 = True
