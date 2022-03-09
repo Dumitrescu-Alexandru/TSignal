@@ -1278,7 +1278,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
             pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
             grad_ind_spT = corresponding_grads[str(pred_sp_ind)+"_spType"]
             grad_ind_CS = corresponding_grads[str(pred_sp_ind)+"_csPred"]
-            seq_preds_grad_CSgrad.append((seq, pred_string, torch.sum(torch.abs(grads[grad_ind_spT][pred_sp_ind]), dim=-1).detach().cpu().numpy(),
+            seq_preds_grad_CSgrad.append((seq_, pred_string, torch.sum(torch.abs(grads[grad_ind_spT][pred_sp_ind]), dim=-1).detach().cpu().numpy(),
                                          torch.sum(torch.abs(grads[grad_ind_CS][pred_sp_ind]), dim=-1).detach().cpu().numpy()))
         pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds_{}.bin".format(batch_index_), "wb"))
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
