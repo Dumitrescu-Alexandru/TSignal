@@ -85,7 +85,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     retain_grads = []
     if saliency_map:
         def hook_(self, grad_inp, grad_out):
-            retain_grads.append(grad_out.cpu())
+            retain_grads.append((grad_out[0].cpu()))
 
         model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
         # model.ProtBertBFD.embeddings.word_embeddings.register_forward_hook(hook_)
