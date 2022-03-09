@@ -220,6 +220,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         model.glbl_generator.eval()
     all_probs = []
     for i in range(start_ind, max(seq_lens) + 1):
+        print("seq index... {}".format(i))
         if saliency_map:
             tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
             if second_model is not None:
