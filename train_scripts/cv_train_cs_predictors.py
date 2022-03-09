@@ -65,7 +65,10 @@ def generate_square_subsequent_mask(sz):
     return mask
 
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
-                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=True):
+                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False):
+    # model.ProtBertBFD.requires_grad=True
+    model.requires_grad=True
+    model.unfreeze_encoder()
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -79,7 +82,15 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     all_outs = []
     all_outs_2nd_mdl = []
     glbl_labels = None
+    retain_grads = []
     if saliency_map:
+        def hook_(self, grad_inp, grad_out):
+            print(grad_inp)
+            print(grad_out)
+            retain_grads.append(grad_out)
+
+        model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
+        # model.ProtBertBFD.embeddings.word_embeddings.register_forward_hook(hook_)
         if tune_bert:
             seq_lengths = [len(s) for s in src]
             seqs = [" ".join(r_ for r_ in s) for s in src]
@@ -129,9 +140,9 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                                                            max_length=model.hparams.max_length)
                 input_ids = torch.tensor(inputs['input_ids'], device=model.device)
                 attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
-                # memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
-                memory_bfd = model(input_ids=input_ids, attention_mask=attention_mask,
-                                   token_type_ids=inputs['token_type_ids'],return_embeddings=True)[0]
+                memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
+                # memory_bfd = model(input_ids=input_ids, attention_mask=attention_mask,
+                #                    token_type_ids=inputs['token_type_ids'],return_embeddings=True)[0]
                 if not model.classification_head.train_only_decoder:
                     memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
                 else:
@@ -219,7 +230,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
                 all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
             if tune_bert:
-                memory.requires_grad=True
+                # for n, p in model.ProtBertBFD.named_parameters():
+                #     print(n)
+                # exit(1)
+
+                # memory.requires_grad=True
                 if model.classification_head.train_only_decoder:
                     prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs,
                                                                           tgt_mask.to(device))
@@ -229,8 +244,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     out = out.transpose(0, 1)
                     prob = model.classification_head.generator(out[:, -1])
                     all_outs.append(out[:, -1])
-                prob[0,0].backward()
-                print(memory.grad.data)
+                # print("doing the backward pass...")
+                for batch_ind in range(prob.shape[0]):
+                    max_ind = torch.argmax(prob[batch_ind])
+                    prob[batch_ind,max_ind].backward(retain_graph=True)
+                # print("did the backward pass")
             else:
                 out = model.decode(ys, memory.to(device), tgt_mask.to(device))
                 out = out.transpose(0, 1)
@@ -323,8 +341,14 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
                               second_model.glbl_generator(
                                   torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1), dim=-1)
+        if saliency_map:
+
+            return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits,
+                    glbl_labels), retain_grads
         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
                glbl_labels
+    if saliency_map:
+        return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits), retain_grads
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 
 
@@ -1218,6 +1242,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             pos_fp_info.extend(false_positives)
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False):
+    def visualize_importance(outs, grads, seqs_):
+        batch_s = len(seqs_)
+        for ind, (seq_, pred_) in enumerate(zip(seqs_, outs[1])):
+            pred_string = "".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred])
+            if "S" in pred_string:
+                print(torch.sum(torch.abs(grads[ind * batch_s][ind]), dim=-1))
+                cs_pred = pred_string.rfind("S") + 1
+                print(torch.sum(torch.abs(grads[ind * batch_s + cs_pred][ind]), dim=-1))
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
@@ -1254,14 +1286,11 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     seqs, some_output = [], []
     for batch in dataset_loader:
         seqs, lbl_seqs, _, glbl_lbls = batch
-        print(seqs, lbl_seqs, glbl_lbls)
-        some_output = greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
-                      test_only_cs=False, glbl_lbls=None, tune_bert=tune_bert)
-        # print("here", some_output[0])
-        # print()
+        some_output, input_gradients = greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
+                                            form_sp_reg_data=False, second_model=None, test_only_cs=False,
+                                                     glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
+        visualize_importance(some_output, input_gradients, seqs)
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
-    # print(ind2lbl)
-    # print(torch.softmax(some_output[1][:,0,:], dim=1))
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
