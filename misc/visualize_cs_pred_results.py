@@ -256,7 +256,10 @@ def get_cs_preds_by_tol(tl, pl):
 def plot_all_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_acc, ece):
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
     fig, ax = plt.subplots(2, 2)
+    import pylab as pl
+    from matplotlib.ticker import FixedLocator, FormatStrFormatter
     for i in range(4):
         accs = [acc_to_perc[0] for acc_to_perc in resulted_perc_by_acc[i]]
         total_counts_per_acc_ = list(total_counts_per_acc[i])
@@ -265,14 +268,13 @@ def plot_all_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_a
         # ax[i//2, i%2].set_title(name[i], fontsize=11)
         if i == 0:
             box = ax[i//2, i%2].get_position()
-            ax[i//2, i%2].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 0.85, box.height * 0.75])
-
+            ax[i//2, i%2].set_position([box.x0, box.y0 + box.height * 0.5, box.width * 1.15, box.height * 0.65])
             ax[i//2, i%2].bar(accs, accs, width=bars_width, alpha=0.5, linewidth=2, edgecolor="black", color='blue',
-                    label='Perfect\ncalibration')
-            ax[i//2, i%2].bar(accs, percs, width=bars_width, alpha=0.5, color='red', label="Model's\ncalibration")
-            ax[i//2, i%2].set_xticks([round(accs[j*2+1],2) for j in range(len(accs)//2)])
-            ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[j * 2 + 1], 2)), str(total_counts_per_acc_[j * 2 + 1])) for j in
-               range(len(accs) // 2 )],fontsize=6)
+                    label='Perfect calibration')
+            ax[i//2, i%2].bar(accs, percs, width=bars_width, alpha=0.5, color='red', label="Model's calibration")
+            ax[i//2, i%2].set_xticks([round(accs[j],2) for j in range(len(accs))])
+            ax[i//2, i%2].set_xticklabels(["{}/{}".format(str(round(accs[j], 2)), str(total_counts_per_acc_[j])) for j in
+               range(len(accs))],fontsize=6, rotation=300)
             ax[i // 2, i % 2].set_xlim([0,1])
             ax[i // 2, i % 2].set_title("tol {}, ece: {}".format(i, ece[i]), fontsize=8)
             # ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[i], 2)), str(total_counts_per_acc[i])) for i in
@@ -281,14 +283,18 @@ def plot_all_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_a
             ax[i//2, i%2].set_yticklabels([0, 0.5, 1], fontsize=6)
         else:
             box = ax[i//2, i%2].get_position()
-            horizontal_offset = - 0.2 * box.width if i == 1 or i == 3 else 0
-            vertical_offset = 0.35 * box.height if i == 1 else 0.18 * box.height
-            ax[i//2, i%2].set_position([box.x0 + horizontal_offset, box.y0 + vertical_offset, box.width * 0.85, box.height * 0.75])
+            horizontal_offset = 0.1 * box.width if i == 1 or i == 3 else 0
+            vertical_offset = 0.5 * box.height if i == 1 else 0.5 * box.height
+            ax[i//2, i%2].set_position([box.x0 + horizontal_offset, box.y0 + vertical_offset, box.width * 1.15, box.height * 0.65])
             ax[i // 2, i % 2].bar(accs, accs, width=bars_width, alpha=0.5, linewidth=2, edgecolor="black", color='blue')
             ax[i // 2, i % 2].bar(accs, percs, width=bars_width, alpha=0.5, color='red')
-            ax[i//2, i%2].set_xticks([round(accs[j*2+1],2) for j in range(len(accs)//2)])
-            ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[j * 2 + 1], 2)), str(total_counts_per_acc_[j * 2 + 1])) for j in
-               range(len(accs) // 2 )],fontsize=6)
+            # ax[i//2, i%2].set_xticks([round(accs[j*2+1],2) for j in range(len(accs)//2)])
+            # ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[j * 2 + 1], 2)), str(total_counts_per_acc_[j * 2 + 1])) for j in
+            #    range(len(accs) // 2 )],fontsize=6)
+            ax[i//2, i%2].set_xticks([round(accs[j],2) for j in range(len(accs))])
+            ax[i//2, i%2].set_xticklabels(["{}/{}".format(str(round(accs[j], 2)), str(total_counts_per_acc_[j])) for j in
+               range(len(accs))],fontsize=6, rotation=300)
+
             ax[i // 2, i % 2].set_xlim([0,1])
             ax[i // 2, i % 2].set_title("tol {}, ece: {}".format(i, ece[i]), fontsize=8)
             ax[i//2, i%2].set_yticks([0, 0.5, 1])
@@ -296,16 +302,18 @@ def plot_all_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_a
 
         if i > 1:
             ax[i//2, i%2].set_xlabel("Confidence/No of samples", fontsize=8)
+            ax[i//2, i%2].xaxis.set_label_coords(0.5, -0.6)
+
         if i == 0 or i == 2:
             ax[i//2, i%2].set_ylabel("Accuracy", fontsize=8)
-    fig.legend(loc='center left', bbox_to_anchor=(0.78, 0.5), fontsize=8)
+    fig.legend(loc='center left', bbox_to_anchor=(0.2, 0.05), fontsize=8, ncol=2)
     plt.show()
 
 def plot_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_acc):
 
     import matplotlib as mpl
     fig = mpl.pyplot.gcf()
-    mpl.rcParams['figure.dpi'] = 100
+    mpl.rcParams['figure.dpi'] = 350
     fig.set_size_inches(12, 8)
 
     accs = [acc_to_perc[0] for acc_to_perc in resulted_perc_by_acc]
@@ -2026,73 +2034,90 @@ def plot_sp6_vs_tnmt():
 
     names = ["TSignal", "SignalP6", "LipoP", "DeepSig", "Phobius"]
     colors = ["c", "orage", "green", "black", "purple"]
-    titles = ["e", "n", "p", "a"]
+    titles = ["", "", "", ""]
     x_positions = []
 
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
     fig, ax = plt.subplots(3, 1)
-
     line_w = 0.3
     offsets = [-line_w*0.5, line_w*0.5]
     sptypes=["Sec/SPI", "Sec/SPII", "Tat/SP1"]
     for ind in range(3):
         upper_lim = 17 if ind == 0 else 13
         lower_lim = 0 if ind == 0 else 1
+        lower_lim_plots = 1 if ind == 0 else 5
         all_f1s = all_sptypes_all_f1s[ind]
+        ax[ind].plot([4.5,4.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        ax[ind].plot([8.5,8.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        ax[ind].plot([12.5,12.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
         for j in range(2):
-            ax[ind].bar([i + offsets[j] for i in range(1, upper_lim)], all_f1s[j],  label=names[j],
+            ax[ind].bar([i + offsets[j] for i in range(lower_lim_plots, 17)], all_f1s[j],  label=names[j],
                    width=line_w)
         box = ax[ind].get_position()
-        ax[ind].set_position([box.x0 + box.width * 0.1, box.y0 + box.height * 0.1, box.width * 0.73, box.height * 0.82])
+        ax[ind].set_xlim(0.5,16.5)
+        ax[ind].set_position([box.x0, box.y0 + box.height * 0.65, box.width * 1.1, box.height * 0.75])
         ax[ind].set_yticks([0, 0.5, 1])
+        ax[ind].set_ylim([0, 1.1])
 
         # ax[ind].set_position([box.x0, box.y0, box.width * 0.8, box.height])
         # ax[ind].legend(loc='center left', bbox_to_anchor=(1, 0.5, ), fontsize=26)
-        ax[ind].set_xticks(list(range(1, upper_lim)))
+        ax[ind].set_xticks(list(range(lower_lim_plots, 17)))
         if ind == 2:
             handles, labels = ax[ind].get_legend_handles_labels()
         ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=8)
-        # ax[ind].set_title("SPI performance", fontsize=11)
-        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), rotation=0, fontsize=8)
-        ax[ind].yaxis.set_label_coords(-0.23, 0.2)
+        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=8)
+        ax[ind].yaxis.set_label_coords(-0.07, 0.42)
         ax[ind].set_yticklabels([0,0.5,1],fontsize=8)
-        if ind == 0:
-            ax[ind].set_title("Weighted F1 scores for TSignal/SignalP6: 0.8132/0.7976", fontsize=8, y=1.1)
-    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.77, 0.5))
+        # if ind == 0:
+        #     ax[ind].set_title("Weighted F1 scores for TSignal/SignalP6: 0.8132/0.7976", fontsize=8, y=1.1)
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=8)
+    fig.suppressComposite = False
+    from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
+    mini_line = Arrow(569,100, 0, 100+800, color='black', alpha=1)
+    # dotted_line(569,100, patches=fig.patches)
+    # dotted_line(910,100, patches=fig.patches)
+    # dotted_line(1251,100, patches=fig.patches)
+    ax[2].set_xlabel("eukarya                    gn bacteria             gp bacteria                    archaea\n\n "
+                     "tolerance/life group",fontsize=8)
+
+    # with plt.rc_context({'image.composite_image': False}):
+    #     fig.savefig('t.pdf', dpi=350)
+
     plt.show()
 
-    all_f1s = [np.array(tnmt_f1_sp2).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
-    line_w = 0.15
-    offsets = [-line_w*0.5, line_w*0.5]
-    ax = plt.subplot(111)
-    for j in range(2):
-        ax.bar([i + offsets[j] for i in range(1, 13)], all_f1s[j],  label=names[j],
-               width=line_w)
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=26)
-    ax.set_xticks(list(range(1, 13)))
-    ax.set_xticklabels(['{}\ntol {}'.format(titles[1 + i//4], i%4) for i in range(12)])
-    ax.set_title("SPII Performance", fontsize=26)
-    ax.set_ylabel("F1 score")
-    plt.show()
+    # all_f1s = [np.array(tnmt_f1_sp2).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
+    # line_w = 0.15
+    # offsets = [-line_w*0.5, line_w*0.5]
+    # ax = plt.subplot(111)
+    # for j in range(2):
+    #     ax.bar([i + offsets[j] for i in range(1, 13)], all_f1s[j],  label=names[j],
+    #            width=line_w)
+    # box = ax.get_position()
+    # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=26)
+    # ax.set_xticks(list(range(1, 13)))
+    # ax.set_xticklabels(['{}\ntol {}'.format(titles[1 + i//4], i%4) for i in range(12)])
+    # ax.set_title("SPII Performance", fontsize=8)
+    # ax.set_ylabel("F1 score")
+    # plt.show()
 
-    all_f1s = [np.array(tnmt_f1_tat).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
-    line_w = 0.15
-    offsets = [-line_w*0.5, line_w*0.5]
-    ax = plt.subplot(111)
-    for j in range(2):
-        ax.bar([i + offsets[j] for i in range(1, 13)], all_f1s[j],  label=names[j],
-               width=line_w)
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=26)
-    ax.set_xticks(list(range(1, 13)))
-    ax.set_xticklabels(['{}\ntol {}'.format(titles[1 + i//4], i%4) for i in range(12)])
-    ax.set_title("TAT Performance", fontsize=26)
-    ax.set_ylabel("F1 score")
-    plt.show()
+    # all_f1s = [np.array(tnmt_f1_tat).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
+    # line_w = 0.15
+    # offsets = [-line_w*0.5, line_w*0.5]
+    # ax = plt.subplot(111)
+    # for j in range(2):
+    #     ax.bar([i + offsets[j] for i in range(1, 13)], all_f1s[j],  label=names[j],
+    #            width=line_w)
+    # box = ax.get_position()
+    # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=26)
+    # ax.set_xticks(list(range(1, 13)))
+    # ax.set_xticklabels(['{}\ntol {}'.format(titles[1 + i//4], i%4) for i in range(12)])
+    # ax.set_title("TAT Performance", fontsize=26)
+    # ax.set_ylabel("F1 score")
+    # plt.show()
 
 def plot_comparative_performance_sp1_mdls():
     # enc-dec model
@@ -2143,6 +2168,7 @@ def plot_comparative_performance_sp1_mdls():
     #     plt.show()
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
     from matplotlib.pyplot import figure
 
 
@@ -2156,25 +2182,28 @@ def plot_comparative_performance_sp1_mdls():
         for j in range(5):
             ax[ind].bar([i + offsets[j] for i in range(1,5)], all_f1s[j][ind], color=colors[j], label=names[j], width=line_w)
         box = ax[ind].get_position()
-        ax[ind].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.1, box.width * 0.7, box.height * 0.9])
+        ax[ind].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.75, box.width * 0.9, box.height * 0.75])
         if ind == 3:
             # ax[ind].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=14)
             handles, labels = ax[ind].get_legend_handles_labels()
 
-        if ind != 3:
-            ax[ind].set_xticks([])
-        else:
-            ax[ind].set_xticks(list(range(1,5)))
-            ax[ind].set_xticklabels(['tol {}'.format(i) for i in range(4)], fontsize=11)
+        # if ind != 3:
+        #     ax[ind].set_xticks([])
+        # else:
+        ax[ind].set_xticks(list(range(1,5)))
+        ax[ind].set_xticklabels(['{}'.format(i) for i in range(4)], fontsize=8)
         ax[ind].set_yticks([0, 0.5, 1])
-        # ax.set_yticklabels(labels=ax.get_yticklabels(),fontsize=12)
+        ax[ind].set_yticklabels(labels=[0, 0.5, 1],fontsize=8)
         # plt.yticks(fontsize=10)
         # if ind == 0:
         #     ax[ind].set_title("F1 score", fontsize=14)
-        ax[ind].set_ylabel(titles[ind] + "\nF1", fontsize=11, rotation=0)
-        ax[ind].yaxis.set_label_coords(-0.26, 0)
+        ax[ind].set_ylabel(titles[ind] + "\nF1", fontsize=8, rotation=0)
+        ax[ind].yaxis.set_label_coords(-0.18, 0)
+        ax[ind].set_xlim(0.6, 4.4)
+        if ind == 3:
+            ax[ind].set_xlabel("tolerance", fontsize=8)
 
-    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.78, 0.5))
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.12, 0.045), ncol=5, fontsize=8)
     plt.show()
 
 def create_random_split_fold_data():
@@ -2402,6 +2431,7 @@ def plot_perf_over_data_perc():
     # [0.7568873852102465, 0.8506524891251813, 0.8941517641372644, 0.9139681005316579]
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
     fig, ax = plt.subplots(2, 2)
     # print(ax)
     # print(ax[0])
@@ -2467,19 +2497,21 @@ def plot_perf_over_data_perc():
         all_euk_mean_tol3 = np.array(all_euk_mean_tol3)
         all_euk_std_tol0 = np.array(all_euk_std_tol0)
         all_euk_std_tol3 = np.array(all_euk_std_tol3)
-        ax[0,0].plot(subsets, all_euk_mean_tol0, '-', label='e0', color='blue')
+        ax[0,0].plot(subsets, all_euk_mean_tol0, '-', label='eukarya tol 0', color='blue')
         ax[0,0].fill_between(subsets, all_euk_mean_tol0 - 2 * all_euk_std_tol0, all_euk_mean_tol0 + 2 * all_euk_std_tol0, alpha=0.2, color='blue')
-        ax[0,0].plot(subsets, all_euk_mean_tol3, '--',label='e3', color='blue')
+        ax[0,0].plot(subsets, all_euk_mean_tol3, '--',label='eukarya tol 3', color='blue')
         ax[0,0].fill_between(subsets, all_euk_mean_tol3 - 2 * all_euk_std_tol3, all_euk_mean_tol3 + 2 * all_euk_std_tol3, alpha=0.2, color='blue')
         # ax[0,0].title("Performance over data percentage", fontsize=26)
         # ax[0,0].set_xlabel("Percentage of training data used")
         # ax[0,0].set_ylabel("F1 score")
         box = ax[0,0].get_position()
-        ax[0,0].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
-        ax[0,0].set_ylabel("F1\nscore", rotation=0, fontsize=11)
-        ax[0, 0].yaxis.set_label_coords(-0.5, 0.35)
-        ax[0, 0].set_yticks([0, 0.5, 1])
+        ax[0,0].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.45, box.width, box.height * 0.75])
+        ax[0,0].set_ylabel("F1 score", fontsize=8)
+        ax[0, 0].yaxis.set_label_coords(-0.2, 0.45)
+        ax[0, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
         ax[0, 0].set_xticks([0.25, 0.5, 0.75, 1])
+        ax[0, 0].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=8)
+        ax[0, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
 
         # ax[0,0].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=11)
     all_neg_mean_tol0 = np.array(all_neg_mean_tol0)
@@ -2491,17 +2523,19 @@ def plot_perf_over_data_perc():
     # ax[0,1].set_xlabel("Percentage of training data used")
     # ax[0,1].set_ylabel("F1 score")
 
-    ax[0,1].plot(subsets, all_neg_mean_tol0, '-', label='n0', color='orange')
+    ax[0,1].plot(subsets, all_neg_mean_tol0, '-', label='gn bacteria tol 0', color='orange')
     ax[0,1].fill_between(subsets, all_neg_mean_tol0 - 2 * all_neg_std_tol0, all_neg_mean_tol0 + 2 * all_neg_std_tol0,
                     alpha=0.2, color='orange')
-    ax[0,1].plot(subsets, all_neg_mean_tol3, '--', label='n3', color='orange')
+    ax[0,1].plot(subsets, all_neg_mean_tol3, '--', label='gn bacteria tol 3', color='orange')
     ax[0,1].fill_between(subsets, all_neg_mean_tol3 - 2 * all_neg_std_tol3, all_neg_mean_tol3 + 2 * all_neg_std_tol3,
                     alpha=0.2, color='orange')
     box = ax[0,1].get_position()
-    ax[0,1].set_yticks([0, 0.5, 1])
+    ax[0,1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
 
-    ax[0,1].set_position([box.x0 - box.width * 0.1, box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
+    ax[0,1].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.45, box.width, box.height * 0.75])
     ax[0,1].set_xticks([0.25, 0.5, 0.75, 1])
+    ax[0,1].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=8)
+    ax[0,1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
 
     all_pos_mean_tol0 = np.array(all_pos_mean_tol0)
     all_pos_mean_tol3 = np.array(all_pos_mean_tol3)
@@ -2511,20 +2545,23 @@ def plot_perf_over_data_perc():
     # plt.title("Performance over data percentage", fontsize=26)
     # ax[1,0].set_xlabel("Percentage of training data used")
     # ax[1,0].set_ylabel("F1 score")
-    ax[1,0].plot(subsets, all_pos_mean_tol0, '-', label='p0', color='purple')
+    ax[1,0].plot(subsets, all_pos_mean_tol0, '-', label='gp bacteria tol 0', color='purple')
     ax[1,0].fill_between(subsets, all_pos_mean_tol0 - 2 * all_pos_std_tol0, all_pos_mean_tol0 + 2 * all_pos_std_tol0,
                     alpha=0.2, color='purple')
-    ax[1,0].plot(subsets, all_pos_mean_tol3, '--', label='p3', color='purple')
+    ax[1,0].plot(subsets, all_pos_mean_tol3, '--', label='gp bacteria tol 3', color='purple')
     ax[1,0].fill_between(subsets, all_pos_mean_tol3 - 2 * all_pos_std_tol3, all_pos_mean_tol3 + 2 * all_pos_std_tol3,
                     alpha=0.2, color='purple')
-    ax[1, 0].set_ylabel("F1\nscore", rotation=0, fontsize=11)
-    ax[1, 0].yaxis.set_label_coords(-0.5, 0.35)
+    ax[1, 0].set_ylabel("F1 score", fontsize=8)
+    ax[1, 0].yaxis.set_label_coords(-0.2, 0.45)
     ax[1, 0].set_xticks([0.25, 0.5, 0.75, 1])
 
     box = ax[1,0].get_position()
-    ax[1,0].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.2, box.width * 0.7, box.height * 0.85])
-    ax[1,0].set_xlabel("data percentage", fontsize=11)
-    ax[1,0].set_yticks([0, 0.5, 1])
+    ax[1,0].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.6, box.width, box.height * 0.75])
+    ax[1,0].set_xlabel("data percentage", fontsize=8)
+    ax[1,0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+
+    ax[1,0].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=8)
+    ax[1,0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
     # plt.show()
     all_archaea_mean_tol0 = np.array(all_archaea_mean_tol0)
     all_archaea_mean_tol3 = np.array(all_archaea_mean_tol3)
@@ -2535,19 +2572,21 @@ def plot_perf_over_data_perc():
     # ax[1,1].set_xlabel("Percentage of training data used")
     # ax[1,1].set_ylabel("F1 score")
 
-    ax[1,1].plot(subsets, all_archaea_mean_tol0, '-', label='a0', color='red')
+    ax[1,1].plot(subsets, all_archaea_mean_tol0, '-', label='archaea tol 0', color='red')
     ax[1,1].fill_between(subsets, all_archaea_mean_tol0 - 2 * all_archaea_std_tol0, all_archaea_mean_tol0 + 2 * all_archaea_std_tol0,
                     alpha=0.2, color='red')
 
-    ax[1,1].plot(subsets, all_archaea_mean_tol3, '--', label='a3', color='red')
+    ax[1,1].plot(subsets, all_archaea_mean_tol3, '--', label='archaea tol 3', color='red')
     ax[1,1].fill_between(subsets, all_archaea_mean_tol3 - 2 * all_archaea_std_tol3, all_archaea_mean_tol3 + 2 * all_archaea_std_tol3,
                     alpha=0.2, color='red')
     box = ax[1,1].get_position()
-    ax[1,1].set_position([box.x0 - box.width * 0.1, box.y0 + box.height * 0.2, box.width * 0.7, box.height * 0.85])
-    ax[1,1].set_xlabel("data percentage", fontsize=11)
-    ax[1,1].set_yticks([0, 0.5, 1])
+    ax[1,1].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.6, box.width, box.height * 0.75])
+    ax[1,1].set_xlabel("data percentage", fontsize=8)
+    ax[1,1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1    ])
     ax[1,1].set_xticks([0.25, 0.5, 0.75, 1])
 
+    ax[1,1].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=8)
+    ax[1,1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
 
     all_handles, all_labels = [], []
     for ind in range(2):
@@ -2556,7 +2595,7 @@ def plot_perf_over_data_perc():
             all_handles.extend(handles)
             all_labels.extend(labels)
 
-    fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.8, 0.5))
+    fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.03, 0.1), ncol=4, fontsize=8)
     # fig.text(0.5, 0.04, 'common X', ha='center')
     # fig.text(0.04, 0.5, 'common Y', va='center', rotation='vertical')
     plt.show()
@@ -2624,10 +2663,11 @@ def extract_performance_over_tolerance():
 
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
     import matplotlib.gridspec as gridspec
     fig, ax = plt.subplots(2, 2)
 
-    names = ["e", "n", "p", "a"]
+    names = ["eukarya", "gn bacteria", "gp bacteria", "archaea"]
     sp1_f1s = np.stack(sp1_f1s)
     sp1_mean_f1s = np.mean(np.stack(sp1_f1s), axis=0)
     sp1_mean_f1s = np.mean(np.stack(sp1_f1s), axis=0)
@@ -2653,41 +2693,47 @@ def extract_performance_over_tolerance():
 
 
     tolerances = list(range(4))
-    ax[0, 0].plot(tolerances, euk_means_sp1, '-', label='e', color='blue')
+    ax[0, 0].plot(tolerances, euk_means_sp1, '-', label='eukarya', color='blue')
     ax[0, 0].fill_between(tolerances, euk_means_sp1 - 2 * euk_std_sp1, euk_means_sp1 + 2 * euk_std_sp1, alpha=0.2, color='blue')
-    ax[0, 0].set_yticks([0, 0.5, 1])
+    ax[0, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+    ax[0, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
     ax[0, 0].set_xticks([0, 1, 2, 3])
-    ax[0, 0].set_xticklabels(["tol 0", "tol 1", "tol 2", "tol 3"])
+    ax[0, 0].set_xticklabels(["0", "1", "2", "3"], fontsize=8)
     box = ax[0, 0].get_position()
-    ax[0, 0].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
-    ax[0, 0].yaxis.set_label_coords(-0.5, 0.35)
-    ax[0, 0].set_ylabel("F1\nscore", rotation=0, fontsize=11)
+    ax[0, 0].set_position([box.x0 , box.y0 + box.height * 0.5, box.width, box.height * 0.78])
+    ax[0, 0].set_ylabel("F1 score", fontsize=8)
+    ax[0, 0].yaxis.set_label_coords(-0.2, 0.5)
 
-    ax[0, 1].plot(tolerances, neg_means_sp1, '-', label='n', color='orange')
+    ax[0, 1].plot(tolerances, neg_means_sp1, '-', label='gn bacteria', color='orange')
     ax[0, 1].fill_between(tolerances, neg_means_sp1 - 2 * neg_std_sp1, neg_means_sp1 + 2 * neg_std_sp1, alpha=0.2, color='blue')
-    ax[0, 1].set_yticks([0, 0.5, 1])
     ax[0, 1].set_xticks([0, 1, 2, 3])
-    ax[0, 1].set_xticklabels(["tol 0", "tol 1", "tol 2", "tol 3"])
+    ax[0, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+    ax[0, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+    ax[0, 1].set_xticklabels(["0", "1", "2", "3"], fontsize=8)
     box = ax[0, 1].get_position()
-    ax[0, 1].set_position([box.x0, box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
+    ax[0, 1].set_position([box.x0 , box.y0 + box.height * 0.5, box.width, box.height * 0.78])
 
-    ax[1, 0].plot(tolerances, pos_means_sp1, '-', label='p', color='purple')
+    ax[1, 0].plot(tolerances, pos_means_sp1, '-', label='gp bacteria', color='purple')
     ax[1, 0].fill_between(tolerances, pos_means_sp1 - 2 * pos_std_sp1, pos_means_sp1 + 2 * pos_std_sp1, alpha=0.2, color='purple')
-    ax[1, 0].set_yticks([0, 0.5, 1])
     ax[1, 0].set_xticks([0, 1, 2, 3])
-    ax[1, 0].set_xticklabels(["tol 0", "tol 1", "tol 2", "tol 3"])
+    ax[1, 0].set_xticklabels(["0", "1", "2", "3"], fontsize=8)
+    ax[1, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+    ax[1, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
     box = ax[1, 0].get_position()
-    ax[1, 0].set_position([box.x0 + box.width * 0.15 , box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
-    ax[1, 0].set_ylabel("F1\nscore", rotation=0, fontsize=11)
-    ax[1, 0].yaxis.set_label_coords(-0.5, 0.35)
+    ax[1, 0].set_position([box.x0 , box.y0 + box.height * 0.5, box.width, box.height * 0.78])
+    ax[1, 0].set_ylabel("F1 score", fontsize=8)
+    ax[1, 0].yaxis.set_label_coords(-0.2, 0.5)
+    ax[1, 0].set_xlabel("tolerance", fontsize=8)
 
-    ax[1, 1].plot(tolerances, arch_means_sp1, '-', label='a', color='red')
+    ax[1, 1].plot(tolerances, arch_means_sp1, '-', label='archaea', color='red')
     ax[1, 1].fill_between(tolerances, arch_means_sp1 - 2 * arch_std_sp1, arch_means_sp1 + 2 * arch_std_sp1, alpha=0.2, color='red')
-    ax[1, 1].set_yticks([0, 0.5, 1])
+    ax[1, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+    ax[1, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
     ax[1, 1].set_xticks([0, 1, 2, 3])
-    ax[1, 1].set_xticklabels(["tol 0", "tol 1", "tol 2", "tol 3"])
+    ax[1, 1].set_xticklabels(["0", "1", "2", "3"], fontsize=8)
+    ax[1, 1].set_xlabel("tolerance", fontsize=8)
     box = ax[1, 1].get_position()
-    ax[1, 1].set_position([box.x0 , box.y0 + box.height * 0.15, box.width * 0.7, box.height * 0.85])
+    ax[1, 1].set_position([box.x0 , box.y0 + box.height * 0.5, box.width, box.height * 0.78])
 
     all_handles, all_labels = [], []
     for ind in range(2):
@@ -2696,7 +2742,7 @@ def extract_performance_over_tolerance():
             all_handles.extend(handles)
             all_labels.extend(labels)
 
-    fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.83, 0.5))
+    fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.125, 0.09),ncol=4, fontsize=8)
     plt.show()
 
     # ax[0].plot(subsets, all_euk_mean_tol3, '--',label='e3', color='blue')
@@ -2705,53 +2751,92 @@ def extract_performance_over_tolerance():
 def plot_compare_pos_nopos():
     nopos_bench = [0.563, 0.679, 0.728, 0.752, 0.346, 0.506, 0.531, 0.556, 0.364, 0.409, 0.5, 0.545, 0.4, 0.615, 0.646, 0.646]
     nopos_nobench = [0.725, 0.853, 0.894, 0.918, 0.614, 0.722, 0.744, 0.764, 0.464, 0.594, 0.669, 0.717, 0.469, 0.667, 0.691, 0.691]
+    linearpos_bench = [0.347, 0.687, 0.767, 0.82, 0.24, 0.507, 0.547, 0.587, 0.27, 0.378, 0.649, 0.649, 0.219, 0.469, 0.625, 0.688]
+    linearpos_nobench = [0.494, 0.833, 0.892, 0.919, 0.467, 0.745, 0.788, 0.809, 0.292, 0.498, 0.648, 0.769, 0.275, 0.55, 0.675, 0.725]
     pos_bench = [0.692, 0.737, 0.769, 0.782, 0.462, 0.564, 0.59, 0.59, 0.526, 0.684, 0.684, 0.684, 0.606, 0.697, 0.697, 0.727]
     pos_nobench = [0.8, 0.869, 0.907, 0.928, 0.759, 0.807, 0.82, 0.828, 0.664, 0.728, 0.756, 0.763, 0.659, 0.732, 0.732, 0.756]
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
+
     fig, ax = plt.subplots(2, 1)
-    line_w = 0.3
+    line_w = 0.25
     x_positions = []
     names = ["with pe", "w/o pe"]
     datasets = ["benchmark\ndataset\n(CS F1 score)", 'whole\ndataset\n(CS F1 score)']
     colors = ["red", "blue", "green", "black"]
-    names_xticks = ["e", "n", "p", "a"]
+    names_xticks = ["", "", "", ""]
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import ConnectionPatch
+
     xticklbls = []
     for lg in names_xticks:
         for tol in range(4):
             xticklbls.append(lg+str(tol))
     no_pos_enc = [nopos_bench, nopos_nobench]
     pos_enc = [pos_bench, pos_nobench]
-
+    lin_pos_enc = [linearpos_bench, linearpos_nobench]
     for i in range(2):
+        ax[i].plot([3.5,3.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        ax[i].plot([7.5,7.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        ax[i].plot([11.5,11.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
         box = ax[i].get_position()
-        ax[i].set_position([box.x0 + box.width *0.14, box.y0, box.width * 0.68, box.height * 0.75])
-        x_pos_nopos = np.array(list(range(len(nopos_bench)))) + line_w/2
-        x_pos_pos = np.array(list(range(len(nopos_bench)))) - line_w/2
+        ax[i].set_position([box.x0 + box.width *0.14, box.y0 + box.height*0.6, box.width * 0.9, box.height * 0.7])
+        x_pos_nopos = np.array(list(range(len(nopos_bench)))) + line_w
+        x_pos_lin_pos = np.array(list(range(len(nopos_bench))))
+        x_pos_pos = np.array(list(range(len(nopos_bench)))) - line_w
         if i == 0:
-            ax[i].bar(x_pos_nopos, no_pos_enc[i], width=line_w, color='blue',
-                                  label="positional\nencoding")
             ax[i].bar(x_pos_pos, pos_enc[i], width=line_w, color='red',
-                                  label="w/o positional\nencoding")
+                                  label="sine positional encoding")
+            ax[i].bar(x_pos_lin_pos, lin_pos_enc[i], width=line_w, color='orange',
+                      label="linear positional encoding")
+            ax[i].bar(x_pos_nopos, no_pos_enc[i], width=line_w, color='black',
+                                  label="no positional encoding")
+
         else:
-            ax[i].bar(x_pos_nopos, no_pos_enc[i], width=line_w, color='blue')
             ax[i].bar(x_pos_pos, pos_enc[i], width=line_w, color='red')
+            ax[i].bar(x_pos_lin_pos, lin_pos_enc[i], width=line_w, color='orange')
+            ax[i].bar(x_pos_nopos, no_pos_enc[i], width=line_w, color='black')
         ax[i].set_ylim(0, 1)
+        ax[i].set_xlim(-0.5, 15.5)
         ax[i].set_xticks(list(range(16)))
         ax[i].set_xticklabels(xticklbls, fontsize=8)
-        ax[i].set_yticks([0, 0.5, 1])
-        ax[i].set_yticklabels([0, 0.5, 1], fontsize=8)
+        ax[i].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        ax[i].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
         ax[i].set_ylabel(datasets[i], fontsize=8, rotation=0)
-        ax[i].yaxis.set_label_coords(-0.27, 0.35)
+        ax[i].yaxis.set_label_coords(-0.2, 0.35)
 
         # ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[i], 2)), str(total_counts_per_acc[i])) for i in
         #             range(len(accs)//2 - 2)], fontsize=8)
         # ax[i // 2, i % 2].set_yticks([0.5, 1])
         # ax[i // 2, i % 2].set_yticklabels([0.5, 1], fontsize=6)
-    fig.legend(loc='center left', bbox_to_anchor=(0.76, 0.5), fontsize=8)
-    ax[0].set_title("Sec/SPI performance increase when using\nadditional positional encodings", fontsize=8)
+    ax[1].set_xlabel("   eukarya               gn bacteria           gp bacteria           archaea\n\n tolerance/life group", fontsize=8)
+    # ax[0].annotate('', xy=(3.5, 1), xycoords='axes fraction', xytext=(3.5, 2),
+    #             arrowprops=dict(arrowstyle="-", color='b'))
+    from matplotlib.patches import RegularPolygon, Rectangle
+    # tri = Rectangle((752,150), width=2, height=800, color='purple', alpha=0.3)
+    # fig.patches.append(tri)
+    # tri = Rectangle((1075,150), width=1, height=800, color='purple', alpha=0.3)
+    # fig.patches.append(tri)
+    # tri = Rectangle((1398,150), width=1, height=800, color='purple', alpha=0.3)
+    # fig.patches.append(tri)
+    # dotted_line(752,100, patches=fig.patches)
+    # dotted_line(1075,100, patches=fig.patches)
+    # dotted_line(1398,100, patches=fig.patches)
+
+
+
+    fig.legend(loc='center left', bbox_to_anchor=(0, 0.05), fontsize=8, ncol=3)
     plt.show()
 
+
+def dotted_line(x, y_start, height=800, patches=None):
+    from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
+    mini_line_height = int((height*3/5)/30)
+    # for i in range(30):
+        # mini_line = Patch((x, y_start + (i * height)//20), height=mini_line_height, color='black')
+    mini_line = Arrow(x, y_start, 0, y_start+800, color='black', alpha=1)
+    patches.append(mini_line)
 
 def compare_experiment_results():
     separate_bert_tuning = [0.781, 0.843, 0.885, 0.903, 0.701, 0.764, 0.772, 0.782, 0.517, 0.55, 0.57, 0.584, 0.593, 0.642, 0.642, 0.667  ]
@@ -2760,20 +2845,21 @@ def compare_experiment_results():
     tuning_bert_only_enc = [0.8  , 0.869, 0.907, 0.928, 0.759, 0.807, 0.82 , 0.828, 0.664, 0.728, 0.756, 0.763, 0.659, 0.732, 0.732, 0.756 ]
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
     fig, ax = plt.subplots(1, 1)
     line_w = 0.4
     x_positions = []
     names = ["with pe", "w/o pe"]
     datasets = ["benchmark\ndataset\n(CS F1 score)", 'whole\ndataset\n(CS F1 score)']
     colors = ["red", "blue", "green", "black"]
-    names_xticks = ["e", "n", "p", "a"]
+    names_xticks = ["", "", "", ""]
     xticklbls = []
     for lg in names_xticks:
         for tol in range(4):
             xticklbls.append(lg+str(tol))
 
     box = ax.get_position()
-    ax.set_position([box.x0 + box.width * 0.05, box.y0, box.width * 0.8, box.height * 0.95])
+    ax.set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1, box.height * 0.75])
     x_pos_notuning = np.array(list(range(len(separate_bert_tuning)))) + line_w * 0.75
     x_pos_notuning *= 2
     x_pos_tune_sep = np.array(list(range(len(separate_bert_tuning)))) + line_w * 0.25
@@ -2783,31 +2869,98 @@ def compare_experiment_results():
     x_pos_tune_together_onlyEnc = np.array(list(range(len(separate_bert_tuning)))) - line_w * 0.75
     x_pos_tune_together_onlyEnc *= 2
     ax.bar(x_pos_tune_together_onlyEnc, tuning_bert_only_enc, width=line_w, color='black',
-                          label="only dec\ntuning")
+                          label="T decoder + tuning LM")
     ax.bar(x_pos_tune_together, tuning_bert_together, width=line_w, color='red',
-                          label="tuning")
+                          label="T encoder-decoder + tuning LM")
     ax.bar(x_pos_tune_sep, separate_bert_tuning, width=line_w, color='purple',
-                          label="separate\ntuning")
+                          label="T encoder-decoder + separate tuning LM")
     ax.bar(x_pos_notuning, no_bert_tuning, width=line_w, color='blue',
-                          label="no tuning")
+                          label="T encoder-decoder (no LM tuning)")
     ax.set_ylim(0, 1)
+    xticks = list(np.array(list(range(16)))*2)
+    xticks.append(-3)
     ax.set_xticks(np.array(list(range(16)))*2)
     ax.set_xticklabels(xticklbls, fontsize=8)
-    ax.set_yticks([0, 0.5, 1])
-    ax.set_yticklabels([0, 0.5, 1], fontsize=8)
-    ax.set_ylabel("F1\nscore", fontsize=8, rotation=0)
-    ax.yaxis.set_label_coords(-0.18, 0.45)
+    ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+    ax.set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+    ax.set_ylabel("F1 score", fontsize=8)
+    ax.set_xlim(-1, 31)
+    ax.set_xlabel("eukarya                gn bacteria           gp bacteria                 archaea\n\n "
+                  "    tolerance/life group",fontsize=8)
+
+    ax.plot([7, 7], [0, 1.5], linestyle='--', dashes=(1, 1), color='black')
+    ax.plot([15, 15], [0, 1.5], linestyle='--', dashes=(1, 1), color='black')
+    ax.plot([23, 23], [0, 1.5], linestyle='--', dashes=(1, 1), color='black')
+    # ax.yaxis.set_label_coords(-0.18, 0.45)
 
         # ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[i], 2)), str(total_counts_per_acc[i])) for i in
         #             range(len(accs)//2 - 2)], fontsize=8)
         # ax[i // 2, i % 2].set_yticks([0.5, 1])
         # ax[i // 2, i % 2].set_yticklabels([0.5, 1], fontsize=6)
-    fig.legend(loc='center left', bbox_to_anchor=(0.8, 0.5), fontsize=8)
-    ax.set_title("Sec/SPI F1 performance comparison between\nexperiments; whole data test", fontsize=8)
+    # fig.legend(loc='center left', bbox_to_anchor=(0.8, 0.5), fontsize=8)
+    fig.legend(loc='center left', bbox_to_anchor=(0.05, 0.09), fontsize=8, ncol=2)
+    from matplotlib.patches import RegularPolygon, Rectangle
+    # tri = Rectangle((587,150), width=2, height=800, color='black')
+    # dotted_line(587, 150, patches=fig.patches)
+    # dotted_line(946, 150, patches=fig.patches)
+    # dotted_line(1304, 150, patches=fig.patches)
+    # # fig.patches.append(tri)
+    # tri = Rectangle((946,150), width=1, height=800, color='black')
+    # fig.patches.append(tri)
+    # tri = Rectangle((1304,150), width=1, height=800, color='black')
+    # fig.patches.append(tri)
+
     plt.show()
 
 if __name__ == "__main__":
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder_4l/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_linear_pos_enc_only/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    #                                         # ,restrict_types=["SP", "NO_SP"])
+    # exit(1)
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_repeat2_only_decoder/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=False)
+    #                                         # ,restrict_types=["SP", "NO_SP"])
+    #
+    # exit(1)
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_remove_bertL_only_decoder/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=False)
+    # exit(1)
+    # compare_experiment_results()
+    # plot_sp6_vs_tnmt()
+    # plot_perf_over_data_perc
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder_2l/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat_best_RMV1L_experiment/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     plot_compare_pos_nopos()
+    # plot_comparative_performance_sp1_mdls()
+    # extract_performance_over_tolerance()
+    lg_and_tol2_lg = extract_calibration_probs_for_mdl(model="repeat2_only_decoder_",
+                                                       folder='tuning_bert_repeat2_only_decoder/',
+                                                       plot=True)
 
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="one_hot_new/",
@@ -2822,7 +2975,6 @@ if __name__ == "__main__":
                                             benchmark=False)
     exit(1)
 
-    compare_experiment_results()
     # SEPARATE BERT TUNING
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_repeat_tuningBertSeparately/",
@@ -2853,7 +3005,6 @@ if __name__ == "__main__":
                                             # ,restrict_types=["SP", "NO_SP"])
 
     exit(1)
-    plot_compare_pos_nopos()
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_only_decoder_no_pos_enc/",
                                             compare_mdl_plots=False,
@@ -2872,7 +3023,6 @@ if __name__ == "__main__":
                                             remove_test_seqs=False,
                                             benchmark=False)
     exit(1)
-    plot_comparative_performance_sp1_mdls()
     exit(1)
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_one_random_fold_run_only_dec/",
@@ -2883,7 +3033,7 @@ if __name__ == "__main__":
     # exit(1)
     plot_perf_over_data_perc()
     exit(1)
-    extract_performance_over_tolerance()
+
 
     exit(1)
     # plot_comparative_performance_sp1_mdls()
@@ -2906,7 +3056,6 @@ if __name__ == "__main__":
                                                        folder='tuning_bert_repeat2_only_decoder/',
                                                        plot=True)
 
-    plot_sp6_vs_tnmt()
     exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_repeat2_only_decoder/",

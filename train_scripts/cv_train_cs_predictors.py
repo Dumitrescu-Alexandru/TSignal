@@ -65,7 +65,7 @@ def generate_square_subsequent_mask(sz):
     return mask
 
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
-                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False):
+                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=True):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -79,7 +79,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     all_outs = []
     all_outs_2nd_mdl = []
     glbl_labels = None
-    with torch.no_grad():
+    if saliency_map:
         if tune_bert:
             seq_lengths = [len(s) for s in src]
             seqs = [" ".join(r_ for r_ in s) for s in src]
@@ -117,6 +117,45 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 else:
                     glbl_labels = model.get_v3_glbl_lbls(src)
                     _, glbl_preds = torch.max(glbl_labels, dim=1)
+    else:
+        with torch.no_grad():
+            if tune_bert:
+                seq_lengths = [len(s) for s in src]
+                seqs = [" ".join(r_ for r_ in s) for s in src]
+                inputs = model.tokenizer.batch_encode_plus(seqs,
+                                                           add_special_tokens=model.hparams.special_tokens,
+                                                           padding=True,
+                                                           truncation=True,
+                                                           max_length=model.hparams.max_length)
+                input_ids = torch.tensor(inputs['input_ids'], device=model.device)
+                attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
+                memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
+                if not model.classification_head.train_only_decoder:
+                    memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
+                else:
+                    memory = memory_bfd
+            else:
+                memory = model.encode(src)
+            if second_model is not None:
+                memory_2nd_mdl = model.encode(src)
+            else:
+                memory_2nd_mdl = None
+            if tune_bert and model.classification_head.glbl_lbl_version and model.classification_head.use_glbl_lbls or \
+                    not tune_bert and model.glbl_lbl_version == 3 and model.use_glbl_lbls:
+                # when tuning BERT model + TSignal and having a separate classifier for ths SP type which (should) be based
+                # on the embeddings comming from the BERT model
+                if test_only_cs:
+                    batch_size = len(src)
+                    glbl_labels = torch.zeros(batch_size, 6)
+                    glbl_labels[list(range(batch_size)), glbl_lbls] = 1
+                    _, glbl_preds = torch.max(glbl_labels, dim=1)
+                else:
+                    if tune_bert:
+                        glbl_labels = model.classification_head.get_v3_glbl_lbls(memory_bfd, inp_seqs=src)
+                        _, glbl_preds = torch.max(glbl_labels, dim=1)
+                    else:
+                        glbl_labels = model.get_v3_glbl_lbls(src)
+                        _, glbl_preds = torch.max(glbl_labels, dim=1)
 
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
     ys = []
@@ -170,7 +209,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         model.glbl_generator.eval()
     all_probs = []
     for i in range(start_ind, max(seq_lens) + 1):
-        with torch.no_grad():
+        if saliency_map:
             tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
             if second_model is not None:
                 out_2nd_mdl = second_model.decode(ys, memory_2nd_mdl.to(device), tgt_mask.to(device))
@@ -179,7 +218,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
             if tune_bert:
                 if model.classification_head.train_only_decoder:
-                    prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs, tgt_mask.to(device))
+                    prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs,
+                                                                          tgt_mask.to(device))
                     prob = prob[-1]
                 else:
                     out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
@@ -191,6 +231,28 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 out = out.transpose(0, 1)
                 prob = model.generator(out[:, -1])
                 all_outs.append(out[:, -1])
+        else:
+            with torch.no_grad():
+                tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
+                if second_model is not None:
+                    out_2nd_mdl = second_model.decode(ys, memory_2nd_mdl.to(device), tgt_mask.to(device))
+                    out_2nd_mdl = out_2nd_mdl.transpose(0, 1)
+                    prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
+                    all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
+                if tune_bert:
+                    if model.classification_head.train_only_decoder:
+                        prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs, tgt_mask.to(device))
+                        prob = prob[-1]
+                    else:
+                        out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
+                        out = out.transpose(0, 1)
+                        prob = model.classification_head.generator(out[:, -1])
+                        all_outs.append(out[:, -1])
+                else:
+                    out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+                    out = out.transpose(0, 1)
+                    prob = model.generator(out[:, -1])
+                    all_outs.append(out[:, -1])
 
         if i == 0 and not form_sp_reg_data:
             # extract the sp-presence probabilities

@@ -642,6 +642,8 @@ class ProtBertClassifier(pl.LightningModule):
             inp_seqs.append("".join([self.aaind2lblvocab[i_] for i_ in inp.detach().cpu().numpy()]).replace("[PAD]", ""))
         batch_size, seq_dim = input_ids.shape[0], input_ids.shape[1]
         attention_mask = torch.tensor(attention_mask, device=self.device)
+        input_ids.requires_grad=True
+        print(input_ids.dtype)
         word_embeddings = self.ProtBertBFD(input_ids,
                                            attention_mask)[0]
 
