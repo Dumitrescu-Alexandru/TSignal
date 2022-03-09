@@ -1303,7 +1303,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                                  num_workers=4, collate_fn=collate_fn)
     seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
-    for batch in dataset_loader:
+    for ind, batch in enumerate(dataset_loader):
+        print("{} number of batches our of {} tested".format(len(batch) * ind, len(batch)*len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
         some_output, input_gradients = greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
