@@ -855,7 +855,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
-                        random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0):
+                        random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -973,13 +973,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         losses_glbl = 0
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
             seqs, lbl_seqs, _, glbl_lbls = batch
+            # if augment_trimmed_seqs:
+            cuts = np.random.randint(0,10,len(seqs))
+            if augment_trimmed_seqs:
+                cut_seqs = [s[:-cuts[cut_ind]]  if cut_ind != 0 else s for cut_ind, s in enumerate(seqs)]
+                lbl_seqs = [l[:-cuts[cut_ind]] if cut_ind != 0  else l for cut_ind, l in enumerate(lbl_seqs)]
+            else:
+                cut_seqs = None
             if use_glbl_lbls:
-                # if "MKIFFAVLVILVLFSMLIWTAYGTPYPVNCKTDRDCVMCGLGISCKNGYCQGCTR" in seqs:
-                #     datruind = -1
-                #     for ind__, s in enumerate(seqs):
-                #         if s == "MKIFFAVLVILVLFSMLIWTAYGTPYPVNCKTDRDCVMCGLGISCKNGYCQGCTR":
-                #             datruind = ind__
-                #     print(lbl_seqs[datruind])
                 if tune_bert:
                     seq_lengths = [len(s) for s in seqs]
                     seqs = [" ".join(r_ for r_ in s) for s in seqs]
@@ -1042,13 +1043,15 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 if tune_bert:
                     seq_lengths = [len(s) for s in seqs]
                     seqs = [" ".join(r_ for r_ in s) for s in seqs]
-                    inputs = model.tokenizer.batch_encode_plus(seqs,
+                    cut_seqs = [" ".join(r_ for r_ in s) for s in cut_seqs] if cut_seqs is not None else None
+                    inputs = model.tokenizer.batch_encode_plus(cut_seqs if augment_trimmed_seqs else seqs,
                                                                add_special_tokens=model.hparams.special_tokens,
                                                                padding=True,
                                                                truncation=True,
                                                                max_length=model.hparams.max_length)
                     inputs['targets'] = lbl_seqs
                     inputs['seq_lengths'] = seq_lengths
+                    inputs['sequences'] = seqs if augment_trimmed_seqs else None
                     logits = model(**inputs)
                 else:
                     logits = model(seqs, lbl_seqs)

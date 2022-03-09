@@ -629,7 +629,7 @@ class ProtBertClassifier(pl.LightningModule):
         return mask
 
     def forward(self, input_ids, token_type_ids, attention_mask, target_positions=None, return_embeddings=False,
-                targets=None, seq_lengths=None, v=False):
+                targets=None, seq_lengths=None, v=False,sequences=None):
         """ Usual pytorch forward function.
         :param tokens: text sequences [batch_size x src_seq_len]
         :param lengths: source lengths [batch_size]
@@ -638,11 +638,13 @@ class ProtBertClassifier(pl.LightningModule):
         """
         input_ids = torch.tensor(input_ids, device=self.device)
         inp_seqs = []
-        for inp in input_ids:
-            inp_seqs.append("".join([self.aaind2lblvocab[i_] for i_ in inp.detach().cpu().numpy()]).replace("[PAD]", ""))
+        if sequences is not None:
+            inp_seqs = [s.replace(" ", "") for s in sequences]
+        else:
+            for inp in input_ids:
+                inp_seqs.append("".join([self.aaind2lblvocab[i_] for i_ in inp.detach().cpu().numpy()]).replace("[PAD]", ""))
         batch_size, seq_dim = input_ids.shape[0], input_ids.shape[1]
         attention_mask = torch.tensor(attention_mask, device=self.device)
-        input_ids.requires_grad=True
         word_embeddings = self.ProtBertBFD(input_ids,
                                            attention_mask)[0]
         if return_embeddings:
