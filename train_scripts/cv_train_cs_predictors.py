@@ -65,7 +65,7 @@ def generate_square_subsequent_mask(sz):
     return mask
 
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
-                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False):
+                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=True):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -129,7 +129,9 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                                                            max_length=model.hparams.max_length)
                 input_ids = torch.tensor(inputs['input_ids'], device=model.device)
                 attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
-                memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
+                # memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
+                memory_bfd = model(input_ids=input_ids, attention_mask=attention_mask,
+                                   token_type_ids=inputs['token_type_ids'],return_embeddings=True)[0]
                 if not model.classification_head.train_only_decoder:
                     memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
                 else:
@@ -226,6 +228,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     out = out.transpose(0, 1)
                     prob = model.classification_head.generator(out[:, -1])
                     all_outs.append(out[:, -1])
+                prob[0,0,0].backward()
+                print(input_ids.grad)
             else:
                 out = model.decode(ys, memory.to(device), tgt_mask.to(device))
                 out = out.transpose(0, 1)
@@ -1242,8 +1246,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     model.classification_head = classification_head
     model.to(device)
     # model = load_model(model_f_name, dict_file=None)
-    model.load_state_dict(load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True))
-
+    model.load_state_dict(load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True).state_dict())
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=50, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
