@@ -1304,11 +1304,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                      linear_pos_enc=False, scale_input=False,
                                      tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                      tune_bert=tune_bert, train_only_decoder=True)
-    model = ProtBertClassifier(hparams)
-    model.classification_head = classification_head
-    model.to(device)
-    # model = load_model(model_f_name, dict_file=None)
-    model.load_state_dict(load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True).state_dict())
+    model = load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=5, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
