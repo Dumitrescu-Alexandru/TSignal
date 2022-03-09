@@ -1245,9 +1245,9 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         for ind, (seq_, pred_) in enumerate(zip(seqs_, outs[1])):
             pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
             if "S" in pred_string:
-                print(torch.sum(torch.abs(grads[ind * batch_s][ind]), dim=-1))
+                print(torch.sum(torch.abs(grads[ind * batch_s][0][ind]), dim=-1))
                 cs_pred = pred_string.rfind("S") + 1
-                print(torch.sum(torch.abs(grads[ind * batch_s + cs_pred][ind]), dim=-1))
+                print(torch.sum(torch.abs(grads[ind * batch_s + cs_pred][0][ind]), dim=-1))
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
