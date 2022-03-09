@@ -228,7 +228,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     out = out.transpose(0, 1)
                     prob = model.classification_head.generator(out[:, -1])
                     all_outs.append(out[:, -1])
-                prob[0,0,0].backward()
+                prob[0,0].backward()
                 print(input_ids.grad)
             else:
                 out = model.decode(ys, memory.to(device), tgt_mask.to(device))
