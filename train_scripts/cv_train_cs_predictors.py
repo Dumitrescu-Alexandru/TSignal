@@ -1268,15 +1268,13 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                     gather_10[2] += 1
                 print(ind, len(grads), cs_pred, batch_s)
                 seq_preds_grad_CSgrad.append((seq_, pred_string,
-                                              torch.sum(torch.abs(grads[ind][0][ind]), dim=-1).detach().cpu().numpy(),
-                                              torch.sum(torch.abs(grads[batch_s * cs_pred + ind][0][ind]), dim=-1).detach().cpu().numpy()))
+                                              torch.sum(torch.abs(grads[ind][ind]), dim=-1).detach().cpu().numpy(),
+                                              torch.sum(torch.abs(grads[batch_s * cs_pred + ind][ind]), dim=-1).detach().cpu().numpy()))
             if sum(gather_10) >= 30:
                 pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds.bin", "wb"))
                 print("Finished extracting. Exiting.")
                 exit(0)
         pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds_{}.bin".format(batch_index_), "wb"))
-        print("Finished extracting. Exiting.")
-        exit(0)
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
 
     hparams.train_enc_dec_sp6 = True
