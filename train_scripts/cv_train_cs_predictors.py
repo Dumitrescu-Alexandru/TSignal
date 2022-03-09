@@ -1240,10 +1240,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             pos_fp_info.extend(false_positives)
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False):
-    def visualize_importance(outs, grads, seqs_):
+    def visualize_importance(outs, grads, seqs_, ind2lbl_):
         batch_s = len(seqs_)
         for ind, (seq_, pred_) in enumerate(zip(seqs_, outs[1])):
-            pred_string = "".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred_])
+            pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
             if "S" in pred_string:
                 print(torch.sum(torch.abs(grads[ind * batch_s][ind]), dim=-1))
                 cs_pred = pred_string.rfind("S") + 1
@@ -1282,13 +1282,13 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                                  batch_size=50, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
     seqs, some_output = [], []
+    ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     for batch in dataset_loader:
         seqs, lbl_seqs, _, glbl_lbls = batch
         some_output, input_gradients = greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
-        visualize_importance(some_output, input_gradients, seqs)
-    ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
+        visualize_importance(some_output, input_gradients, seqs, ind2lbl)
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
