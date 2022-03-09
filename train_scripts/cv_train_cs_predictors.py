@@ -1257,7 +1257,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         for ind, (seq_, pred_) in enumerate(zip(seqs_, outs[1])):
             pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
             if "S" in pred_string[:-1] and gather_10[0] < 10 or "L" in pred_string and gather_10[1] < 10 or "T" in pred_string and gather_10[2] < 10:
-                if "S" in pred_string:
+                if "S" in pred_string[:-1]:
                     cs_pred = pred_string[:-1].rfind("S") + 1
                     gather_10[0] += 1
                 elif "L" in pred_string:

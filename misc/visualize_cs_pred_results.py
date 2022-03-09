@@ -2912,7 +2912,22 @@ def compare_experiment_results():
 
     plt.show()
 
+def visualize_inp_gradients():
+    preds_and_probs = pickle.load(open("input_gradients_for_cs_preds_0.bin", "rb"))
+    letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
+    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
+        if lbls[0] in letter2type.keys():
+            plt.bar(list(range(len(seq))), spCSgrds)
+            plt.xticks(list(range(len(seq))), ["{}\n{}".format(s,l) for s,l in zip(seq, lbls)])
+            plt.title(letter2type[lbls[0]] + " cleavage site")
+            plt.show()
+            plt.bar(list(range(len(seq))), spTypeGrds)
+            plt.xticks(list(range(len(seq))), ["{}\n{}".format(s,l) for s,l in zip(seq, lbls)])
+            plt.title(letter2type[lbls[0]] + " sp type")
+            plt.show()
+
 if __name__ == "__main__":
+    visualize_inp_gradients()
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_only_decoder_4l/",
                                             compare_mdl_plots=False,
