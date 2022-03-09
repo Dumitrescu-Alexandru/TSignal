@@ -1243,6 +1243,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             pos_fp_info.extend(false_positives)
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False):
+    sp_data = SPCSpredictionData(form_sp_reg_data=False)
+    # hard-code this for now to check some sequences
+    test_file = "sp6_partitioned_data_train_1.bin"
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file, pick_seqs=True)
     gather_10 = [0, 0, 0]
     sp_type_letters = ["S","L","T"]
     seq_preds_grad_CSgrad =  []
@@ -1270,11 +1275,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         print("Finished extracting. Exiting.")
         exit(0)
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
-    sp_data = SPCSpredictionData(form_sp_reg_data=False)
-    # hard-code this for now to check some sequences
-    test_file = "sp6_partitioned_data_sublbls_test_1.bin"
-    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file, pick_seqs=True)
+
     hparams.train_enc_dec_sp6 = True
     hparams.use_glbl_lbls = False
     lg2ind = sp_data.lg2ind
@@ -1304,6 +1305,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=50, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
+    print(len(dataset_loader))
     seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     for ind, batch in enumerate(dataset_loader):

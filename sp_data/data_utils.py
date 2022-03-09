@@ -373,19 +373,21 @@ class CSPredsDataset(Dataset):
             self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
             self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
         if pick_seqs:
+            ind2lbl = {v:k for k,v in lbl2inds.items()}
             gather_SLT = [0,0,0]
             new_s,new_l,new_lg, new_gl = [],[],[],[]
             for s, l, lg, gl in zip(self.seqs, self.lbls, self.life_grp, self.glbl_lbl):
-                if "S" in l[:-1] and gather_SLT[0] < 3 or "T" in l[:-1] and gather_SLT[2] < 3 or "L" in l[:-1] and gather_SLT[1] < 3:
+                act_lbl = "".join([ind2lbl[l_] for l_ in l])
+                if "S" in act_lbl[:-1] and gather_SLT[0] < 3 or "T" in act_lbl[:-1] and gather_SLT[2] < 3 or "L" in act_lbl[:-1] and gather_SLT[1] < 3:
                     new_s.append(s)
                     new_l.append(l)
                     new_lg.append(lg)
                     new_gl.append(gl)
-                    if "S" in l[:-1]:
+                    if "S" in act_lbl[:-1]:
                         gather_SLT[0]+=1
-                    if "L" in l[:-1]:
+                    if "L" in act_lbl[:-1]:
                         gather_SLT[1] +=1
-                    if "T" in l[:-1]:
+                    if "T" in act_lbl[:-1]:
                         gather_SLT[2] += 1
                 if sum(gather_SLT) >= 9:
                     self.seqs = new_s
