@@ -1250,16 +1250,16 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         batch_s = len(seqs_)
         for ind, (seq_, pred_) in enumerate(zip(seqs_, outs[1])):
             pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
-            if "S" in pred_string and gather_10[0] < 10 or "L" in pred_string and gather_10[1] < 10 or "T" in pred_string and gather_10[2] < 10:
+            if "S" in pred_string[:-1] and gather_10[0] < 10 or "L" in pred_string and gather_10[1] < 10 or "T" in pred_string and gather_10[2] < 10:
                 if "S" in pred_string:
-                    cs_pred = pred_string[:1].rfind("S") + 1
+                    cs_pred = pred_string[:-1].rfind("S") + 1
                 elif "L" in pred_string:
-                    cs_pred = pred_string[:1].rfind("L") + 1
+                    cs_pred = pred_string[:-1].rfind("L") + 1
                 elif "T" in pred_string:
-                    cs_pred = pred_string[:1].rfind("T") + 1
+                    cs_pred = pred_string[:-1].rfind("T") + 1
                 seq_preds_grad_CSgrad.append((seq_, pred_string,
-                                              torch.sum(torch.abs(grads[ind * batch_s + ind][0][ind]), dim=-1).detach().cpu().numpy(),
-                                              torch.sum(torch.abs(grads[ind * batch_s + cs_pred + ind][0][ind]), dim=-1).detach().cpu().numpy()))
+                                              torch.sum(torch.abs(grads[ind][0][ind]), dim=-1).detach().cpu().numpy(),
+                                              torch.sum(torch.abs(grads[batch_s * cs_pred + ind][0][ind]), dim=-1).detach().cpu().numpy()))
                 sp_l_index = int("SSS" in pred_string) + int("L" in pred_string) * 2 + int("T" in pred_string) * 3
                 gather_10[sp_l_index]  += 1
             if sum(gather_10) >= 30:
