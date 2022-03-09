@@ -348,7 +348,7 @@ class SPCSpredictionData:
 class CSPredsDataset(Dataset):
     def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True, sets=["train", "test"],
                  test_f_name="", form_sp_reg_data=False, tuned_bert_embs_prefix="", extended_sublbls=False, random_folds_prefix="",
-                 train_on_subset=1.):
+                 train_on_subset=1., pick_seqs=False):
         extended_pref = "extended_" if extended_sublbls else ""
         self.life_grp, self.seqs, self.lbls, self.glbl_lbl = [], [], [], []
         if partitions is not None:
@@ -372,6 +372,26 @@ class CSPredsDataset(Dataset):
             self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
             self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
             self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
+        if pick_seqs:
+            gather_SLT = [0,0,0]
+            new_s,new_l,new_lg, new_gl = [],[],[],[]
+            for s, l, lg, gl in zip(self.seqs, self.lbls, self.life_grp, self.glbl_lbl):
+                if "S" in l[:-1] and gather_SLT[0] < 3 or "T" in l[:-1] and gather_SLT[2] < 3 or "L" in l[:-1] and gather_SLT[1] < 3:
+                    new_s.append(s)
+                    new_l.append(l)
+                    new_lg.append(lg)
+                    new_gl.append(gl)
+                    if "S" in l[:-1]:
+                        gather_SLT[0]+=1
+                    if "L" in l[:-1]:
+                        gather_SLT[1] +=1
+                    if "T" in l[:-1]:
+                        gather_SLT[2] += 1
+                if sum(gather_SLT) >= 9:
+                    self.seqs = new_s
+                    self.lbls = new_l
+                    self.life_grp = new_lg
+                    self.glbl_lbl = new_gl
 
     def __len__(self):
         return len(self.seqs)

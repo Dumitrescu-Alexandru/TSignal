@@ -1266,12 +1266,15 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                 pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds.bin", "wb"))
                 print("Finished extracting. Exiting.")
                 exit(0)
+        pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds.bin", "wb"))
+        print("Finished extracting. Exiting.")
+        exit(0)
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
     # hard-code this for now to check some sequences
     test_file = "sp6_partitioned_data_sublbls_test_1.bin"
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file)
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file, pick_seqs=True)
     hparams.train_enc_dec_sp6 = True
     hparams.use_glbl_lbls = False
     lg2ind = sp_data.lg2ind
@@ -1304,7 +1307,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     for ind, batch in enumerate(dataset_loader):
-        print("{} number of batches our of {} tested".format(len(batch) * ind, len(batch)*len(dataset_loader)))
+        print("{} number of seqs out of {} tested".format(len(batch) * ind, len(batch)*len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
         some_output, input_gradients = greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
