@@ -83,6 +83,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     all_outs_2nd_mdl = []
     glbl_labels = None
     retain_grads = []
+    sp_predicted_batch_elements = []
+    sp_pred_inds_CS_spType = []
     if saliency_map:
         def hook_(self, grad_inp, grad_out):
             retain_grads.append((grad_out[0].cpu()))
@@ -246,10 +248,20 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 # print("doing the backward pass...")
                 for batch_ind in range(prob.shape[0]):
                     max_ind = torch.argmax(prob[batch_ind])
-                    model.zero_grad()
-                    model.ProtBertBFD.zero_grad()
-                    model.classification_head.zero_grad()
-                    prob[batch_ind,max_ind].backward(retain_graph=True)
+                    if ind2lbl[max_ind] in ["S", "T", "L"] :
+                        if i == start_ind:
+                            sp_predicted_batch_elements.append(batch_ind)
+                            model.zero_grad()
+                            model.ProtBertBFD.zero_grad()
+                            model.classification_head.zero_grad()
+                            prob[batch_ind, max_ind].backward(retain_graph=True)
+                            sp_pred_inds_CS_spType.append(str(batch_ind) + "_spType")
+                    elif ind2lbl[max_ind] not in ["S", "T", "L"] and batch_ind in sp_predicted_batch_elements:
+                        model.zero_grad()
+                        model.ProtBertBFD.zero_grad()
+                        model.classification_head.zero_grad()
+                        prob[batch_ind, max_ind].backward(retain_graph=True)
+                        sp_pred_inds_CS_spType.append(str(batch_ind) + "_csPred")
                 # print("did the backward pass")
             else:
                 out = model.decode(ys, memory.to(device), tgt_mask.to(device))
@@ -346,11 +358,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         if saliency_map:
 
             return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits,
-                    glbl_labels), retain_grads
+                    glbl_labels), retain_grads, sp_pred_inds_CS_spType
         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
                glbl_labels
     if saliency_map:
-        return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits), retain_grads
+        return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits), retain_grads, sp_pred_inds_CS_spType
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 
 
@@ -1252,28 +1264,19 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     gather_10 = [0, 0, 0]
     sp_type_letters = ["S","L","T"]
     seq_preds_grad_CSgrad =  []
-    def visualize_importance(outs, grads, seqs_, ind2lbl_, batch_index_):
-        batch_s = len(seqs_)
-        for ind, (seq_, pred_) in enumerate(zip(seqs_, outs[1])):
+    corresponding_grads = {}
+    def visualize_importance(outs, grads, seqs_, ind2lbl_, batch_index_, sp_pred_inds_CS_spType_):
+        predicted_SPs = []
+        for ind_, elem in enumerate(sp_pred_inds_CS_spType_):
+            predicted_SPs.append(int(elem.split("_")))
+            corresponding_grads[elem] = ind_
+        for pred_sp_ind in predicted_SPs:
+            seq_, pred_ = seqs_[pred_sp_ind], outs[1][pred_sp_ind]
             pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
-            if "S" in pred_string[:-1] and gather_10[0] < 10 or "L" in pred_string and gather_10[1] < 10 or "T" in pred_string and gather_10[2] < 10:
-                if "S" in pred_string[:-1]:
-                    cs_pred = pred_string[:-1].rfind("S") + 1
-                    gather_10[0] += 1
-                elif "L" in pred_string:
-                    cs_pred = pred_string[:-1].rfind("L") + 1
-                    gather_10[1] += 1
-                elif "T" in pred_string:
-                    cs_pred = pred_string[:-1].rfind("T") + 1
-                    gather_10[2] += 1
-                print(ind, len(grads), cs_pred, batch_s)
-                seq_preds_grad_CSgrad.append((seq_, pred_string,
-                                              torch.sum(torch.abs(grads[ind][ind]), dim=-1).detach().cpu().numpy(),
-                                              torch.sum(torch.abs(grads[batch_s * cs_pred + ind][ind]), dim=-1).detach().cpu().numpy()))
-            if sum(gather_10) >= 30:
-                pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds.bin", "wb"))
-                print("Finished extracting. Exiting.")
-                exit(0)
+            grad_ind_spT = corresponding_grads[str(pred_sp_ind)+"_spType"]
+            grad_ind_CS = corresponding_grads[str(pred_sp_ind)+"_csPred"]
+            seq_preds_grad_CSgrad.append((seq, pred_string, torch.sum(torch.abs(grads[grad_ind_spT][pred_sp_ind]), dim=-1).detach().cpu().numpy(),
+                                         torch.sum(torch.abs(grads[grad_ind_CS][pred_sp_ind]), dim=-1).detach().cpu().numpy()))
         pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds_{}.bin".format(batch_index_), "wb"))
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
 
@@ -1312,10 +1315,10 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     for ind, batch in enumerate(dataset_loader):
         print("{} number of seqs out of {} tested".format(len(batch) * ind, len(batch[0])*len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
-        some_output, input_gradients = greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
+        some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
-        visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind)
+        visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType)
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
