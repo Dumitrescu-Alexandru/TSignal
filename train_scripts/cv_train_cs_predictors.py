@@ -1251,7 +1251,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     gather_10 = [0, 0, 0]
     sp_type_letters = ["S","L","T"]
     seq_preds_grad_CSgrad =  []
-    def visualize_importance(outs, grads, seqs_, ind2lbl_):
+    def visualize_importance(outs, grads, seqs_, ind2lbl_, batch_index_):
         batch_s = len(seqs_)
         for ind, (seq_, pred_) in enumerate(zip(seqs_, outs[1])):
             pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
@@ -1271,7 +1271,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                 pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds.bin", "wb"))
                 print("Finished extracting. Exiting.")
                 exit(0)
-        pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds.bin", "wb"))
+        pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds_{}.bin".format(batch_index_), "wb"))
         print("Finished extracting. Exiting.")
         exit(0)
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
@@ -1303,18 +1303,18 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # model = load_model(model_f_name, dict_file=None)
     model.load_state_dict(load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True).state_dict())
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=50, shuffle=True,
+                                                 batch_size=5, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
     print(len(dataset_loader))
     seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     for ind, batch in enumerate(dataset_loader):
-        print("{} number of seqs out of {} tested".format(len(batch) * ind, len(batch)*len(dataset_loader)))
+        print("{} number of seqs out of {} tested".format(len(batch) * ind, len(batch[0])*len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
         some_output, input_gradients = greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
-        visualize_importance(some_output, input_gradients, seqs, ind2lbl)
+        visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind)
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
