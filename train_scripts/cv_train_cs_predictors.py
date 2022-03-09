@@ -90,7 +90,12 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         def hook_(self, grad_inp, grad_out):
             retain_grads.append((grad_out[0].cpu()))
 
-        model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
+        # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
+        # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
+        model.ProtBertBFD.encoder.register_backward_hook(hook_)
+        # for n, p in model.ProtBertBFD.named_modules():
+        #     print(n)
+        # exit(1)
         # model.ProtBertBFD.embeddings.word_embeddings.register_forward_hook(hook_)
         if tune_bert:
             seq_lengths = [len(s) for s in src]
@@ -1280,7 +1285,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
             grad_ind_CS = corresponding_grads[str(pred_sp_ind)+"_csPred"]
             seq_preds_grad_CSgrad.append((seq_, pred_string, torch.sum(torch.abs(grads[grad_ind_spT][pred_sp_ind]), dim=-1).detach().cpu().numpy(),
                                          torch.sum(torch.abs(grads[grad_ind_CS][pred_sp_ind]), dim=-1).detach().cpu().numpy()))
-        pickle.dump(seq_preds_grad_CSgrad, open("input_gradients_for_cs_preds_{}.bin".format(batch_index_), "wb"))
+        pickle.dump(seq_preds_grad_CSgrad, open("using_bert_grds_input_gradients_for_cs_preds_{}.bin".format(batch_index_), "wb"))
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
 
     hparams.train_enc_dec_sp6 = True
