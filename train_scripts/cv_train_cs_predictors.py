@@ -1266,6 +1266,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                 elif "T" in pred_string:
                     cs_pred = pred_string[:-1].rfind("T") + 1
                     gather_10[2] += 1
+                print(ind, len(grads), cs_pred, batch_s)
                 seq_preds_grad_CSgrad.append((seq_, pred_string,
                                               torch.sum(torch.abs(grads[ind][0][ind]), dim=-1).detach().cpu().numpy(),
                                               torch.sum(torch.abs(grads[batch_s * cs_pred + ind][0][ind]), dim=-1).detach().cpu().numpy()))
