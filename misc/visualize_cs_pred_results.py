@@ -2913,6 +2913,12 @@ def compare_experiment_results():
     plt.show()
 
 def visualize_inp_gradients():
+    folder = get_data_folder()
+    seq2lbls = {}
+    for i in [0,1,2]:
+        for t in ["train", "test"]:
+            a = pickle.load(open(folder+"random_folds_sp6_partitioned_data_{}_{}.bin".format(t,i), "rb"))
+            seq2lbls.update({seq:lbls[1] for seq,lbls in a.items()})
     preds_and_probs = pickle.load(open("input_gradients_for_cs_preds_0.bin", "rb"))
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
@@ -2920,12 +2926,13 @@ def visualize_inp_gradients():
             l_ = lbls[:len(seq)]
             spCSgrds = spCSgrds[:len(seq)]
             spTypeGrds = spTypeGrds[:len(seq)]
+            true_lbl = seq2lbls[seq]
             plt.bar(list(range(len(seq))), spCSgrds)
-            plt.xticks(list(range(len(seq))), ["{}\n{}".format(s,l) for s,l in zip(seq, l_)])
+            plt.xticks(list(range(len(seq))), ["{}\n{}\n{}".format(s,l,tl) for s,l,tl in zip(seq, l_, true_lbl)])
             plt.title(letter2type[l_[0]] + " cleavage site")
             plt.show()
             plt.bar(list(range(len(seq))), spTypeGrds)
-            plt.xticks(list(range(len(seq))), ["{}\n{}".format(s,l) for s,l in zip(seq, l_)])
+            plt.xticks(list(range(len(seq))), ["{}\n{}\n{}".format(s,l,tl) for s,l,tl in zip(seq, l_, true_lbl)])
             plt.title(letter2type[l_[0]] + " sp type")
             plt.show()
 

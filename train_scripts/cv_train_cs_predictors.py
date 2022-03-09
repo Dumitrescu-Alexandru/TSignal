@@ -1312,12 +1312,13 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     for ind, batch in enumerate(dataset_loader):
-        print("{} number of seqs out of {} tested".format(len(batch) * ind, len(batch[0])*len(dataset_loader)))
-        seqs, lbl_seqs, _, glbl_lbls = batch
-        some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
-                                            form_sp_reg_data=False, second_model=None, test_only_cs=False,
-                                                     glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
-        visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType)
+        if ind == 1:
+            print("{} number of seqs out of {} tested".format(len(batch) * ind, len(batch[0])*len(dataset_loader)))
+            seqs, lbl_seqs, _, glbl_lbls = batch
+            some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
+                                                form_sp_reg_data=False, second_model=None, test_only_cs=False,
+                                                         glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
+            visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType)
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
