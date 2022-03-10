@@ -98,8 +98,6 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         # for n, p in model.ProtBertBFD.named_modules():
         #     print(n)
         # exit(1)
-        handle = model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
-
         # model.ProtBertBFD.embeddings.word_embeddings.register_forward_hook(hook_)
         if tune_bert:
             seq_lengths = [len(s) for s in src]
@@ -374,13 +372,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                               second_model.glbl_generator(
                                   torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1), dim=-1)
         if saliency_map:
-            handle.remove()
             return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits,
                     glbl_labels), retain_grads, sp_pred_inds_CS_spType
         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
                glbl_labels
     if saliency_map:
-        handle.remove()
         return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits), retain_grads, sp_pred_inds_CS_spType
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 
@@ -1285,9 +1281,9 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file)
     gather_10 = [0, 0, 0]
     sp_type_letters = ["S","L","T"]
-    seq_preds_grad_CSgrad =  []
     corresponding_grads = {}
     def visualize_importance(outs, grads, seqs_, ind2lbl_, batch_index_, sp_pred_inds_CS_spType_):
+        seq_preds_grad_CSgrad = []
         predicted_SPs = []
         for ind_, elem in enumerate(sp_pred_inds_CS_spType_):
             predicted_SPs.append(int(elem.split("_")[0]))
