@@ -1324,7 +1324,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                      tune_bert=tune_bert, train_only_decoder=True)
     model = load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=30, shuffle=False,
+                                                 batch_size=10, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
     print(len(dataset_loader))
     seqs, some_output = [], []
@@ -1338,8 +1338,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
         all_seq_preds_grad_CSgrad.extend(visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
 
-    pickle.dump(seq_preds_grad_CSgrad,
-                open("using_posEncOut_grds_input_gradients_for_cs_preds_{}.bin".format(batch_index_), "wb"))
+    pickle.dump(all_seq_preds_grad_CSgrad,
+                open("using_posEncOut_grds_input_gradients_for_cs_preds.bin", "wb"))
 
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
