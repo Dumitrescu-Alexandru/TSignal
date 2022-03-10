@@ -1282,8 +1282,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file)
     gather_10 = [0, 0, 0]
     sp_type_letters = ["S","L","T"]
-    corresponding_grads = {}
     def visualize_importance(outs, grads, seqs_, ind2lbl_, batch_index_, sp_pred_inds_CS_spType_):
+        corresponding_grads = {}
         seq_preds_grad_CSgrad = []
         predicted_SPs = []
         for ind_, elem in enumerate(sp_pred_inds_CS_spType_):
