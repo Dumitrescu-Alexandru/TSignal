@@ -98,7 +98,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         # for n, p in model.ProtBertBFD.named_modules():
         #     print(n)
         # exit(1)
-        handle = model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
+        model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
 
         # model.ProtBertBFD.embeddings.word_embeddings.register_forward_hook(hook_)
         if tune_bert:
@@ -374,13 +374,12 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                               second_model.glbl_generator(
                                   torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1), dim=-1)
         if saliency_map:
-            handle.remove()
+
             return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits,
                     glbl_labels), retain_grads, sp_pred_inds_CS_spType
         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
                glbl_labels
     if saliency_map:
-        handle.remove()
         return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits), retain_grads, sp_pred_inds_CS_spType
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 
@@ -1304,9 +1303,28 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
 
     hparams.train_enc_dec_sp6 = True
     hparams.use_glbl_lbls = False
+    lg2ind = sp_data.lg2ind
+    aa2ind = None
+    tuned_bert_embs_prefix = ""
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    # form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False
+    # the form_sp_reg_data param is used to both denote teh RR/C... usage and usually had a mandatory glbl label
+    # in the SP-cs. The current experiment however tests no-glbl-cs tuning
+    classification_head = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
+                                     dropout=0.1, use_glbl_lbls=False,
+                                     no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
+                                     ff_dim=4096, nlayers=3, nheads=16, train_oh=False, aa2ind=aa2ind,
+                                     glbl_lbl_version=1,
+                                     form_sp_reg_data=False,
+                                     version2_agregation="max", input_drop=False,
+                                     no_pos_enc=False,
+                                     linear_pos_enc=False, scale_input=False,
+                                     tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                                     tune_bert=tune_bert, train_only_decoder=True)
     model = load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=2, shuffle=False,
+                                                 batch_size=10, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
     print(len(dataset_loader))
     seqs, some_output = [], []
@@ -1317,8 +1335,6 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
             break
         print("{} number of seqs out of {} tested".format(ind, len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
-        seqs, lbl_seqs, _, glbl_lbls = [seqs[1], seqs[0]], [lbl_seqs[1],lbl_seqs[0]], _, [glbl_lbls[1],glbl_lbls[0]]
-
         some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
