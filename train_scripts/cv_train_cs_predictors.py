@@ -264,13 +264,13 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                             model.zero_grad()
                             model.ProtBertBFD.zero_grad()
                             model.classification_head.zero_grad()
-                            if ind2lbl[max_ind] == 'T':
-                                prob[batch_ind,max_ind]/(prob[batch_ind,lbl2ind['S']] +
-                                                         prob[batch_ind,lbl2ind['L']] +
-                                                         prob[batch_ind,lbl2ind['W']] +
-                                                         prob[batch_ind,lbl2ind['P']]).backward(retain_graph=True)
-                            else:
-                                prob[batch_ind, max_ind].backward(retain_graph=True)
+                            # if ind2lbl[max_ind] == 'T':
+                            #     prob[batch_ind,max_ind]/(prob[batch_ind,lbl2ind['S']] +
+                            #                              prob[batch_ind,lbl2ind['L']] +
+                            #                              prob[batch_ind,lbl2ind['W']] +
+                            #                              prob[batch_ind,lbl2ind['P']]).backward(retain_graph=True)
+                            # else:
+                            prob[batch_ind, max_ind].backward(retain_graph=True)
                             sp_pred_inds_CS_spType.append(str(batch_ind) + "_spType")
                     elif ind2lbl[max_ind] not in ["S", "T", "L"] and batch_ind in sp_predicted_batch_elements \
                             and batch_ind not in sp_predicted_batch_elements_extracated_cs:

@@ -2922,6 +2922,7 @@ def visualize_inp_gradients():
     preds_and_probs_BERT = pickle.load(open("using_bert_grds_input_gradients_for_cs_preds_1.bin", "rb"))
     preds_and_probs_IEPE = pickle.load(open("using_posEncOut_grds_input_gradients_for_cs_preds_1.bin", "rb"))
     preds_and_probs_IE = pickle.load(open("input_gradients_for_cs_preds_1.bin", "rb"))
+    preds_and_probs_IE_seetAT = pickle.load(open("see_tat_using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     labels = ['input embs', 'IE + PE', 'BERT']
@@ -2929,7 +2930,7 @@ def visualize_inp_gradients():
 
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IEPE:
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_BERT:
-    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IEPE:
+    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IE_seetAT:
         # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
         if lbls[0] in letter2type.keys():
             l_ = lbls[:len(seq)]
