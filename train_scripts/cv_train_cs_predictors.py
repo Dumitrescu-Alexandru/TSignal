@@ -94,7 +94,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         # exit(1)
         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
-        # model.ProtBertBFD.encoder.register_backward_hook(hook_)
+        model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
         # for n, p in model.ProtBertBFD.named_modules():
         #     print(n)
         # exit(1)
@@ -1308,17 +1308,6 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False
     # the form_sp_reg_data param is used to both denote teh RR/C... usage and usually had a mandatory glbl label
     # in the SP-cs. The current experiment however tests no-glbl-cs tuning
-    classification_head = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
-                                     dropout=0.1, use_glbl_lbls=False,
-                                     no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
-                                     ff_dim=4096, nlayers=3, nheads=16, train_oh=False, aa2ind=aa2ind,
-                                     glbl_lbl_version=1,
-                                     form_sp_reg_data=False,
-                                     version2_agregation="max", input_drop=False,
-                                     no_pos_enc=False,
-                                     linear_pos_enc=False, scale_input=False,
-                                     tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                                     tune_bert=tune_bert, train_only_decoder=True)
     model = load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=6000, shuffle=False,
@@ -1332,7 +1321,6 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         print("{} number of seqs out of {} tested".format(ind, len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
         seqs, lbl_seqs, _, glbl_lbls = [seqs[-1], seqs[-2]], [lbl_seqs[-1],lbl_seqs[-2]], _, [glbl_lbls[-1], glbl_lbls[-2]]
-        exit(1)
         some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
