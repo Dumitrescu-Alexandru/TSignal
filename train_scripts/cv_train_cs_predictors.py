@@ -1321,9 +1321,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                      tune_bert=tune_bert, train_only_decoder=True)
     model = load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=10, shuffle=True,
+                                                 batch_size=6000, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
-    print(len(dataset_loader))
     seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     all_seq_preds_grad_CSgrad = []
@@ -1332,11 +1331,13 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
             break
         print("{} number of seqs out of {} tested".format(ind, len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
+        seqs, lbl_seqs, _, glbl_lbls = [seqs[-1], seqs[-2]], [lbl_seqs[-1],lbl_seqs[-2]], _, [glbl_lbls[-1], glbl_lbls[-2]]
+        exit(1)
         some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
         all_seq_preds_grad_CSgrad.extend(visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
-
+        break
     pickle.dump(all_seq_preds_grad_CSgrad,
                 open("using_posEncOut_grds_input_gradients_for_cs_preds.bin", "wb"))
 
