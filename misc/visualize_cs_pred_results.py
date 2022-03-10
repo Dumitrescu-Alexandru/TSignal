@@ -2919,23 +2919,32 @@ def visualize_inp_gradients():
         for t in ["train", "test"]:
             a = pickle.load(open(folder+"random_folds_sp6_partitioned_data_{}_{}.bin".format(t,i), "rb"))
             seq2lbls.update({seq:lbls[1] for seq,lbls in a.items()})
-    preds_and_probs = pickle.load(open("input_gradients_for_cs_preds_0.bin", "rb"))
-    preds_and_probs = pickle.load(open("using_bert_grds_input_gradients_for_cs_preds_1.bin", "rb"))
+    preds_and_probs_BERT = pickle.load(open("using_bert_grds_input_gradients_for_cs_preds_1.bin", "rb"))
+    preds_and_probs_IEPE = pickle.load(open("using_posEncOut_grds_input_gradients_for_cs_preds_1.bin", "rb"))
+    preds_and_probs_IE = pickle.load(open("input_gradients_for_cs_preds_1.bin", "rb"))
+    all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
-    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
+    labels = ['input embs', 'IE + PE', 'BERT']
+    # for seq_ind in range(8):
+
+    # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IEPE:
+    # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_BERT:
+    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IEPE:
+        # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
         if lbls[0] in letter2type.keys():
             l_ = lbls[:len(seq)]
             spCSgrds = spCSgrds[:len(seq)]
             spTypeGrds = spTypeGrds[:len(seq)]
             true_lbl = seq2lbls[seq]
-            plt.bar(list(range(len(seq))), spCSgrds)
+            plt.bar(list(range(len(seq))), spCSgrds,)
             plt.xticks(list(range(len(seq))), ["{}\n{}\n{}".format(s,l,tl) for s,l,tl in zip(seq, l_, true_lbl)])
             plt.title(letter2type[l_[0]] + " cleavage site")
             plt.show()
             plt.bar(list(range(len(seq))), spTypeGrds)
             plt.xticks(list(range(len(seq))), ["{}\n{}\n{}".format(s,l,tl) for s,l,tl in zip(seq, l_, true_lbl)])
-            plt.title(letter2type[l_[0]] + " sp type")
+            plt.title(letter2type[l_[0]] + " SP type")
             plt.show()
+
 
 if __name__ == "__main__":
     visualize_inp_gradients()

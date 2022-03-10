@@ -95,10 +95,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
         # model.ProtBertBFD.encoder.register_backward_hook(hook_)
-        model.ProtBertBFD.embeddings.position_embeddings.register_backward_hook(hook_)
         # for n, p in model.ProtBertBFD.named_modules():
         #     print(n)
         # exit(1)
+        model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
+
         # model.ProtBertBFD.embeddings.word_embeddings.register_forward_hook(hook_)
         if tune_bert:
             seq_lengths = [len(s) for s in src]
@@ -251,6 +252,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 else:
                     out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
                     out = out.transpose(0, 1)
+                    # TODO what if for TAT I use something like p(TAT)/(p(SP)+p(LIPO)+p(PILIN)+p(TAT/SPII))
                     prob = model.classification_head.generator(out[:, -1])
                     all_outs.append(out[:, -1])
                 # print("doing the backward pass...")
@@ -262,7 +264,13 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                             model.zero_grad()
                             model.ProtBertBFD.zero_grad()
                             model.classification_head.zero_grad()
-                            prob[batch_ind, max_ind].backward(retain_graph=True)
+                            if ind2lbl[max_ind] == 'T':
+                                prob[batch_ind,max_ind]/(prob[batch_ind,lbl2ind['S']] +
+                                                         prob[batch_ind,lbl2ind['L']] +
+                                                         prob[batch_ind,lbl2ind['W']] +
+                                                         prob[batch_ind,lbl2ind['P']]).backward(retain_graph=True)
+                            else:
+                                prob[batch_ind, max_ind].backward(retain_graph=True)
                             sp_pred_inds_CS_spType.append(str(batch_ind) + "_spType")
                     elif ind2lbl[max_ind] not in ["S", "T", "L"] and batch_ind in sp_predicted_batch_elements \
                             and batch_ind not in sp_predicted_batch_elements_extracated_cs:
@@ -1322,13 +1330,12 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     for ind, batch in enumerate(dataset_loader):
-        if ind == 1:
-            print("{} number of seqs out of {} tested".format(len(batch) * ind, len(batch[0])*len(dataset_loader)))
-            seqs, lbl_seqs, _, glbl_lbls = batch
-            some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
-                                                form_sp_reg_data=False, second_model=None, test_only_cs=False,
-                                                         glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
-            visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType)
+        print("{} number of seqs out of {} tested".format(len(batch) * ind, len(batch[0])*len(dataset_loader)))
+        seqs, lbl_seqs, _, glbl_lbls = batch
+        some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
+                                            form_sp_reg_data=False, second_model=None, test_only_cs=False,
+                                                     glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
+        visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType)
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
