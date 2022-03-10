@@ -95,7 +95,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
         # model.ProtBertBFD.encoder.register_backward_hook(hook_)
-        model.ProtBertBFD.position_embeddings.register_backward_hook(hook_)
+        model.ProtBertBFD.embeddings.position_embeddings.register_backward_hook(hook_)
         # for n, p in model.ProtBertBFD.named_modules():
         #     print(n)
         # exit(1)
