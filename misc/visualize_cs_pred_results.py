@@ -2919,7 +2919,7 @@ def visualize_inp_gradients():
         for t in ["train", "test"]:
             a = pickle.load(open(folder+"random_folds_sp6_partitioned_data_{}_{}.bin".format(t,i), "rb"))
             seq2lbls.update({seq:lbls[1] for seq,lbls in a.items()})
-    preds_and_probs = pickle.load(open("input_gradients_for_cs_preds_1.bin", "rb"))
+    preds_and_probs = pickle.load(open("input_gradients_for_cs_preds_0.bin", "rb"))
     preds_and_probs = pickle.load(open("using_bert_grds_input_gradients_for_cs_preds_1.bin", "rb"))
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
@@ -2939,6 +2939,12 @@ def visualize_inp_gradients():
 
 if __name__ == "__main__":
     visualize_inp_gradients()
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_augment_CutSeq_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_only_decoder_4l/",
                                             compare_mdl_plots=False,
