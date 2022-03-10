@@ -1274,6 +1274,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             pos_fp_info.extend(false_positives)
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False):
+    folder = get_data_folder()
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
     # hard-code this for now to check some sequences
     test_file = "sp6_partitioned_data_train_1.bin"
@@ -1323,7 +1324,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
         all_seq_preds_grad_CSgrad.extend(visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
     pickle.dump(all_seq_preds_grad_CSgrad,
-                open("using_posEncOut_grds_input_gradients_for_cs_preds.bin", "wb"))
+                open(folder+"using_posEncOut_grds_input_gradients_for_cs_preds.bin", "wb"))
 
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
