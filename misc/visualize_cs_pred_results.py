@@ -2911,7 +2911,14 @@ def compare_experiment_results():
     # fig.patches.append(tri)
 
     plt.show()
-
+def sanity_check(a, b):
+    dict_a = {a_[0]:[a_[1],a_[2],a_[3]] for a_ in a}
+    for elem in b:
+        if elem[0] in dict_a:
+            if sum(dict_a[elem[0]][-1] - elem[-1]) != 0 or sum(dict_a[elem[0]][-2] - elem[-2]) != 0:
+                print("elem")
+    print("Welp... :/")
+    exit(1)
 def visualize_inp_gradients():
     folder = get_data_folder()
     seq2lbls = {}
@@ -2924,15 +2931,17 @@ def visualize_inp_gradients():
     preds_and_probs_IE = pickle.load(open("input_gradients_for_cs_preds_1.bin", "rb"))
     preds_and_probs_IE_seetAT = pickle.load(open("see_tat_using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
     preds_and_probs_IE_seetLOTTASEQS = pickle.load(open("using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
+    preds_and_probs_IE_seetLOTTASEQS_sanityCheck = pickle.load(open("repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     labels = ['input embs', 'IE + PE', 'BERT']
+    # sanity_check(preds_and_probs_IE_seetLOTTASEQS,preds_and_probs_IE_seetLOTTASEQS_sanityCheck)
     # for seq_ind in range(8):
 
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IEPE:
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_BERT:
     normalized_C_cs_values_pm_5aas = []
-    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IE_seetLOTTASEQS:
+    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IE_seetLOTTASEQS_sanityCheck:
         # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
         # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
         #     true_lbl = seq2lbls[seq]
@@ -2948,6 +2957,17 @@ def visualize_inp_gradients():
                 normalized_C_cs_values_pm_5aas.append(normalized_C_cs_values[cs_pred-5:cs_pred+7])
     print(np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
     plt.bar(list(range(12)), np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
+    plt.show()
+    normalized_Tat_values = []
+    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IE_seetLOTTASEQS_sanityCheck:
+        if lbls[0] == "T" and seq2lbls[seq][0] == "T":
+            if "RR" in seq[:lbls.rfind("T")]:
+                rr_seq = seq.find("RR")
+                normalized_C_cs_values = np.array(spTypeGrds) / np.sum(spTypeGrds)
+                print(rr_seq)
+                if 5<rr_seq <10:
+                    normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+7])
+    plt.bar(list(range(12)), np.mean(np.stack(normalized_Tat_values), axis=0))
     plt.show()
     exit(1)
     plt.bar(list(range(len(seq))), spCSgrds,)
