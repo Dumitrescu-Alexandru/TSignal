@@ -1324,13 +1324,15 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                      tune_bert=tune_bert, train_only_decoder=True)
     model = load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=10, shuffle=False,
+                                                 batch_size=10, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
     print(len(dataset_loader))
     seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     all_seq_preds_grad_CSgrad = []
     for ind, batch in enumerate(dataset_loader):
+        if ind >= len(dataset_loader)/2:
+            break
         print("{} number of seqs out of {} tested".format(ind, len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
         some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
