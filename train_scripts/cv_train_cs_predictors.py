@@ -1331,7 +1331,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     all_seq_preds_grad_CSgrad = []
     for ind, batch in enumerate(dataset_loader):
-        if ind >= len(dataset_loader)/2:
+        if ind >= len(dataset_loader)/10:
             break
         print("{} number of seqs out of {} tested".format(ind, len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
