@@ -94,7 +94,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         # exit(1)
         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
-        model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
+        handle = model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
         # for n, p in model.ProtBertBFD.named_modules():
         #     print(n)
         # exit(1)
@@ -372,11 +372,13 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                               second_model.glbl_generator(
                                   torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1), dim=-1)
         if saliency_map:
+            handle.remove()
             return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits,
                     glbl_labels), retain_grads, sp_pred_inds_CS_spType
         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
                glbl_labels
     if saliency_map:
+        handle.remove()
         return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits), retain_grads, sp_pred_inds_CS_spType
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 
@@ -1326,13 +1328,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
         all_seq_preds_grad_CSgrad.extend(visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
-        if len(all_seq_preds_grad_CSgrad) > 10:
-
-            pickle.dump(all_seq_preds_grad_CSgrad,
-                        open(folder+"using_posEncOut_grds_input_gradients_for_cs_preds_{}.bin".format(save_index), "wb"))
-            save_index+=1
-            all_seq_preds_grad_CSgrad = []
-
+    pickle.dump(all_seq_preds_grad_CSgrad,
+                open(folder+"using_posEncOut_grds_input_gradients_for_cs_preds_{}.bin".format(save_index), "wb"))
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
