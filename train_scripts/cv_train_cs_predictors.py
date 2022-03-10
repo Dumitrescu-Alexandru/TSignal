@@ -1281,7 +1281,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # hard-code this for now to check some sequences
     test_file = "sp6_partitioned_data_train_1.bin"
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file, pick_seqs=True)
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file)
     gather_10 = [0, 0, 0]
     sp_type_letters = ["S","L","T"]
     seq_preds_grad_CSgrad =  []
@@ -1298,7 +1298,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
             grad_ind_CS = corresponding_grads[str(pred_sp_ind)+"_csPred"]
             seq_preds_grad_CSgrad.append((seq_, pred_string, torch.sum(torch.abs(grads[grad_ind_spT][pred_sp_ind]), dim=-1).detach().cpu().numpy(),
                                          torch.sum(torch.abs(grads[grad_ind_CS][pred_sp_ind]), dim=-1).detach().cpu().numpy()))
-        pickle.dump(seq_preds_grad_CSgrad, open("using_posEncOut_grds_input_gradients_for_cs_preds_{}.bin".format(batch_index_), "wb"))
+        return seq_preds_grad_CSgrad
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
 
     hparams.train_enc_dec_sp6 = True
@@ -1324,18 +1324,23 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                      tune_bert=tune_bert, train_only_decoder=True)
     model = load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=5, shuffle=False,
+                                                 batch_size=30, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
     print(len(dataset_loader))
     seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
+    all_seq_preds_grad_CSgrad = []
     for ind, batch in enumerate(dataset_loader):
-        print("{} number of seqs out of {} tested".format(len(batch) * ind, len(batch[0])*len(dataset_loader)))
+        print("{} number of seqs out of {} tested".format(ind, len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
         some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
-        visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType)
+        all_seq_preds_grad_CSgrad.extend(visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
+
+    pickle.dump(seq_preds_grad_CSgrad,
+                open("using_posEncOut_grds_input_gradients_for_cs_preds_{}.bin".format(batch_index_), "wb"))
+
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
