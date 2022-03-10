@@ -2923,6 +2923,7 @@ def visualize_inp_gradients():
     preds_and_probs_IEPE = pickle.load(open("using_posEncOut_grds_input_gradients_for_cs_preds_1.bin", "rb"))
     preds_and_probs_IE = pickle.load(open("input_gradients_for_cs_preds_1.bin", "rb"))
     preds_and_probs_IE_seetAT = pickle.load(open("see_tat_using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
+    preds_and_probs_IE_seetLOTTASEQS = pickle.load(open("using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     labels = ['input embs', 'IE + PE', 'BERT']
@@ -2930,9 +2931,32 @@ def visualize_inp_gradients():
 
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IEPE:
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_BERT:
-    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IE_seetAT:
+    normalized_C_cs_values_pm_5aas = []
+    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IE_seetLOTTASEQS:
         # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
-        if lbls[0] in letter2type.keys():
+        # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
+        #     true_lbl = seq2lbls[seq]
+        #     print(lbls[lbls.rfind("L") + 1])
+        #     print(seq)
+        #     print(lbls)
+        #     print(true_lbl)
+        if lbls[0] == "L" and seq2lbls[seq][0] == "L":
+            normalized_C_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
+            # normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spCSgrds)
+            cs_pred = lbls.rfind("L")
+            if 5 < cs_pred < len(lbls) - 5:
+                normalized_C_cs_values_pm_5aas.append(normalized_C_cs_values[cs_pred-5:cs_pred+7])
+    print(np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
+    plt.bar(list(range(12)), np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
+    plt.show()
+    exit(1)
+    plt.bar(list(range(len(seq))), spCSgrds,)
+    plt.xticks(list(range(len(seq))), ["{}\n{}\n{}".format(s,l,tl) for s,l,tl in zip(seq, l_, true_lbl)])
+    plt.title(letter2type[l_[0]] + " cleavage site")
+    plt.show()
+    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IE_seetLOTTASEQS:
+        # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
+        if lbls[0] in ["L", "T"]:#letter2type.keys():
             l_ = lbls[:len(seq)]
             spCSgrds = spCSgrds[:len(seq)]
             spTypeGrds = spTypeGrds[:len(seq)]

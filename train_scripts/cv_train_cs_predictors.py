@@ -1291,6 +1291,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         for ind_, elem in enumerate(sp_pred_inds_CS_spType_):
             predicted_SPs.append(int(elem.split("_")[0]))
             corresponding_grads[elem] = ind_
+        # pred_sp_ind selects the grad from batch_size dimension [batch_size, 70,1024] (gradients contain all batch
+        # elements, gradients wrt o other batch elems are 0 for the corresp seq)
         for pred_sp_ind in predicted_SPs:
             seq_, pred_ = seqs_[pred_sp_ind], outs[1][pred_sp_ind]
             pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
@@ -1313,15 +1315,13 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # in the SP-cs. The current experiment however tests no-glbl-cs tuning
     model = load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=10, shuffle=True,
+                                                 batch_size=10, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
     seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     all_seq_preds_grad_CSgrad = []
     save_index = 0
     for ind, batch in enumerate(dataset_loader):
-        if ind >= len(dataset_loader)/2:
-            break
         print("{} number of seqs out of {} tested".format(ind, len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
         some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
@@ -1329,7 +1329,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
         all_seq_preds_grad_CSgrad.extend(visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
     pickle.dump(all_seq_preds_grad_CSgrad,
-                open(folder+"using_posEncOut_grds_input_gradients_for_cs_preds_{}.bin".format(save_index), "wb"))
+                open(folder+"repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds_{}.bin".format(save_index), "wb"))
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
