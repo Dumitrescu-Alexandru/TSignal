@@ -2933,6 +2933,7 @@ def visualize_inp_gradients():
     preds_and_probs_IE_seetLOTTASEQS = pickle.load(open("using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
     preds_and_probs_IE_seetLOTTASEQS_sanityCheck = pickle.load(open("repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
     preds_and_probs_IE_seetLOTTASEQS_BertOutGrds = pickle.load(open("change_enc_repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds.bin", "rb"))
+    letsee = pickle.load(open("save.bin", "rb"))
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     labels = ['input embs', 'IE + PE', 'BERT']
@@ -2943,6 +2944,7 @@ def visualize_inp_gradients():
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_BERT:
     normalized_C_cs_values_pm_5aas = []
     tobetestd = preds_and_probs_IE_seetLOTTASEQS_BertOutGrds
+    tobetestd = letsee
     # tobetestd = preds_and_probs_IE_seetLOTTASEQS_sanityCheck
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
         # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:

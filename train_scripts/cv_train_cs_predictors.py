@@ -65,7 +65,8 @@ def generate_square_subsequent_mask(sz):
     return mask
 
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
-                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False):
+                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False,
+                  hook_layer="bert"):
     # model.ProtBertBFD.requires_grad=True
     if saliency_map:
         model.requires_grad=True
@@ -95,8 +96,10 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         # exit(1)
         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
         handle = model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
-        # handle = model.ProtBertBFD.encoder.register_backward_hook(hook_)
-        # model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
+        if hook_layer == "bert":
+            handle = model.ProtBertBFD.encoder.register_backward_hook(hook_)
+        else:
+            model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
         # for n, p in model.ProtBertBFD.named_modules():
         #     print(n)
         # exit(1)
@@ -1277,7 +1280,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             pos_fp_info = total_positives
             pos_fp_info.extend(false_positives)
 
-def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin"):
+def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert"):
     folder = get_data_folder()
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
     # hard-code this for now to check some sequences
@@ -1328,7 +1331,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         seqs, lbl_seqs, _, glbl_lbls = batch
         some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
-                                                     glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
+                                                     glbl_lbls=None, tune_bert=tune_bert, saliency_map=True,
+                                                                            hook_layer="bert")
         all_seq_preds_grad_CSgrad.extend(visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
     pickle.dump(all_seq_preds_grad_CSgrad,
                 open(folder+saliency_map_save_fn, "wb"))
