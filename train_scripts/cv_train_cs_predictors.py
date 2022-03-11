@@ -99,7 +99,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         if hook_layer == "bert":
             handle = model.ProtBertBFD.encoder.register_backward_hook(hook_)
         else:
-            model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
+            handle = model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
         # for n, p in model.ProtBertBFD.named_modules():
         #     print(n)
         # exit(1)
