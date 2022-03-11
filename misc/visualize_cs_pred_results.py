@@ -2944,7 +2944,18 @@ def visualize_inp_gradients():
     inpEncOut_word_embs = pickle.load(open("full_emb_grads_simpler_model_fold_1.bin", "rb"))
     actualBERToutPUT_2lModel = pickle.load(open("actualBERToutPUT_2lModel.bin", "rb"))
     actualBERToutPUT_3lModel = pickle.load(open("actualBERToutPUT_3lModel.bin", "rb"))
-    repeat_actualBERToutPUT_2lModel = pickle.load(open("repeat_actualBERToutPUT_2lModel.bin", "rb"))
+    repeat_actualBERToutPUT_2lModel_fold1 = pickle.load(open("repeat_actualBERToutPUT_2lModel.bin", "rb"))
+    repeat_actualBERToutPUT_2lModel_fold2 = pickle.load(open("repeat_actualBERToutPUT_2lModel_fold2.bin", "rb"))
+    repeat_actualBERToutPUT_2lModel_fold0 = pickle.load(open("repeat_actualBERToutPUT_2lModel_fold0.bin", "rb"))
+    repeat_actualBERToutPUT_3lModel_fold1 = pickle.load(open("3l_bert_embs.bin", "rb"))
+    deployment_mdl3l = pickle.load(open("test_depl_mdl.bin", "rb"))
+    actualBERToutPUT_4lModel = pickle.load(open("actualBERToutPUT_4lModel.bin", "rb"))
+    test_depl_mdl_bertEmbs = pickle.load(open("test_depl_mdl_bertEmbs.bin", "rb"))
+    noPosEncmdl = pickle.load(open("noPosEncmdl.bin", "rb"))
+    mdlStillTraining1l = pickle.load(open("1lmdlStillTraining.bin", "rb"))
+    mdlStillTraining2ndsave1l = pickle.load(open("1lmdlStillTraining2ndsave.bin", "rb"))
+    mdlStillTraining3rd1l = pickle.load(open("1lmdlStillTraining3rd.bin", "rb"))
+    mdlStillTraining4th1l = pickle.load(open("1lmdlStillTraining4th.bin", "rb"))
 
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
@@ -2966,7 +2977,50 @@ def visualize_inp_gradients():
     tobetestd = actualBERToutPUT_2lModel
     tobetestd = actualBERToutPUT_2lModel
     # tobetestd = actualBERToutPUT_3lModel
-    tobetestd = repeat_actualBERToutPUT_2lModel
+    tobetestd = actualBERToutPUT_4lModel
+    tobetestd = repeat_actualBERToutPUT_2lModel_fold2
+    tobetestd.extend(repeat_actualBERToutPUT_2lModel_fold1)
+    tobetestd.extend(repeat_actualBERToutPUT_2lModel_fold0)
+    tobetestd = deployment_mdl3l
+    tobetestd = noPosEncmdl
+    tobetestd = mdlStillTraining1l
+    tobetestd = mdlStillTraining2ndsave1l
+    tobetestd = mdlStillTraining3rd1l
+    tobetestd = mdlStillTraining4th1l
+    # tobetestd = test_depl_mdl_bertEmbs
+    # tobetestd = repeat_actualBERToutPUT_3lModel_fold1
+    #
+    # tobetestd = simpler_layer_norm_word_embs
+    norm_values = np.zeros(150)
+    counts = np.zeros(150)
+    normalized_Tat_values = []
+    motif_test = "FLK"
+    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
+        if lbls[0] == "T" and seq2lbls[seq][0] == "T":
+            if motif_test in seq[:lbls.rfind("T")] and seq[-3+seq.find(motif_test):+seq.find(motif_test)-1] == "RR":
+                rr_seq = seq.find(motif_test)
+                normalized_C_cs_values = np.array(spTypeGrds) / np.sum(spTypeGrds)
+                # if 5<rr_seq <10:
+                #     normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+27])
+                norm_values[75-rr_seq:75+len(seq)-rr_seq]+=normalized_C_cs_values
+                counts[75-rr_seq:75+len(seq)-rr_seq]+= np.ones(len(seq))
+    start_ind, end_ind = 0, 0
+    for i in range(150):
+        if norm_values[i] != 0 and start_ind==0:
+            start_ind = i
+        elif norm_values[i] == 0 and start_ind != 0 and end_ind == 0:
+            end_ind = i-1
+    normalized_Tat_values = norm_values[start_ind:end_ind]/counts[start_ind:end_ind]
+    xticks_str = " "*(75-start_ind - 3) + "RRXFLK" + " "* (len(normalized_Tat_values)- 75 + start_ind - 3)
+    xticks = [s for s in xticks_str]
+    motif_pos = xticks_str.find("RRXFLK")
+    plt.bar(range(len(normalized_Tat_values))[:motif_pos], normalized_Tat_values[:motif_pos], color='#1f77b4')
+    plt.bar(range(len(normalized_Tat_values))[motif_pos:motif_pos+6], normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
+    plt.bar(range(len(normalized_Tat_values))[motif_pos+6:], normalized_Tat_values[motif_pos+6:], color='#1f77b4')
+    plt.xticks(list(range(len(normalized_Tat_values))), xticks)
+    print(np.mean(np.stack(normalized_Tat_values), axis=0))
+    print(len(normalized_Tat_values))
+    plt.show()
     # tobetestd = simpler_mdl_word_embs
     # tobetestd = bert_embs_test
     # tobetestd = preds_and_probs_IE_seetLOTTASEQS_sanityCheck
@@ -2984,10 +3038,10 @@ def visualize_inp_gradients():
             cs_pred = lbls.rfind("L") + 1
             if 5 < cs_pred < len(lbls) - 5:
                 normalized_C_cs_values_pm_5aas.append(normalized_C_cs_values[cs_pred-5:cs_pred+7])
-    print(np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
     plt.bar(list(range(12)), np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
     plt.title("sec/SPII cleavage site")
     plt.show()
+    exit(1)
 
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
         # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
@@ -3005,6 +3059,7 @@ def visualize_inp_gradients():
                 if len(normalized_secSPI_cs_values[cs_pred-10:cs_pred+7]) != 12:
                     print(cs_pred, lbls)
                 normalized_secSPI_cs_values_pm_5aas.append(normalized_secSPI_cs_values[cs_pred-10:cs_pred+7])
+    print(len(normalized_secSPI_cs_values_pm_5aas))
     plt.bar(list(range(17)), np.mean(np.stack(normalized_secSPI_cs_values_pm_5aas), axis=0))
     plt.title("sec/SPI comparison CS comparison")
     plt.show()
@@ -3025,21 +3080,10 @@ def visualize_inp_gradients():
     plt.title("sec/SPI comparison SPtype comparison")
     plt.show()
 
-    normalized_Tat_values = []
-    motif_test = "FLK"
-    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
-        if lbls[0] == "T" and seq2lbls[seq][0] == "T":
-            if motif_test in seq[:lbls.rfind("T")]:
-                rr_seq = seq.find(motif_test)
-                normalized_C_cs_values = np.array(spTypeGrds) / np.sum(spTypeGrds)
-                print(rr_seq)
-                if 5<rr_seq <10:
-                    normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+27])
-    plt.bar(list(range(20+12)), np.mean(np.stack(normalized_Tat_values), axis=0))
-    plt.xticks(list(range(20+12)), [" ", " ", "R", "R", "X", "F", "L", "K"] + 24 * [" "])
-    print(np.mean(np.stack(normalized_Tat_values), axis=0))
-    plt.show()
-    exit(1)
+
+
+
+
     plt.bar(list(range(len(seq))), spCSgrds,)
     plt.xticks(list(range(len(seq))), ["{}\n{}\n{}".format(s,l,tl) for s,l,tl in zip(seq, l_, true_lbl)])
     plt.title(letter2type[l_[0]] + " cleavage site")
@@ -3062,8 +3106,23 @@ def visualize_inp_gradients():
 
 
 if __name__ == "__main__":
-    visualize_inp_gradients()
-
+    # visualize_inp_gradients()
+    #
+    # visualize_validation(run="repeat_only_decoder_", folds=[0, 1],
+    #                      folder="tuning_bert_repeat_only_decoder_/")
+    #tuning_bert_repeat_only_decoder_
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder_1l/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder_2l/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_repeat_only_decoder_/",
                                             compare_mdl_plots=False,

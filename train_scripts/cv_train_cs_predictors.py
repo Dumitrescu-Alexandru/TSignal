@@ -71,6 +71,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     if saliency_map:
         model.requires_grad=True
         model.unfreeze_encoder()
+    model.eval()
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -107,9 +108,9 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             handle = model.classification_head.transformer.decoder[-2].register_backward_hook(hook_)
         else:
             handle = model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
-        for n, p in model.ProtBertBFD.named_modules():
-            print(n)
-        exit(1)
+        # for n, p in model.ProtBertBFD.named_modules():
+        #     print(n)
+        # exit(1)
         # model.ProtBertBFD.embeddings.word_embeddings.register_forward_hook(hook_)
         if tune_bert:
             seq_lengths = [len(s) for s in src]
@@ -237,7 +238,6 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 current_ys[-1].append(next_word[bach_ind])
         ys = current_ys
         start_ind = 1
-    model.eval()
     if not tune_bert and not train_oh:
         model.glbl_generator.eval()
     all_probs = []
@@ -1306,12 +1306,15 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         # pred_sp_ind selects the grad from batch_size dimension [batch_size, 70,1024] (gradients contain all batch
         # elements, gradients wrt o other batch elems are 0 for the corresp seq)
         for pred_sp_ind in predicted_SPs:
-            seq_, pred_ = seqs_[pred_sp_ind], outs[1][pred_sp_ind]
-            pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
-            grad_ind_spT = corresponding_grads[str(pred_sp_ind)+"_spType"]
-            grad_ind_CS = corresponding_grads[str(pred_sp_ind)+"_csPred"]
-            seq_preds_grad_CSgrad.append((seq_, pred_string, torch.sum(torch.abs(grads[grad_ind_spT][pred_sp_ind]), dim=-1).detach().cpu().numpy(),
-                                         torch.sum(torch.abs(grads[grad_ind_CS][pred_sp_ind]), dim=-1).detach().cpu().numpy()))
+            # one single case with SP but no CS prediction was found
+            if str(pred_sp_ind) + "_spType" in corresponding_grads and str(
+                    pred_sp_ind) + "_csPred" in corresponding_grads:
+                seq_, pred_ = seqs_[pred_sp_ind], outs[1][pred_sp_ind]
+                pred_string = "".join([ind2lbl_[torch.argmax(out_wrd).item()] for out_wrd in pred_])
+                grad_ind_spT = corresponding_grads[str(pred_sp_ind)+"_spType"]
+                grad_ind_CS = corresponding_grads[str(pred_sp_ind)+"_csPred"]
+                seq_preds_grad_CSgrad.append((seq_, pred_string, torch.sum(torch.abs(grads[grad_ind_spT][pred_sp_ind]), dim=-1).detach().cpu().numpy(),
+                                             torch.sum(torch.abs(grads[grad_ind_CS][pred_sp_ind]), dim=-1).detach().cpu().numpy()))
         return seq_preds_grad_CSgrad
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
 
