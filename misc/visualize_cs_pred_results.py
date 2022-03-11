@@ -2934,6 +2934,14 @@ def visualize_inp_gradients():
     preds_and_probs_IE_seetLOTTASEQS_sanityCheck = pickle.load(open("repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
     preds_and_probs_IE_seetLOTTASEQS_BertOutGrds = pickle.load(open("change_enc_repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds.bin", "rb"))
     letsee = pickle.load(open("save.bin", "rb"))
+
+
+    bert_embs_test = pickle.load(open("bert_embs_grads_fold_1.bin", "rb"))
+    # word_embs_test seems transh. (no clear C-gradient, no clear FLK motif)
+    word_embs_test = pickle.load(open("word_embs_grads_fold_1.bin", "rb"))
+    layer_norm_word_embs_test = pickle.load(open("ie_plus_pe_embs_grads_fold_1.bin", "rb"))
+
+
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     labels = ['input embs', 'IE + PE', 'BERT']
@@ -2945,6 +2953,9 @@ def visualize_inp_gradients():
     normalized_C_cs_values_pm_5aas = []
     tobetestd = preds_and_probs_IE_seetLOTTASEQS_BertOutGrds
     tobetestd = letsee
+    tobetestd = word_embs_test
+    # tobetestd = layer_norm_word_embs_test
+    # tobetestd = bert_embs_test
     # tobetestd = preds_and_probs_IE_seetLOTTASEQS_sanityCheck
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
         # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
@@ -2957,17 +2968,18 @@ def visualize_inp_gradients():
         if lbls[0] == "L" and seq2lbls[seq][0] == "L":
             normalized_C_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
             # normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spCSgrds)
-            cs_pred = lbls.rfind("L")
+            cs_pred = lbls.rfind("L") + 1
             if 5 < cs_pred < len(lbls) - 5:
                 normalized_C_cs_values_pm_5aas.append(normalized_C_cs_values[cs_pred-5:cs_pred+7])
     print(np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
     plt.bar(list(range(12)), np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
     plt.show()
     normalized_Tat_values = []
+    motif_test = "FLK"
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
         if lbls[0] == "T" and seq2lbls[seq][0] == "T":
-            if "FLK" in seq[:lbls.rfind("T")]:
-                rr_seq = seq.find("FLK")
+            if motif_test in seq[:lbls.rfind("T")]:
+                rr_seq = seq.find(motif_test)
                 normalized_C_cs_values = np.array(spTypeGrds) / np.sum(spTypeGrds)
                 print(rr_seq)
                 if 5<rr_seq <10:

@@ -1333,7 +1333,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                             form_sp_reg_data=False, second_model=None, test_only_cs=False,
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True,
-                                                                            hook_layer="bert")
+                                                                            hook_layer=hook_layer)
         all_seq_preds_grad_CSgrad.extend(visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
     pickle.dump(all_seq_preds_grad_CSgrad,
                 open(folder+saliency_map_save_fn, "wb"))
