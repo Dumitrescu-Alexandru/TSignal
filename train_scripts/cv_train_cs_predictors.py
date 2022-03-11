@@ -103,11 +103,13 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             handle = model.ProtBertBFD.embeddings.register_backward_hook(hook_)
         elif hook_layer == "pos_enc":
             handle = model.ProtBertBFD.embeddings.position_embeddings.register_backward_hook(hook_)
+        elif hook_layer == "classification_layer":
+            handle = model.classification_head.transformer.decoder[-2].register_backward_hook(hook_)
         else:
             handle = model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
-        # for n, p in model.ProtBertBFD.named_modules():
-        #     print(n)
-        # exit(1)
+        for n, p in model.ProtBertBFD.named_modules():
+            print(n)
+        exit(1)
         # model.ProtBertBFD.embeddings.word_embeddings.register_forward_hook(hook_)
         if tune_bert:
             seq_lengths = [len(s) for s in src]

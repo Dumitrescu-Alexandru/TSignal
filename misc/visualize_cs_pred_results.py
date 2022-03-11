@@ -2942,6 +2942,9 @@ def visualize_inp_gradients():
     simpler_mdl_word_embs = pickle.load(open("word_embs_grads_simpler_model_fold_1.bin", "rb"))
     simpler_layer_norm_word_embs = pickle.load(open("layer_norm_grads_simpler_model_fold_1.bin", "rb"))
     inpEncOut_word_embs = pickle.load(open("full_emb_grads_simpler_model_fold_1.bin", "rb"))
+    actualBERToutPUT_2lModel = pickle.load(open("actualBERToutPUT_2lModel.bin", "rb"))
+    actualBERToutPUT_3lModel = pickle.load(open("actualBERToutPUT_3lModel.bin", "rb"))
+    repeat_actualBERToutPUT_2lModel = pickle.load(open("repeat_actualBERToutPUT_2lModel.bin", "rb"))
 
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
@@ -2952,12 +2955,18 @@ def visualize_inp_gradients():
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IEPE:
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_BERT:
     normalized_C_cs_values_pm_5aas = []
+    normalized_secSPI_cs_values_pm_5aas = []
+    normalized_secSPI_sptype_values = []
     tobetestd = preds_and_probs_IE_seetLOTTASEQS_BertOutGrds
     tobetestd = letsee
     tobetestd = word_embs_test
     tobetestd = layer_norm_word_embs_test
     tobetestd = simpler_layer_norm_word_embs
     tobetestd = inpEncOut_word_embs
+    tobetestd = actualBERToutPUT_2lModel
+    tobetestd = actualBERToutPUT_2lModel
+    # tobetestd = actualBERToutPUT_3lModel
+    tobetestd = repeat_actualBERToutPUT_2lModel
     # tobetestd = simpler_mdl_word_embs
     # tobetestd = bert_embs_test
     # tobetestd = preds_and_probs_IE_seetLOTTASEQS_sanityCheck
@@ -2977,7 +2986,45 @@ def visualize_inp_gradients():
                 normalized_C_cs_values_pm_5aas.append(normalized_C_cs_values[cs_pred-5:cs_pred+7])
     print(np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
     plt.bar(list(range(12)), np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
+    plt.title("sec/SPII cleavage site")
     plt.show()
+
+    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
+        # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
+        # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
+        #     true_lbl = seq2lbls[seq]
+        #     print(lbls[lbls.rfind("L") + 1])
+        #     print(seq)
+        #     print(lbls)
+        #     print(true_lbl)
+        if lbls[0] == "S" and seq2lbls[seq][0] == "S":
+            normalized_secSPI_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
+            # normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spCSgrds)
+            cs_pred = lbls[:lbls.find("ES")].rfind("S") + 1
+            if 10 < cs_pred < len(lbls) - 5:
+                if len(normalized_secSPI_cs_values[cs_pred-10:cs_pred+7]) != 12:
+                    print(cs_pred, lbls)
+                normalized_secSPI_cs_values_pm_5aas.append(normalized_secSPI_cs_values[cs_pred-10:cs_pred+7])
+    plt.bar(list(range(17)), np.mean(np.stack(normalized_secSPI_cs_values_pm_5aas), axis=0))
+    plt.title("sec/SPI comparison CS comparison")
+    plt.show()
+
+    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
+        # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
+        # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
+        #     true_lbl = seq2lbls[seq]
+        #     print(lbls[lbls.rfind("L") + 1])
+        #     print(seq)
+        #     print(lbls)
+        #     print(true_lbl)
+        if lbls[0] == "S" and seq2lbls[seq][0] == "S":
+            normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spTypeGrds)
+            cs_pred = lbls[:lbls.find("ES")].rfind("S") + 1
+            normalized_secSPI_sptype_values.append(normalized_C_cs_values[:20])
+    plt.bar(list(range(20)), np.mean(np.stack(normalized_secSPI_sptype_values), axis=0))
+    plt.title("sec/SPI comparison SPtype comparison")
+    plt.show()
+
     normalized_Tat_values = []
     motif_test = "FLK"
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
@@ -2989,6 +3036,8 @@ def visualize_inp_gradients():
                 if 5<rr_seq <10:
                     normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+27])
     plt.bar(list(range(20+12)), np.mean(np.stack(normalized_Tat_values), axis=0))
+    plt.xticks(list(range(20+12)), [" ", " ", "R", "R", "X", "F", "L", "K"] + 24 * [" "])
+    print(np.mean(np.stack(normalized_Tat_values), axis=0))
     plt.show()
     exit(1)
     plt.bar(list(range(len(seq))), spCSgrds,)
