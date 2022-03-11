@@ -2932,6 +2932,7 @@ def visualize_inp_gradients():
     preds_and_probs_IE_seetAT = pickle.load(open("see_tat_using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
     preds_and_probs_IE_seetLOTTASEQS = pickle.load(open("using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
     preds_and_probs_IE_seetLOTTASEQS_sanityCheck = pickle.load(open("repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
+    preds_and_probs_IE_seetLOTTASEQS_BertOutGrds = pickle.load(open("change_enc_repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds.bin", "rb"))
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     labels = ['input embs', 'IE + PE', 'BERT']
@@ -2941,7 +2942,9 @@ def visualize_inp_gradients():
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IEPE:
     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_BERT:
     normalized_C_cs_values_pm_5aas = []
-    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IE_seetLOTTASEQS_sanityCheck:
+    tobetestd = preds_and_probs_IE_seetLOTTASEQS_BertOutGrds
+    # tobetestd = preds_and_probs_IE_seetLOTTASEQS_sanityCheck
+    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
         # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
         # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
         #     true_lbl = seq2lbls[seq]
@@ -2959,15 +2962,15 @@ def visualize_inp_gradients():
     plt.bar(list(range(12)), np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
     plt.show()
     normalized_Tat_values = []
-    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IE_seetLOTTASEQS_sanityCheck:
+    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
         if lbls[0] == "T" and seq2lbls[seq][0] == "T":
-            if "RR" in seq[:lbls.rfind("T")]:
-                rr_seq = seq.find("RR")
+            if "FLK" in seq[:lbls.rfind("T")]:
+                rr_seq = seq.find("FLK")
                 normalized_C_cs_values = np.array(spTypeGrds) / np.sum(spTypeGrds)
                 print(rr_seq)
                 if 5<rr_seq <10:
-                    normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+7])
-    plt.bar(list(range(12)), np.mean(np.stack(normalized_Tat_values), axis=0))
+                    normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+27])
+    plt.bar(list(range(20+12)), np.mean(np.stack(normalized_Tat_values), axis=0))
     plt.show()
     exit(1)
     plt.bar(list(range(len(seq))), spCSgrds,)
@@ -2993,6 +2996,13 @@ def visualize_inp_gradients():
 
 if __name__ == "__main__":
     visualize_inp_gradients()
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat_only_decoder_/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_augment_CutSeq_only_decoder/",
                                             compare_mdl_plots=False,

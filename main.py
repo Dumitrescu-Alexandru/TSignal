@@ -101,6 +101,7 @@ def parse_arguments():
     parser.add_argument("--train_only_decoder", default=False, action="store_true")
     parser.add_argument("--remove_bert_layers", default=0, type=int)
     parser.add_argument("--augment_trimmed_seqs", default=False, action="store_true")
+    parser.add_argument("--saliency_map_save_fn", default="save.bin", type=str)
 
     return parser.parse_args()
 
@@ -201,7 +202,7 @@ if __name__ == "__main__":
     logging.getLogger('some_logger')
     args = parse_arguments()
     if args.test_seqs:
-        test_seqs_w_pretrained_mdl(args.test_mdl, args.test_seqs, tune_bert=args.tune_bert)
+        test_seqs_w_pretrained_mdl(args.test_mdl, args.test_seqs, tune_bert=args.tune_bert, saliency_map_save_fn=args.saliency_map_save_fn)
     elif args.train_cs_predictor:
         args2 = parse_arguments()
         if not os.path.exists("param_groups_by_id_cs.bin"):

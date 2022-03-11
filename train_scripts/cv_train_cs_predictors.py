@@ -67,8 +67,9 @@ def generate_square_subsequent_mask(sz):
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
                   test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False):
     # model.ProtBertBFD.requires_grad=True
-    model.requires_grad=True
-    model.unfreeze_encoder()
+    if saliency_map:
+        model.requires_grad=True
+        model.unfreeze_encoder()
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -94,6 +95,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         # exit(1)
         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
         handle = model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
+        # handle = model.ProtBertBFD.encoder.register_backward_hook(hook_)
         # model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
         # for n, p in model.ProtBertBFD.named_modules():
         #     print(n)
@@ -1275,7 +1277,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             pos_fp_info = total_positives
             pos_fp_info.extend(false_positives)
 
-def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False):
+def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin"):
     folder = get_data_folder()
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
     # hard-code this for now to check some sequences
@@ -1329,7 +1331,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                                      glbl_lbls=None, tune_bert=tune_bert, saliency_map=True)
         all_seq_preds_grad_CSgrad.extend(visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
     pickle.dump(all_seq_preds_grad_CSgrad,
-                open(folder+"repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds_{}.bin".format(save_index), "wb"))
+                open(folder+saliency_map_save_fn, "wb"))
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
         print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
