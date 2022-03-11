@@ -2937,10 +2937,10 @@ def visualize_inp_gradients():
 
 
     bert_embs_test = pickle.load(open("bert_embs_grads_fold_1.bin", "rb"))
-    # word_embs_test seems transh. (no clear C-gradient, no clear FLK motif)
     word_embs_test = pickle.load(open("word_embs_grads_fold_1.bin", "rb"))
     layer_norm_word_embs_test = pickle.load(open("ie_plus_pe_embs_grads_fold_1.bin", "rb"))
-
+    simpler_mdl_word_embs = pickle.load(open("word_embs_grads_simpler_model_fold_1.bin", "rb"))
+    simpler_layer_norm_word_embs = pickle.load(open("layer_norm_grads_simpler_model_fold_1.bin", "rb"))
 
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
@@ -2954,7 +2954,9 @@ def visualize_inp_gradients():
     tobetestd = preds_and_probs_IE_seetLOTTASEQS_BertOutGrds
     tobetestd = letsee
     tobetestd = word_embs_test
-    # tobetestd = layer_norm_word_embs_test
+    tobetestd = layer_norm_word_embs_test
+    tobetestd = simpler_layer_norm_word_embs
+    # tobetestd = simpler_mdl_word_embs
     # tobetestd = bert_embs_test
     # tobetestd = preds_and_probs_IE_seetLOTTASEQS_sanityCheck
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
