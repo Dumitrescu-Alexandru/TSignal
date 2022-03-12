@@ -2956,7 +2956,20 @@ def visualize_inp_gradients():
     mdlStillTraining2ndsave1l = pickle.load(open("1lmdlStillTraining2ndsave.bin", "rb"))
     mdlStillTraining3rd1l = pickle.load(open("1lmdlStillTraining3rd.bin", "rb"))
     mdlStillTraining4th1l = pickle.load(open("1lmdlStillTraining4th.bin", "rb"))
+    only_decFullEmb2l = pickle.load(open("2lonly_decFullEmb.bin", "rb"))
+    repeat_the_good_one_on_full_embs = pickle.load(open("repeat_the_good_one_on_full_embs.bin", "rb"))
+    repeat_the_good_one_on_bert = pickle.load(open("repeat_the_good_one_on_bert.bin", "rb"))
+    trained_grads_on_bert3l = pickle.load(open("3ltrained_grads_on_bert.bin", "rb"))
 
+    trained_grads_on_bert3lfold_1 = pickle.load(open("3ltrained_grads_on_bert.bin", "rb"))
+    trained_grads_on_bert3l_fold0 = pickle.load(open("3ltrained_grads_on_bert_fold0.bin", "rb"))
+    trained_grads_on_bert3l_fold2 = pickle.load(open("3ltrained_grads_on_bert_fold2.bin", "rb"))
+    ongoing3lrunfold1 = pickle.load(open("ongoing3lrunfold1.bin", "rb"))
+    save_hopefullyCorrect_onlyDECmdl_bert_embs_fold1 = pickle.load(open("save_hopefullyCorrect_onlyDECmdl_bert_embs_fold1.bin", "rb"))
+    idkanymore = pickle.load(open("idkanymore.bin", "rb"))
+    ongoing3lrunfold1_2ndsave = pickle.load(open("ongoing3lrunfold1_2ndsave.bin", "rb"))
+    ongoing3lrunfold2 = pickle.load(open("ongoing3lrunfold2_1ndsave.bin", "rb"))
+    ongoing3lrunfold0 = pickle.load(open("ongoing3lrunfold0_1ndsave.bin", "rb"))
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     labels = ['input embs', 'IE + PE', 'BERT']
@@ -2979,31 +2992,86 @@ def visualize_inp_gradients():
     # tobetestd = actualBERToutPUT_3lModel
     tobetestd = actualBERToutPUT_4lModel
     tobetestd = repeat_actualBERToutPUT_2lModel_fold2
-    tobetestd.extend(repeat_actualBERToutPUT_2lModel_fold1)
-    tobetestd.extend(repeat_actualBERToutPUT_2lModel_fold0)
     tobetestd = deployment_mdl3l
     tobetestd = noPosEncmdl
     tobetestd = mdlStillTraining1l
     tobetestd = mdlStillTraining2ndsave1l
     tobetestd = mdlStillTraining3rd1l
     tobetestd = mdlStillTraining4th1l
+    tobetestd = only_decFullEmb2l
+    # tobetestd = repeat_actualBERToutPUT_2lModel_fold1
     # tobetestd = test_depl_mdl_bertEmbs
     # tobetestd = repeat_actualBERToutPUT_3lModel_fold1
-    #
+    # print(len(set([repeat_actualBERToutPUT_2lModel_fold2_[0] for repeat_actualBERToutPUT_2lModel_fold2_ in repeat_actualBERToutPUT_2lModel_fold2])))
+    # print(len(set([repeat_actualBERToutPUT_2lModel_fold1_[0] for repeat_actualBERToutPUT_2lModel_fold1_ in repeat_actualBERToutPUT_2lModel_fold1])))
+    # print(len(set([only_decFullEmb2l_[0] for only_decFullEmb2l_ in only_decFullEmb2l])))
+    # print(len(only_decFullEmb2l), only_decFullEmb2l[0][0], only_decFullEmb2l[1][0])
+    # exit(1)
+    # tobetestd = repeat_actualBERToutPUT_2lModel_fold2
+    # tobetestd.extend(repeat_actualBERToutPUT_2lModel_fold1)
+    # tobetestd = repeat_actualBERToutPUT_2lModel_fold2
+    tobetestd = repeat_actualBERToutPUT_2lModel_fold1.copy()
+    # tobetestd = repeat_actualBERToutPUT_2lModel_fold0.copy()
+    # tobetestd = repeat_actualBERToutPUT_2lModel_fold2.copy()
+    # tobetestd.extend(repeat_actualBERToutPUT_2lModel_fold0)
+    # tobetestd.extend(repeat_actualBERToutPUT_2lModel_fold2)
+    # tobetestd = trained_grads_on_bert3lfold_1.copy()
+    # tobetestd.extend(trained_grads_on_bert3l_fold0)
+    # tobetestd.extend(trained_grads_on_bert3l_fold2)
+    # tobetestd = trained_grads_on_bert3l_fold2
+    # tobetestd = trained_grads_on_bert3l_fold0
+    # tobetestd = trained_grads_on_bert3lfold_1.copy()
+
+
+    # tobetestd = trained_grads_on_bert3l
+    # tobetestd = repeat_actualBERToutPUT_2lModel_fold0
+    # tobetestd = repeat_actualBERToutPUT_2lModel_fold1.copy()
+
+    # tobetestd = repeat_the_good_one_on_full_embs
+    # tobetestd = repeat_the_good_one_on_bert
+    # tobetestd = repeat_actualBERToutPUT_2lModel_fold1
+
+    # tobetestd = repeat_actualBERToutPUT_2lModel_fold0
+    tobetestd = save_hopefullyCorrect_onlyDECmdl_bert_embs_fold1
+    tobetestd = ongoing3lrunfold1
+    tobetestd = ongoing3lrunfold1
+    tobetestd = ongoing3lrunfold2.copy()
+    tobetestd.extend(ongoing3lrunfold1_2ndsave)
+    tobetestd.extend(ongoing3lrunfold2)
+    # tobetestd = ongoing3lrunfold0
+    # tobetestd = idkanymore
+    ss = set()
+    tbt = []
+    for s, a1,a2,a3 in tobetestd:
+        if s not in ss:
+            tbt.append((s,a1,a2,a3))
+            ss.add(s)
+    tobetestd = tbt
     # tobetestd = simpler_layer_norm_word_embs
     norm_values = np.zeros(150)
     counts = np.zeros(150)
+    norm_values_sp1 = np.zeros(60)
+    counts_sp1 = 0
+    norm_values_sp2 = np.zeros(60)
+    counts_sp2 = 0
     normalized_Tat_values = []
     motif_test = "FLK"
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
-        if lbls[0] == "T" and seq2lbls[seq][0] == "T":
-            if motif_test in seq[:lbls.rfind("T")] and seq[-3+seq.find(motif_test):+seq.find(motif_test)-1] == "RR":
+        if lbls[0] == "T":# and seq2lbls[seq][0] == "T":
+            if motif_test in seq[:lbls.rfind("T")]:# and seq[-3+seq.find(motif_test):+seq.find(motif_test)-1] == "RR":
                 rr_seq = seq.find(motif_test)
                 normalized_C_cs_values = np.array(spTypeGrds) / np.sum(spTypeGrds)
                 # if 5<rr_seq <10:
                 #     normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+27])
                 norm_values[75-rr_seq:75+len(seq)-rr_seq]+=normalized_C_cs_values
                 counts[75-rr_seq:75+len(seq)-rr_seq]+= np.ones(len(seq))
+        if lbls[0] == "S" and seq2lbls[seq][0] == "S" and len(seq) >= 60:
+            norm_values_sp1 += np.array(spTypeGrds[:60]) / np.sum(spTypeGrds[:60])
+            counts_sp1 += 1
+        if lbls[0] == "L" and seq2lbls[seq][0] == "L" and len(seq) >= 60:
+            norm_values_sp2 += np.array(spTypeGrds[:60]) / np.sum(spTypeGrds[:60])
+            counts_sp2 +=1
+    print(max(counts))
     start_ind, end_ind = 0, 0
     for i in range(150):
         if norm_values[i] != 0 and start_ind==0:
@@ -3017,9 +3085,24 @@ def visualize_inp_gradients():
     plt.bar(range(len(normalized_Tat_values))[:motif_pos], normalized_Tat_values[:motif_pos], color='#1f77b4')
     plt.bar(range(len(normalized_Tat_values))[motif_pos:motif_pos+6], normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
     plt.bar(range(len(normalized_Tat_values))[motif_pos+6:], normalized_Tat_values[motif_pos+6:], color='#1f77b4')
+    for i in range(60):
+        if i == 0:
+            val = norm_values_sp1[i]/ counts_sp1
+            plt.plot([i-0.5,i+0.5], [val, val], color='green',
+                    label='sp1 comparison')
+        else:
+            val = norm_values_sp1[i]/ counts_sp1
+            plt.plot([i - 0.5, i + 0.5], [val, val] ,color='green')
+    for i in range(60):
+        if i == 0:
+            val = norm_values_sp2[i]/ counts_sp2
+            plt.plot([i-0.5,i+0.5], [val, val], color='black',
+                    label='sp2 comparison')
+        else:
+            val = norm_values_sp2[i]/ counts_sp2
+            plt.plot([i - 0.5, i + 0.5],[val, val], color='black')
+    # plt.bar(range(len(norm_values_sp2)), norm_values_sp2/counts_sp2, alpha=0.3, color='red', label='sp2 comparison')
     plt.xticks(list(range(len(normalized_Tat_values))), xticks)
-    print(np.mean(np.stack(normalized_Tat_values), axis=0))
-    print(len(normalized_Tat_values))
     plt.show()
     # tobetestd = simpler_mdl_word_embs
     # tobetestd = bert_embs_test
@@ -3106,17 +3189,38 @@ def visualize_inp_gradients():
 
 
 if __name__ == "__main__":
-    # visualize_inp_gradients()
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_repeat2_only_decoder/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    #                                         # ,restrict_types=["SP", "NO_SP"])
     #
-    # visualize_validation(run="repeat_only_decoder_", folds=[0, 1],
-    #                      folder="tuning_bert_repeat_only_decoder_/")
-    #tuning_bert_repeat_only_decoder_
+    # exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder_1l/",
+                                            result_folder="tuning_bert_repeat2_onlyDec/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
     exit(1)
+    visualize_inp_gradients()
+    exit(1)
+    #
+    # visualize_validation(run="repeat_only_decoder_", folds=[0, 1],
+    #                      folder="tuning_bert_repeat_only_decoder_/")
+    #tuning_bert_repeat_only_decoder_
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_repeat2l_only_decoder/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_only_decoder_1l/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_only_decoder_2l/",
                                             compare_mdl_plots=False,
