@@ -68,6 +68,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                   test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False,
                   hook_layer="bert"):
     # model.ProtBertBFD.requires_grad=True
+    # onelasttime
     if saliency_map:
         model.requires_grad=True
         model.unfreeze_encoder()
