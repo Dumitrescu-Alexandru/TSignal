@@ -64,337 +64,14 @@ def generate_square_subsequent_mask(sz):
     mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
     return mask
 
-# def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
-#                   test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False,
-#                   hook_layer="bert"):
-#     # model.ProtBertBFD.requires_grad=True
-#     if saliency_map:
-#         model.requires_grad=True
-#         model.unfreeze_encoder()
-#     model.eval()
-#     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
-#     ind2lbl = {v: k for k, v in lbl2ind.items()}
-#     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-#     src = src
-#     seq_lens = [len(src_) for src_ in src]
-#     sp_probs = []
-#     sp_logits = []
-#     all_seq_sp_probs = []
-#     all_seq_sp_logits = []
-#     # used for glbl label version 2
-#     all_outs = []
-#     all_outs_2nd_mdl = []
-#     glbl_labels = None
-#     retain_grads = []
-#     sp_predicted_batch_elements = []
-#     sp_predicted_batch_elements_extracated_cs = []
-#     sp_pred_inds_CS_spType = []
-#     if saliency_map:
-#         def hook_(self, grad_inp, grad_out):
-#             retain_grads.append((grad_out[0].cpu()))
-#         # for n, p in model.ProtBertBFD.named_parameters():
-#         #     print(n)
-#         # exit(1)
-#         # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
-#         if hook_layer == "bert":
-#             handle = model.ProtBertBFD.encoder.register_backward_hook(hook_)
-#         elif hook_layer == "word_embs":
-#             handle = model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
-#         elif hook_layer == "full_emb":
-#             handle = model.ProtBertBFD.embeddings.register_backward_hook(hook_)
-#         elif hook_layer == "pos_enc":
-#             handle = model.ProtBertBFD.embeddings.position_embeddings.register_backward_hook(hook_)
-#         elif hook_layer == "classification_layer":
-#             handle = model.classification_head.transformer.decoder[-2].register_backward_hook(hook_)
-#         else:
-#             handle = model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
-#         # for n, p in model.ProtBertBFD.named_modules():
-#         #     print(n)
-#         # exit(1)
-#         # model.ProtBertBFD.embeddings.word_embeddings.register_forward_hook(hook_)
-#         if tune_bert:
-#             seq_lengths = [len(s) for s in src]
-#             seqs = [" ".join(r_ for r_ in s) for s in src]
-#             inputs = model.tokenizer.batch_encode_plus(seqs,
-#                                                        add_special_tokens=model.hparams.special_tokens,
-#                                                        padding=True,
-#                                                        truncation=True,
-#                                                        max_length=model.hparams.max_length)
-#             input_ids = torch.tensor(inputs['input_ids'], device=model.device)
-#             attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
-#             memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
-#             if not model.classification_head.train_only_decoder:
-#                 memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
-#             else:
-#                 memory = memory_bfd
-#         else:
-#             memory = model.encode(src)
-#         if second_model is not None:
-#             memory_2nd_mdl = model.encode(src)
-#         else:
-#             memory_2nd_mdl = None
-#         if tune_bert and model.classification_head.glbl_lbl_version and model.classification_head.use_glbl_lbls or \
-#                 not tune_bert and model.glbl_lbl_version == 3 and model.use_glbl_lbls:
-#             # when tuning BERT model + TSignal and having a separate classifier for ths SP type which (should) be based
-#             # on the embeddings comming from the BERT model
-#             if test_only_cs:
-#                 batch_size = len(src)
-#                 glbl_labels = torch.zeros(batch_size, 6)
-#                 glbl_labels[list(range(batch_size)), glbl_lbls] = 1
-#                 _, glbl_preds = torch.max(glbl_labels, dim=1)
-#             else:
-#                 if tune_bert:
-#                     glbl_labels = model.classification_head.get_v3_glbl_lbls(memory_bfd, inp_seqs=src)
-#                     _, glbl_preds = torch.max(glbl_labels, dim=1)
-#                 else:
-#                     glbl_labels = model.get_v3_glbl_lbls(src)
-#                     _, glbl_preds = torch.max(glbl_labels, dim=1)
-#     else:
-#         with torch.no_grad():
-#             if tune_bert:
-#                 seq_lengths = [len(s) for s in src]
-#                 seqs = [" ".join(r_ for r_ in s) for s in src]
-#                 inputs = model.tokenizer.batch_encode_plus(seqs,
-#                                                            add_special_tokens=model.hparams.special_tokens,
-#                                                            padding=True,
-#                                                            truncation=True,
-#                                                            max_length=model.hparams.max_length)
-#                 input_ids = torch.tensor(inputs['input_ids'], device=model.device)
-#                 attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
-#                 memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
-#                 # memory_bfd = model(input_ids=input_ids, attention_mask=attention_mask,
-#                 #                    token_type_ids=inputs['token_type_ids'],return_embeddings=True)[0]
-#                 if not model.classification_head.train_only_decoder:
-#                     memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
-#                 else:
-#                     memory = memory_bfd
-#             else:
-#                 memory = model.encode(src)
-#             if second_model is not None:
-#                 memory_2nd_mdl = model.encode(src)
-#             else:
-#                 memory_2nd_mdl = None
-#             if tune_bert and model.classification_head.glbl_lbl_version and model.classification_head.use_glbl_lbls or \
-#                     not tune_bert and model.glbl_lbl_version == 3 and model.use_glbl_lbls:
-#                 # when tuning BERT model + TSignal and having a separate classifier for ths SP type which (should) be based
-#                 # on the embeddings comming from the BERT model
-#                 if test_only_cs:
-#                     batch_size = len(src)
-#                     glbl_labels = torch.zeros(batch_size, 6)
-#                     glbl_labels[list(range(batch_size)), glbl_lbls] = 1
-#                     _, glbl_preds = torch.max(glbl_labels, dim=1)
-#                 else:
-#                     if tune_bert:
-#                         glbl_labels = model.classification_head.get_v3_glbl_lbls(memory_bfd, inp_seqs=src)
-#                         _, glbl_preds = torch.max(glbl_labels, dim=1)
-#                     else:
-#                         glbl_labels = model.get_v3_glbl_lbls(src)
-#                         _, glbl_preds = torch.max(glbl_labels, dim=1)
-#
-#     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
-#     ys = []
-#
-#     if not ys:
-#         for _ in range(len(src)):
-#             ys.append([])
-#     start_ind = 0
-#     # if below condition, then global labels are computed with a separate model. This also affects the first label pred
-#     # of the model predicting the sequence label. Because of this, compute the first predictions first, and take care
-#     # of the glbl label model and sequence-model consistency (e.g. one predicts SP other NO-SP - take care of that)
-#     if glbl_labels is not None:
-#         tgt_mask = (generate_square_subsequent_mask(1))
-#         if tune_bert:
-#             if model.classification_head.train_only_decoder:
-#                 out = model.classification_head.forward_only_decoder(ys, memory.to(device), tgt_mask.to(device))
-#             else:
-#                 out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
-#         else:
-#             out = model.decode(ys, memory.to(device), tgt_mask.to(device))
-#
-#         if tune_bert:
-#             if model.classification_head.train_only_decoder:
-#                 prob = out
-#             else:
-#                 out = out.transpose(0, 1)
-#                 prob = model.classification_head.generator(out[:, -1])
-#         else:
-#             prob = model.generator(out[:, -1])
-#         _, next_words = torch.max(prob, dim=1)
-#         next_word = [nw.item() for nw in next_words]
-#         current_ys = []
-#         # ordered indices of no-sp aa labels O, M, I
-#         ordered_no_sp = [lbl2ind['O'], lbl2ind['M'], lbl2ind['I']]
-#         for bach_ind in range(len(src)):
-#             if ind2glbl_lbl[glbl_preds[bach_ind].item()] == "NO_SP" and ind2lbl[next_word[bach_ind]] == "S":
-#                 max_no_sp = np.argmax([prob[bach_ind][lbl2ind['O']].item(), prob[bach_ind][lbl2ind['M']].item(), prob[bach_ind][lbl2ind['I']].item()])
-#                 current_ys.append(ys[bach_ind])
-#                 current_ys[-1].append(ordered_no_sp[max_no_sp])
-#             elif ind2glbl_lbl[glbl_preds[bach_ind].item()] in ['SP', 'TATLIPO', 'LIPO', 'TAT', 'PILIN'] \
-#                     and ind2lbl[next_word[bach_ind]] != "S":
-#                 current_ys.append(ys[bach_ind])
-#                 current_ys[-1].append(lbl2ind["S"])
-#             else:
-#                 current_ys.append(ys[bach_ind])
-#                 current_ys[-1].append(next_word[bach_ind])
-#         ys = current_ys
-#         start_ind = 1
-#     if not tune_bert and not train_oh:
-#         model.glbl_generator.eval()
-#     all_probs = []
-#     for i in range(start_ind, max(seq_lens) + 1):
-#         if saliency_map:
-#             tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
-#             if second_model is not None:
-#                 out_2nd_mdl = second_model.decode(ys, memory_2nd_mdl.to(device), tgt_mask.to(device))
-#                 out_2nd_mdl = out_2nd_mdl.transpose(0, 1)
-#                 prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
-#                 all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
-#             if tune_bert:
-#                 # for n, p in model.ProtBertBFD.named_parameters():
-#                 #     print(n)
-#                 # exit(1)
-#
-#                 # memory.requires_grad=True
-#                 if model.classification_head.train_only_decoder:
-#                     prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs,
-#                                                                           tgt_mask.to(device))
-#                     prob = prob[-1]
-#                 else:
-#                     out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
-#                     out = out.transpose(0, 1)
-#                     # TODO what if for TAT I use something like p(TAT)/(p(SP)+p(LIPO)+p(PILIN)+p(TAT/SPII))
-#                     prob = model.classification_head.generator(out[:, -1])
-#                     all_outs.append(out[:, -1])
-#                 # print("doing the backward pass...")
-#                 for batch_ind in range(prob.shape[0]):
-#                     max_ind = torch.argmax(prob[batch_ind]).item()
-#                     if ind2lbl[max_ind] in ["S", "T", "L"] :
-#                         if i == start_ind:
-#                             sp_predicted_batch_elements.append(batch_ind)
-#                             model.zero_grad()
-#                             model.ProtBertBFD.zero_grad()
-#                             model.classification_head.zero_grad()
-#                             # if ind2lbl[max_ind] == 'T':
-#                             #     prob[batch_ind,max_ind]/(prob[batch_ind,lbl2ind['S']] +
-#                             #                              prob[batch_ind,lbl2ind['L']] +
-#                             #                              prob[batch_ind,lbl2ind['W']] +
-#                             #                              prob[batch_ind,lbl2ind['P']]).backward(retain_graph=True)
-#                             # else:
-#                             prob[batch_ind, max_ind].backward(retain_graph=True)
-#                             sp_pred_inds_CS_spType.append(str(batch_ind) + "_spType")
-#                     elif ind2lbl[max_ind] not in ["S", "T", "L"] and batch_ind in sp_predicted_batch_elements \
-#                             and batch_ind not in sp_predicted_batch_elements_extracated_cs:
-#                         model.zero_grad()
-#                         model.ProtBertBFD.zero_grad()
-#                         model.classification_head.zero_grad()
-#                         prob[batch_ind, max_ind].backward(retain_graph=True)
-#                         sp_pred_inds_CS_spType.append(str(batch_ind) + "_csPred")
-#                         sp_predicted_batch_elements_extracated_cs.append(batch_ind)
-#                 # print("did the backward pass")
-#             else:
-#                 out = model.decode(ys, memory.to(device), tgt_mask.to(device))
-#                 out = out.transpose(0, 1)
-#                 prob = model.generator(out[:, -1])
-#                 all_outs.append(out[:, -1])
-#         else:
-#             with torch.no_grad():
-#                 tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
-#                 if second_model is not None:
-#                     out_2nd_mdl = second_model.decode(ys, memory_2nd_mdl.to(device), tgt_mask.to(device))
-#                     out_2nd_mdl = out_2nd_mdl.transpose(0, 1)
-#                     prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
-#                     all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
-#                 if tune_bert:
-#                     if model.classification_head.train_only_decoder:
-#                         prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs, tgt_mask.to(device))
-#                         prob = prob[-1]
-#                     else:
-#                         out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
-#                         out = out.transpose(0, 1)
-#                         prob = model.classification_head.generator(out[:, -1])
-#                         all_outs.append(out[:, -1])
-#                 else:
-#                     out = model.decode(ys, memory.to(device), tgt_mask.to(device))
-#                     out = out.transpose(0, 1)
-#                     prob = model.generator(out[:, -1])
-#                     all_outs.append(out[:, -1])
-#
-#         if i == 0 and not form_sp_reg_data:
-#             # extract the sp-presence probabilities
-#             sp_probs = [sp_prb.item() for sp_prb in torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
-#             all_seq_sp_probs = [[sp_prob.item()] for sp_prob in
-#                                 torch.nn.functional.softmax(prob, dim=-1)[:, lbl2ind['S']]]
-#             all_seq_sp_logits = [[sp_prob.item()] for sp_prob in prob[:, lbl2ind['S']]]
-#         elif not form_sp_reg_data:
-#             # used to update the sequences of probabilities
-#             softmax_probs = torch.nn.functional.softmax(prob, dim=-1)
-#             next_sp_probs = softmax_probs[:, lbl2ind['S']]
-#             next_sp_logits = prob[:, lbl2ind['S']]
-#             for seq_prb_ind in range(len(all_seq_sp_probs)):
-#                 all_seq_sp_probs[seq_prb_ind].append(next_sp_probs[seq_prb_ind].item())
-#                 all_seq_sp_logits[seq_prb_ind].append(next_sp_logits[seq_prb_ind].item())
-#         all_probs.append(prob)
-#         if second_model is not None:
-#             probs_fm, next_words_fm = torch.max(torch.nn.functional.softmax(prob, dim=-1), dim=1)
-#             probs_sm, next_words_sm = torch.max(torch.nn.functional.softmax(prob_2nd_mdl, dim=-1), dim=1)
-#             all_probs_mdls = torch.stack([probs_fm, probs_sm])
-#             all_next_w_mdls = torch.stack([next_words_fm, next_words_sm])
-#             if i == 0:
-#                 _, inds = torch.max(all_probs_mdls, dim=0)
-#             next_words = all_next_w_mdls[inds, torch.tensor(list(range(inds.shape[0])))]
-#         else:
-#             _, next_words = torch.max(prob, dim=1)
-#         next_word = [nw.item() for nw in next_words]
-#         current_ys = []
-#         for bach_ind in range(len(src)):
-#             current_ys.append(ys[bach_ind])
-#             current_ys[-1].append(next_word[bach_ind])
-#         ys = current_ys
-#     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-#     if form_sp_reg_data:
-#         glbl_lbl_version, use_glbl_lbls = (model.glbl_lbl_version, model.use_glbl_lbls) if not tune_bert else \
-#             (model.classification_head.glbl_lbl_version, model.classification_head.use_glbl_lbls)
-#         if glbl_lbl_version == 2 and use_glbl_lbls:
-#             if model.version2_agregation == "max":
-#                 glbl_labels = model.glbl_generator(torch.max(torch.stack(all_outs).transpose(0, 1), dim=1)[0])
-#                 if second_model is not None:
-#                     glbl_labels = torch.stack([torch.nn.functional.softmax(glbl_labels, dim=1),
-#                                                torch.nn.functional.softmax(second_model.glbl_generator(
-#                                                    torch.max(torch.stack(all_outs_2nd_mdl).transpose(0, 1), dim=1)[0]),
-#                                                    dim=1)])
-#                     glbl_labels = glbl_labels[inds, torch.tensor(list(range(inds.shape[0]))), :]
-#
-#
-#             elif model.version2_agregation == "avg":
-#                 glbl_labels = model.glbl_generator(torch.mean(torch.stack(all_outs).transpose(0, 1), dim=1))
-#                 if second_model is not None:
-#                     glbl_labels = torch.nn.functional.softmax(glbl_labels) + \
-#                                   torch.nn.functional.softmax(second_model.glbl_generator(
-#                                       torch.mean(torch.stack(all_outs_2nd_mdl).transpose(0, 1), dim=1)), -1)
-#         elif glbl_lbl_version == 1 and use_glbl_lbls:
-#             glbl_labels = model.glbl_generator(memory.transpose(0, 1)[:, 1, :])
-#             if second_model is not None:
-#                 glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
-#                               torch.nn.functional.softmax(
-#                                   second_model.glbl_generator(memory_2nd_mdl.transpose(0, 1)[:, 1, :]), dim=-1)
-#         elif glbl_lbl_version != 3:
-#             glbl_labels = model.glbl_generator(torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1))
-#             if second_model is not None:
-#                 glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
-#                               second_model.glbl_generator(
-#                                   torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1), dim=-1)
-#         if saliency_map:
-#             handle.remove()
-#             return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits,
-#                     glbl_labels), retain_grads, sp_pred_inds_CS_spType
-#         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
-#                glbl_labels
-#     if saliency_map:
-#         handle.remove()
-#         return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits), retain_grads, sp_pred_inds_CS_spType
-#     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
-                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False):
+                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False,
+                  hook_layer="bert"):
+    # model.ProtBertBFD.requires_grad=True
+    if saliency_map:
+        model.requires_grad=True
+        model.unfreeze_encoder()
+    model.eval()
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -408,7 +85,33 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     all_outs = []
     all_outs_2nd_mdl = []
     glbl_labels = None
-    with torch.no_grad():
+    retain_grads = []
+    sp_predicted_batch_elements = []
+    sp_predicted_batch_elements_extracated_cs = []
+    sp_pred_inds_CS_spType = []
+    if saliency_map:
+        def hook_(self, grad_inp, grad_out):
+            retain_grads.append((grad_out[0].cpu()))
+        # for n, p in model.ProtBertBFD.named_parameters():
+        #     print(n)
+        # exit(1)
+        # model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
+        if hook_layer == "bert":
+            handle = model.ProtBertBFD.encoder.register_backward_hook(hook_)
+        elif hook_layer == "word_embs":
+            handle = model.ProtBertBFD.embeddings.word_embeddings.register_backward_hook(hook_)
+        elif hook_layer == "full_emb":
+            handle = model.ProtBertBFD.embeddings.register_backward_hook(hook_)
+        elif hook_layer == "pos_enc":
+            handle = model.ProtBertBFD.embeddings.position_embeddings.register_backward_hook(hook_)
+        elif hook_layer == "classification_layer":
+            handle = model.classification_head.transformer.decoder[-2].register_backward_hook(hook_)
+        else:
+            handle = model.ProtBertBFD.embeddings.LayerNorm.register_backward_hook(hook_)
+        # for n, p in model.ProtBertBFD.named_modules():
+        #     print(n)
+        # exit(1)
+        # model.ProtBertBFD.embeddings.word_embeddings.register_forward_hook(hook_)
         if tune_bert:
             seq_lengths = [len(s) for s in src]
             seqs = [" ".join(r_ for r_ in s) for s in src]
@@ -446,6 +149,47 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 else:
                     glbl_labels = model.get_v3_glbl_lbls(src)
                     _, glbl_preds = torch.max(glbl_labels, dim=1)
+    else:
+        with torch.no_grad():
+            if tune_bert:
+                seq_lengths = [len(s) for s in src]
+                seqs = [" ".join(r_ for r_ in s) for s in src]
+                inputs = model.tokenizer.batch_encode_plus(seqs,
+                                                           add_special_tokens=model.hparams.special_tokens,
+                                                           padding=True,
+                                                           truncation=True,
+                                                           max_length=model.hparams.max_length)
+                input_ids = torch.tensor(inputs['input_ids'], device=model.device)
+                attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
+                memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
+                # memory_bfd = model(input_ids=input_ids, attention_mask=attention_mask,
+                #                    token_type_ids=inputs['token_type_ids'],return_embeddings=True)[0]
+                if not model.classification_head.train_only_decoder:
+                    memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
+                else:
+                    memory = memory_bfd
+            else:
+                memory = model.encode(src)
+            if second_model is not None:
+                memory_2nd_mdl = model.encode(src)
+            else:
+                memory_2nd_mdl = None
+            if tune_bert and model.classification_head.glbl_lbl_version and model.classification_head.use_glbl_lbls or \
+                    not tune_bert and model.glbl_lbl_version == 3 and model.use_glbl_lbls:
+                # when tuning BERT model + TSignal and having a separate classifier for ths SP type which (should) be based
+                # on the embeddings comming from the BERT model
+                if test_only_cs:
+                    batch_size = len(src)
+                    glbl_labels = torch.zeros(batch_size, 6)
+                    glbl_labels[list(range(batch_size)), glbl_lbls] = 1
+                    _, glbl_preds = torch.max(glbl_labels, dim=1)
+                else:
+                    if tune_bert:
+                        glbl_labels = model.classification_head.get_v3_glbl_lbls(memory_bfd, inp_seqs=src)
+                        _, glbl_preds = torch.max(glbl_labels, dim=1)
+                    else:
+                        glbl_labels = model.get_v3_glbl_lbls(src)
+                        _, glbl_preds = torch.max(glbl_labels, dim=1)
 
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
     ys = []
@@ -494,12 +238,11 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 current_ys[-1].append(next_word[bach_ind])
         ys = current_ys
         start_ind = 1
-    model.eval()
-    if not tune_bert:
+    if not tune_bert and not train_oh:
         model.glbl_generator.eval()
     all_probs = []
     for i in range(start_ind, max(seq_lens) + 1):
-        with torch.no_grad():
+        if saliency_map:
             tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
             if second_model is not None:
                 out_2nd_mdl = second_model.decode(ys, memory_2nd_mdl.to(device), tgt_mask.to(device))
@@ -507,19 +250,74 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
                 all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
             if tune_bert:
+                # for n, p in model.ProtBertBFD.named_parameters():
+                #     print(n)
+                # exit(1)
+
+                # memory.requires_grad=True
                 if model.classification_head.train_only_decoder:
-                    prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs, tgt_mask.to(device))
+                    prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs,
+                                                                          tgt_mask.to(device))
                     prob = prob[-1]
                 else:
                     out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
                     out = out.transpose(0, 1)
+                    # TODO what if for TAT I use something like p(TAT)/(p(SP)+p(LIPO)+p(PILIN)+p(TAT/SPII))
                     prob = model.classification_head.generator(out[:, -1])
                     all_outs.append(out[:, -1])
+                # print("doing the backward pass...")
+                for batch_ind in range(prob.shape[0]):
+                    max_ind = torch.argmax(prob[batch_ind]).item()
+                    if ind2lbl[max_ind] in ["S", "T", "L"] :
+                        if i == start_ind:
+                            sp_predicted_batch_elements.append(batch_ind)
+                            model.zero_grad()
+                            model.ProtBertBFD.zero_grad()
+                            model.classification_head.zero_grad()
+                            # if ind2lbl[max_ind] == 'T':
+                            #     prob[batch_ind,max_ind]/(prob[batch_ind,lbl2ind['S']] +
+                            #                              prob[batch_ind,lbl2ind['L']] +
+                            #                              prob[batch_ind,lbl2ind['W']] +
+                            #                              prob[batch_ind,lbl2ind['P']]).backward(retain_graph=True)
+                            # else:
+                            prob[batch_ind, max_ind].backward(retain_graph=True)
+                            sp_pred_inds_CS_spType.append(str(batch_ind) + "_spType")
+                    elif ind2lbl[max_ind] not in ["S", "T", "L"] and batch_ind in sp_predicted_batch_elements \
+                            and batch_ind not in sp_predicted_batch_elements_extracated_cs:
+                        model.zero_grad()
+                        model.ProtBertBFD.zero_grad()
+                        model.classification_head.zero_grad()
+                        prob[batch_ind, max_ind].backward(retain_graph=True)
+                        sp_pred_inds_CS_spType.append(str(batch_ind) + "_csPred")
+                        sp_predicted_batch_elements_extracated_cs.append(batch_ind)
+                # print("did the backward pass")
             else:
                 out = model.decode(ys, memory.to(device), tgt_mask.to(device))
                 out = out.transpose(0, 1)
                 prob = model.generator(out[:, -1])
                 all_outs.append(out[:, -1])
+        else:
+            with torch.no_grad():
+                tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
+                if second_model is not None:
+                    out_2nd_mdl = second_model.decode(ys, memory_2nd_mdl.to(device), tgt_mask.to(device))
+                    out_2nd_mdl = out_2nd_mdl.transpose(0, 1)
+                    prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
+                    all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
+                if tune_bert:
+                    if model.classification_head.train_only_decoder:
+                        prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs, tgt_mask.to(device))
+                        prob = prob[-1]
+                    else:
+                        out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
+                        out = out.transpose(0, 1)
+                        prob = model.classification_head.generator(out[:, -1])
+                        all_outs.append(out[:, -1])
+                else:
+                    out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+                    out = out.transpose(0, 1)
+                    prob = model.generator(out[:, -1])
+                    all_outs.append(out[:, -1])
 
         if i == 0 and not form_sp_reg_data:
             # extract the sp-presence probabilities
@@ -585,10 +383,16 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 glbl_labels = torch.nn.functional.softmax(glbl_labels, dim=-1) + \
                               second_model.glbl_generator(
                                   torch.mean(torch.sigmoid(torch.stack(all_probs)).transpose(0, 1), dim=1), dim=-1)
+        if saliency_map:
+            handle.remove()
+            return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits,
+                    glbl_labels), retain_grads, sp_pred_inds_CS_spType
         return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, \
                glbl_labels
+    if saliency_map:
+        handle.remove()
+        return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits), retain_grads, sp_pred_inds_CS_spType
     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
-
 
 
 def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
