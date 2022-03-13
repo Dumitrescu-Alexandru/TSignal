@@ -639,7 +639,6 @@ class ProtBertClassifier(pl.LightningModule):
         input_ids = torch.tensor(input_ids, device=self.device)
         inp_seqs = []
         if sequences is not None:
-            print("WHY")
             inp_seqs = [s.replace(" ", "") for s in sequences]
         else:
             for inp in input_ids:

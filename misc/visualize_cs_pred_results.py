@@ -2970,6 +2970,9 @@ def visualize_inp_gradients():
     ongoing3lrunfold1_2ndsave = pickle.load(open("ongoing3lrunfold1_2ndsave.bin", "rb"))
     ongoing3lrunfold2 = pickle.load(open("ongoing3lrunfold2_1ndsave.bin", "rb"))
     ongoing3lrunfold0 = pickle.load(open("ongoing3lrunfold0_1ndsave.bin", "rb"))
+    ayer_bertGrads_fold03l = pickle.load(open("3layer_bertGrads_fold0.bin", "rb"))
+    ayer_bertGrads_fold13l = pickle.load(open("3layer_bertGrads_fold1.bin", "rb"))
+    ayer_bertGrads_fold23l = pickle.load(open("3layer_bertGrads_fold2.bin", "rb"))
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     labels = ['input embs', 'IE + PE', 'BERT']
@@ -3038,6 +3041,9 @@ def visualize_inp_gradients():
     tobetestd = ongoing3lrunfold2.copy()
     tobetestd.extend(ongoing3lrunfold1_2ndsave)
     tobetestd.extend(ongoing3lrunfold2)
+    tobetestd = ayer_bertGrads_fold03l.copy()
+    tobetestd.extend(ayer_bertGrads_fold13l)
+    tobetestd.extend(ayer_bertGrads_fold23l)
     # tobetestd = ongoing3lrunfold0
     # tobetestd = idkanymore
     ss = set()
@@ -3189,6 +3195,8 @@ def visualize_inp_gradients():
 
 
 if __name__ == "__main__":
+    # visualize_inp_gradients()
+    # exit(1)
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_repeat2_only_decoder/",
     #                                         compare_mdl_plots=False,
@@ -3197,6 +3205,12 @@ if __name__ == "__main__":
     #                                         # ,restrict_types=["SP", "NO_SP"])
     #
     # exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_repeat3_only_3l_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_repeat2_onlyDec/",
                                             compare_mdl_plots=False,

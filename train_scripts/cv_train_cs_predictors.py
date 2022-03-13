@@ -1072,7 +1072,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                                                max_length=model.hparams.max_length)
                     inputs['targets'] = lbl_seqs
                     inputs['seq_lengths'] = seq_lengths
-                    inputs['sequences'] = seqs if augment_trimmed_seqs else None
+                    if  augment_trimmed_seqs:
+                        inputs['sequences'] = seqs
                     logits = model(**inputs)
                 else:
                     logits = model(seqs, lbl_seqs)
