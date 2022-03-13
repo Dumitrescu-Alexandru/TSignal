@@ -394,7 +394,7 @@ def generate_square_subsequent_mask(sz):
 #         return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits), retain_grads, sp_pred_inds_CS_spType
 #     return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
-                  test_only_cs=False, glbl_lbls=None, tune_bert=False):
+                  test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
