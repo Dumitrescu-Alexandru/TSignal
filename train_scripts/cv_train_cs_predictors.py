@@ -899,7 +899,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    swa_start = 60
+    swa_start = 20
     anneal_epochs = 10
     if len(sp_data.lg2ind.keys()) <= 1 or not use_lg_info:
         lg2ind = None
@@ -967,8 +967,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
     if use_swa:
         warmup_scheduler = None
-        swa_model = AveragedModel(model)
-        scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)
+        swa_model = AveragedModel(model.to("cpu"))
+        # scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)
     else:
         warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
     best_valid_loss = 5 ** 10
@@ -1085,6 +1085,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
             loss.backward()
             optimizer.step()
+        if use_swa:
+            swa_model.update_parameters(model)
+            update_bn(dataset_loader, swa_model)
         if scheduler is not None:
             if e < lr_sched_warmup and lr_sched_warmup > 2:
                 warmup_scheduler.step()
@@ -1101,7 +1104,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
         if validate_on_test:
             validate_partitions = list(test_partition)
-            _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model , sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
+            _ = evaluate(swa_model.module.to(device) if use_swa and e + 1>= swa_start else model , sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
                          epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified,very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
                          tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=extended_sublbls, random_folds_prefix=random_folds_prefix, train_oh=train_oh)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
@@ -1121,7 +1124,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                              sets=valid_sets, form_sp_reg_data=form_sp_reg_data, simplified=simplified,
                                              very_simplified=very_simplified, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
                                              random_folds_prefix=random_folds_prefix)
-            _ = evaluate(swa_model.module if use_swa and e + 1>= swa_start else model, sp_data.lbl2ind, run_name=run_name,
+            _ = evaluate(swa_model.module.to(device) if use_swa and e + 1>= swa_start else model, sp_data.lbl2ind, run_name=run_name,
                          partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
                          simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
                          tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
@@ -1228,7 +1231,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
     if use_swa:
-        update_bn(dataset_loader, swa_model)
+        update_bn(dataset_loader, swa_model.to(device))
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
     model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
