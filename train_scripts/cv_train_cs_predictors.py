@@ -72,7 +72,6 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     if saliency_map:
         model.requires_grad=True
         model.unfreeze_encoder()
-    model.eval()
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     ind2lbl = {v: k for k, v in lbl2ind.items()}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -852,7 +851,7 @@ def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0, use_swa=False):
         elif lr_sched == "cos":
             return CosineAnnealingWarmRestarts(optimizer=op)
 
-    if lr_scheduler == "none" and not use_swa:
+    if lr_scheduler == "none":
         return None, None
     elif lr_sched_warmup >= 2:
         scheduler = get_schduler_type(opt, lr_scheduler)
@@ -899,7 +898,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    swa_start = 20
+    swa_start = 60
     anneal_epochs = 10
     if len(sp_data.lg2ind.keys()) <= 1 or not use_lg_info:
         lg2ind = None
@@ -965,15 +964,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         optimizer = optim.Adam(parameters,  lr=lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
-    if use_swa:
-        warmup_scheduler = None
-        swa_model = AveragedModel(model)
-        swa_model.module.to("cpu")
-        # scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)
-        scheduler = None
-    else:
-        warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
-    scheduler = None
+    warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
     best_valid_loss = 5 ** 10
     best_valid_mcc_and_recall = -1
     best_epoch = 0
