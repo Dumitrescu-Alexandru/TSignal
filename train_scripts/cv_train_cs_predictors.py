@@ -970,6 +970,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         swa_model = AveragedModel(model)
         swa_model.module.to("cpu")
         # scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)
+        scheduler = None
     else:
         warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
     best_valid_loss = 5 ** 10
