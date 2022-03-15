@@ -973,6 +973,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         scheduler = None
     else:
         warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
+    scheduler = None
     best_valid_loss = 5 ** 10
     best_valid_mcc_and_recall = -1
     best_epoch = 0
@@ -1087,9 +1088,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
             loss.backward()
             optimizer.step()
-        if use_swa:
+        if use_swa and e + 1 >= swa_start:
+            swa_model.to("cuda:0")
             swa_model.update_parameters(model)
             update_bn(dataset_loader, swa_model)
+            swa_model.to("cpu")
         if scheduler is not None:
             if e < lr_sched_warmup and lr_sched_warmup > 2:
                 warmup_scheduler.step()
@@ -1213,14 +1216,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if validate_on_mcc:
             print("VALIDATION: avg f1 score on epoch {}: {}".format(e,patiente_metric))
             logging.info("VALIDATION: avg f1 score on epoch {}: {}".format(e,patiente_metric))
+        if e == eps - 1:
+            patience = 0
         if (valid_loss < best_valid_loss and eps == -1 and not validate_on_mcc) or (eps != -1 and e == eps - 1) or \
                 (patiente_metric > best_valid_mcc_and_recall and eps == -1 and validate_on_mcc):
             best_epoch = e
             best_valid_loss = valid_loss
             best_valid_mcc_and_recall = patiente_metric
             save_model(swa_model.module if use_swa and e + 1>= swa_start else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
-            if e == eps - 1:
-                patience = 0
         elif (e > warmup_epochs and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
                 (e > warmup_epochs and best_valid_mcc_and_recall > patiente_metric and eps == -1 and validate_on_mcc):
             if validate_on_mcc:
@@ -1232,6 +1235,18 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} from epoch {} compared to best {}.".
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
+        if use_swa and swa_start == e:
+            model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                               tune_bert=tune_bert)
+            warmup_scheduler = None
+            scheduler = None
+            swa_model = AveragedModel(model)
+            swa_model.module.to("cpu")
+            # scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)
+            eps = e + int(best_epoch * 0.25)
+            # run for 1/4 * best_epoch_number more times using SWA
+        else:
+            warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
     if use_swa:
         update_bn(dataset_loader, swa_model.to(device))
 
