@@ -1249,6 +1249,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
     if use_swa:
         update_bn(dataset_loader, swa_model.to(device))
+        save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
     model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
