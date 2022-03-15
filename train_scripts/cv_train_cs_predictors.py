@@ -1079,7 +1079,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
             loss.backward()
             optimizer.step()
-        if use_swa and e + 1 >= swa_start:
+        if use_swa and e >= swa_start:
             swa_model.to("cuda:0")
             swa_model.update_parameters(model)
             update_bn(dataset_loader, swa_model)
@@ -1226,7 +1226,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} from epoch {} compared to best {}.".
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
-        if use_swa and swa_start == e:
+        if use_swa and swa_start == e + 1:
             model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                tune_bert=tune_bert)
             warmup_scheduler = None
@@ -1235,6 +1235,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             swa_model.module.to("cpu")
             # scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)
             eps = e + int(best_epoch * 0.25)
+            print("Started SWA training for {} more epochs".format(int(best_epoch*0.25)))
+            logging.info("Started SWA training for {} more epochs".format(int(best_epoch*0.25)))
             # run for 1/4 * best_epoch_number more times using SWA
         else:
             warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
