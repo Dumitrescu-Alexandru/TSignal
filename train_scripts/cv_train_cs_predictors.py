@@ -1226,7 +1226,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} from epoch {} compared to best {}.".
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
-        if use_swa and swa_start <= e + 1:
+        if use_swa and swa_start == e + 1:
             model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                tune_bert=tune_bert)
             warmup_scheduler = None
