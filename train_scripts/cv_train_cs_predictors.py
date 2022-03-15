@@ -1120,7 +1120,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                              sets=valid_sets, form_sp_reg_data=form_sp_reg_data, simplified=simplified,
                                              very_simplified=very_simplified, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
                                              random_folds_prefix=random_folds_prefix)
-            _ = evaluate(swa_model.module.to(device) if use_swa and e + 1>= swa_start else model, sp_data.lbl2ind, run_name=run_name,
+            _ = evaluate(swa_model.module.to(device) if use_swa and e >= swa_start else model, sp_data.lbl2ind, run_name=run_name,
                          partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
                          simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
                          tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
@@ -1214,7 +1214,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             best_epoch = e
             best_valid_loss = valid_loss
             best_valid_mcc_and_recall = patiente_metric
-            save_model(swa_model.module if use_swa and e + 1>= swa_start else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
+            save_model(swa_model.module if use_swa >= swa_start else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
         elif (e > warmup_epochs and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
                 (e > warmup_epochs and best_valid_mcc_and_recall > patiente_metric and eps == -1 and validate_on_mcc):
             if validate_on_mcc:
@@ -1226,7 +1226,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} from epoch {} compared to best {}.".
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
-        if use_swa and swa_start == e + 1:
+        if use_swa and swa_start <= e + 1:
             model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                tune_bert=tune_bert)
             warmup_scheduler = None
