@@ -768,23 +768,27 @@ def load_sptype_model(model_path):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     return model.to(device)
 
-def load_model(model_path, dict_file=None, tuned_bert_embs_prefix="", tune_bert=False, testing=False):
+def load_model(model_path, dict_file=None, tuned_bert_embs_prefix="", tune_bert=False, testing=False, opt=False):
     folder = get_data_folder()
     model = torch.load(folder + model_path)
     if not tune_bert:
         model.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     elif tune_bert and testing:
         model.classification_head.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
-
+    if opt:
+        optimizer_ = torch.load(model_path.replace("_best_eval.pth", "_best_eval_opt.pth"))
+        return model, optimizer_
     return model
 
-def save_model(model, model_name="", tuned_bert_embs_prefix="", tune_bert=False):
+def save_model(model, model_name="", tuned_bert_embs_prefix="", tune_bert=False, optimizer=None):
     folder = get_data_folder()
     if not tune_bert:
         model.input_encoder.seq2emb = {}
     torch.save(model, folder + model_name + "_best_eval.pth")
     if not tune_bert:
         model.input_encoder.update(tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+    if optimizer is not None:
+        torch.save(optimizer, folder + model_name + "_best_eval_opt.pth")
 
 def save_sptype_model(model, model_name="", best=False, optimizer=None):
     folder = get_data_folder()
@@ -1218,7 +1222,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             best_epoch = e
             best_valid_loss = valid_loss
             best_valid_mcc_and_recall = patiente_metric
-            save_model(swa_model.module if use_swa and swa_start <= e else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
+            save_model(swa_model.module if use_swa and swa_start <= e else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, optimizer=optimizer)
         elif (e > warmup_epochs and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
                 (e > warmup_epochs and best_valid_mcc_and_recall > patiente_metric and eps == -1 and validate_on_mcc):
             if validate_on_mcc:
@@ -1231,8 +1235,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
         if use_swa and swa_start == e + 1:
-            model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                               tune_bert=tune_bert)
+            model, optimizer = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                               tune_bert=tune_bert, opt=True)
+            scheduler = StepLR(optimizer=optimizer, gamma=0.1, step_size=1)
             warmup_scheduler = None
             if high_lr:
                 scheduler.step()
