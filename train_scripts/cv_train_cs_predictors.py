@@ -776,7 +776,7 @@ def load_model(model_path, dict_file=None, tuned_bert_embs_prefix="", tune_bert=
     elif tune_bert and testing:
         model.classification_head.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     if opt:
-        optimizer_ = torch.load(model_path.replace("_best_eval.pth", "_best_eval_only_opt_state_dict.pth"))
+        optimizer_ = torch.load(folder + model_path.replace("_best_eval.pth", "_best_eval_only_opt_state_dict.pth"))
         return model, optimizer_
     return model
 
