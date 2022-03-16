@@ -789,6 +789,7 @@ def save_model(model, model_name="", tuned_bert_embs_prefix="", tune_bert=False,
         model.input_encoder.update(tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     if optimizer is not None:
         torch.save(optimizer, folder + model_name + "_best_eval_opt.pth")
+        torch.save(optimizer.state_dict(), folder + model_name + "_best_eval_only_opt_state_dict.pth")
 
 def save_sptype_model(model, model_name="", best=False, optimizer=None):
     folder = get_data_folder()
