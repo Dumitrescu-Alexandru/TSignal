@@ -876,7 +876,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
-                        random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False):
+                        random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
+                        high_lr=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -957,14 +958,17 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             {"params": model.classification_head.parameters()},
             {
                 "params": model.ProtBertBFD.parameters(),
-                "lr": lr,
+                "lr": lr * 10 if high_lr else lr,
             },
         ]
         # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
-        optimizer = optim.Adam(parameters,  lr=lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
+        optimizer = optim.Adam(parameters,  lr=lr * 10 if high_lr else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
     warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
+    if high_lr:
+        scheduler = StepLR(optimizer=optimizer, gamma=0.1, step_size=1)
+
     best_valid_loss = 5 ** 10
     best_valid_mcc_and_recall = -1
     best_epoch = 0
@@ -1084,7 +1088,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             swa_model.update_parameters(model)
             update_bn(dataset_loader, swa_model)
             swa_model.to("cpu")
-        if scheduler is not None:
+        if scheduler is not None and not high_lr:
             if e < lr_sched_warmup and lr_sched_warmup > 2:
                 warmup_scheduler.step()
             else:
@@ -1230,7 +1234,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                tune_bert=tune_bert)
             warmup_scheduler = None
-            scheduler = None
+            if high_lr:
+                scheduler.step()
+            else:
+                scheduler = None
             swa_model = AveragedModel(model)
             swa_model.module.to("cpu")
             # scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)

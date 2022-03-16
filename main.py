@@ -48,6 +48,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--use_aa_len", default=200, type=int)
     parser.add_argument("--lr", default=0.00001, type=float)
+    parser.add_argument("--high_lr", default=False, action="store_true", help="increase 10x the lr until swa stars")
     parser.add_argument("--data", default="mammal", type=str)
     parser.add_argument("--param_set_search_number", default=-1, type=int)
     parser.add_argument("--train_cs_predictor", default=False, action="store_true")
@@ -232,7 +233,8 @@ if __name__ == "__main__":
                                 account_lipos=args.account_lipos, tuned_bert_embs=args.tuned_bert_embs,
                                 tune_bert=args.tune_bert, frozen_epochs=args.frozen_epochs, extended_sublbls=args.extended_sublbls,
                                 random_folds=args.random_folds, train_on_subset=args.train_on_subset, train_only_decoder=args.train_only_decoder,
-                                remove_bert_layers=args.remove_bert_layers, augment_trimmed_seqs=args.augment_trimmed_seqs)
+                                remove_bert_layers=args.remove_bert_layers, augment_trimmed_seqs=args.augment_trimmed_seqs,
+                                high_lr=args.high_lr)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):

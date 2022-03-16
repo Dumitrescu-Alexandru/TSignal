@@ -3198,6 +3198,13 @@ def visualize_inp_gradients():
 
 if __name__ == "__main__":
     mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_only_decoder_swa_ctLR/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+                                            # ,restrict_types=["SP", "NO_SP"])
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_repeat5NoDrop_only/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
