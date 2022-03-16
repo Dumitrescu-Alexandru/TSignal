@@ -1237,6 +1237,15 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if use_swa and swa_start == e + 1:
             model, optimizer_state_d = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                tune_bert=tune_bert, opt=True)
+            parameters = [
+                {"params": model.classification_head.parameters()},
+                {
+                    "params": model.ProtBertBFD.parameters(),
+                    "lr": lr,
+                },
+            ]
+            optimizer = optim.Adam(parameters, lr=lr * 10 if high_lr else lr, eps=1e-9, weight_decay=wd,
+                                   betas=(0.9, 0.98), )
             optimizer.load_state_dict(optimizer_state_d)
             scheduler = StepLR(optimizer=optimizer, gamma=0.1, step_size=1)
             warmup_scheduler = None
