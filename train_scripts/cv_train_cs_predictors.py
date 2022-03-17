@@ -1247,16 +1247,17 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             optimizer = optim.Adam(parameters, lr=lr * 10 if high_lr else lr, eps=1e-9, weight_decay=wd,
                                    betas=(0.9, 0.98), )
             optimizer.load_state_dict(optimizer_state_d)
-            scheduler = StepLR(optimizer=optimizer, gamma=0.1, step_size=1)
+            # scheduler = StepLR(optimizer=optimizer, gamma=0.1, step_size=1)
+            scheduler = None
             warmup_scheduler = None
-            if high_lr:
-                scheduler.step()
-            else:
-                scheduler = None
+            # if high_lr:
+            #     scheduler.step()
+            # else:
+            #     scheduler = None
             swa_model = AveragedModel(model)
             swa_model.module.to("cpu")
             # scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)
-            eps = e + int(best_epoch * 0.25)
+            eps = e + int(best_epoch * 0.5)
             print("Started SWA training for {} more epochs".format(int(best_epoch*0.25)))
             logging.info("Started SWA training for {} more epochs".format(int(best_epoch*0.25)))
             # run for 1/4 * best_epoch_number more times using SWA
