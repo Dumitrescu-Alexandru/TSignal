@@ -776,6 +776,10 @@ def load_model(model_path, dict_file=None, tuned_bert_embs_prefix="", tune_bert=
     elif tune_bert and testing:
         model.classification_head.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     if opt:
+        if os.path.exists(folder + model_path.replace("_best_eval.pth","_best_eval_only_opt_state_dict_cls_head.pth")):
+            opt_cls_h_dict = torch.load(folder + model_path.replace("_best_eval.pth","_best_eval_only_opt_state_dict_cls_head.pth"))
+            opt_bert_dict = torch.load(folder + model_path.replace("_best_eval.pth","_best_eval_only_opt_state_dict_bert.pth"))
+            return model, [opt_cls_h_dict, opt_bert_dict]
         optimizer_ = torch.load(folder + model_path.replace("_best_eval.pth", "_best_eval_only_opt_state_dict.pth"))
         return model, optimizer_
     return model
@@ -788,7 +792,11 @@ def save_model(model, model_name="", tuned_bert_embs_prefix="", tune_bert=False,
     if not tune_bert:
         model.input_encoder.update(tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     if optimizer is not None:
-        torch.save(optimizer.state_dict(), folder + model_name + "_best_eval_only_opt_state_dict.pth")
+        if type(optimizer) == list:
+            torch.save(optimizer[0].state_dict(), folder + model_name + "_best_eval_only_opt_state_dict_cls_head.pth")
+            torch.save(optimizer[1].state_dict(), folder + model_name + "_best_eval_only_opt_state_dict_bert.pth")
+        else:
+            torch.save(optimizer.state_dict(), folder + model_name + "_best_eval_only_opt_state_dict.pth")
 
 def save_sptype_model(model, model_name="", best=False, optimizer=None):
     folder = get_data_folder()
@@ -958,21 +966,34 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
 
     if tune_bert:
-        # BERT model always has this LR, as any higher lr worsens the results
-        parameters = [
-            {"params": model.classification_head.parameters()},
-            {
-                "params": model.ProtBertBFD.parameters(),
-                "lr": 0.00001,
-            },
-        ]
-        # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
-        optimizer = optim.Adam(parameters,  lr=lr * 10 if high_lr else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
+        if use_swa and lr_scheduler != "none":
+            # in this case, we will use a cyclic scheduler on the best model found based on early stopping. few problems:
+            # 1. the BERT lr is much more sensitive than classification_head optimizer
+            # 2. We need to load the optimizer(best_model) found in early stopping to resume training
+            # 3. when adding the scheduler, we want to increase (cyclically) the lr only for classification_head parameters; That we
+            # cannot do with a scheduler on an optimizer on the full model; therefore we need to use 2 optimizers and
+            # attach a schduler only on classification_head_optimizer
+            classification_head_optimizer = optim.Adam(model.classification_head.parameters(),  lr=lr * 10 if high_lr
+                                                                else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
+            bert_optimizer =  optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001 if high_lr else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
+            optimizer = [classification_head_optimizer, bert_optimizer]
+        else:
+            # BERT model always has this LR, as any higher lr worsens the results
+            parameters = [
+                {"params": model.classification_head.parameters()},
+                {
+                    "params": model.ProtBertBFD.parameters(),
+                    "lr": 0.00001,
+                },
+            ]
+            # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
+            optimizer = optim.Adam(parameters,  lr=lr * 10 if high_lr else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
-    warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
-    if high_lr:
-        scheduler = StepLR(optimizer=optimizer, gamma=0.1, step_size=1)
+    if not use_swa and lr_scheduler != "none":
+        warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
+    else:
+        warmup_scheduler, scheduler = None, None
 
     best_valid_loss = 5 ** 10
     best_valid_mcc_and_recall = -1
@@ -1019,7 +1040,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     logits, glbl_logits = model(**inputs)
                 else:
                     logits, glbl_logits = model(seqs, lbl_seqs)
-                optimizer.zero_grad()
+                if type(optimizer) == list:
+                    # for separate classification_head/BERT optimizers
+                    optimizer[0].zero_grad()
+                    optimizer[1].zero_grad()
+                else:
+                    optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
                 if tune_cs > 0 and e > 35:
                     seq_indices = []
@@ -1056,7 +1082,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     loss += loss_glbl * glbl_lbl_weight
             elif form_sp_reg_data and not extended_sublbls:
                 logits, glbl_logits = model(seqs, lbl_seqs)
-                optimizer.zero_grad()
+                if type(optimizer) == "list":
+                    optimizer[0].zero_grad()
+                    optimizer[1].zero_grad()
+                else:
+                    optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
                 loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
                 losses += loss.item()
@@ -1081,13 +1111,21 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     logits = model(**inputs)
                 else:
                     logits = model(seqs, lbl_seqs)
-                optimizer.zero_grad()
+                if type(optimizer) == list:
+                    optimizer[0].zero_grad()
+                    optimizer[1].zero_grad()
+                else:
+                    optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
                 loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
                 losses += loss.item()
 
             loss.backward()
-            optimizer.step()
+            if type(optimizer) == list:
+                optimizer[0].step()
+                optimizer[1].step()
+            else:
+                optimizer.step()
         if use_swa and e >= swa_start:
             swa_model.to("cuda:0")
             swa_model.update_parameters(model)
@@ -1179,7 +1217,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 "On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
         if current_sptype_f1 > bestf1_sp_type and separate_save_sptype_preds:
             bestf1_sp_type = current_sptype_f1
-            save_sptype_model(model.glbl_generator, run_name, best=True, optimizer=optimizer)
+            save_sptype_model(model.glbl_generator, run_name, best=True, optimizer=optimizer if use_swa else None)
             print("Best SP type has been saved with score {}".format(current_sptype_f1))
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                                                            list(np.array(all_precisions).flatten()), list(
@@ -1238,30 +1276,33 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if use_swa and swa_start == e + 1:
             model, optimizer_state_d = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                tune_bert=tune_bert, opt=True)
-            parameters = [
-                {"params": model.classification_head.parameters()},
-                {
-                    "params": model.ProtBertBFD.parameters(),
-                    "lr": lr,
-                },
-            ]
-            optimizer = optim.Adam(parameters, lr=lr * 10 if high_lr else lr, eps=1e-9, weight_decay=wd,
-                                   betas=(0.9, 0.98), )
-            optimizer.load_state_dict(optimizer_state_d)
-            # scheduler = StepLR(optimizer=optimizer, gamma=0.1, step_size=1)
-            scheduler = None
-            warmup_scheduler = None
-            # if high_lr:
-            #     scheduler.step()
-            # else:
-            #     scheduler = None
-            swa_model = AveragedModel(model)
-            swa_model.module.to("cpu")
-            # scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)
-            eps = e + int(best_epoch * 0.5)
-            print("Started SWA training for {} more epochs".format(int(best_epoch*0.5)))
-            logging.info("Started SWA training for {} more epochs".format(int(best_epoch*0.5)))
-            # run for 1/4 * best_epoch_number more times using SWA
+            if type(optimizer) == list:
+                classification_head_optimizer = optim.Adam(model.ProtBertBFD.parameters(), lr=0.00001, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
+                bert_optimizer = optim.Adam(model.classification_head.parameters(), lr=lr * 10 if high_lr else lr, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
+                # dont know how to set the optimizer for StepLR to start with 0.0002 lr but have the rest of the states
+                # the same (momentum...
+                # classification_head_optimizer.load_state_dict(optimizer_state_d[0])
+                bert_optimizer.load_state_dict(optimizer_state_d[1])
+
+                swa_model = AveragedModel(model)
+                swa_model.module.to("cpu")
+                eps = e + 50
+                # eps = e + int(best_epoch * 0.5)
+                print("Started SWA training for {} more epochs".format(50))
+                logging.info("Started SWA training for {} more epochs".format(50))
+            else:
+                parameters = [
+                    {"params": model.classification_head.parameters()},
+                    {
+                        "params": model.ProtBertBFD.parameters(),
+                        "lr": lr,
+                    },
+                ]
+                optimizer = optim.Adam(parameters, lr=lr * 10 if high_lr else lr, eps=1e-9, weight_decay=wd,
+                                       betas=(0.9, 0.98), )
+                optimizer.load_state_dict(optimizer_state_d)
+                scheduler = None
+                warmup_scheduler = None
         else:
             warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
     if use_swa:
@@ -1328,16 +1369,34 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             pos_fp_info.extend(false_positives)
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert"):
+    # model = nn.Sequential(nn.Linear(100,10), nn.Linear(10,5))
+    # opt = torch.optim.Adam(model.parameters(), lr=0.1)
+    # torch.save(opt.state_dict(), "asd.txt")
+    # model2, model3 = nn.Linear(100, 10), nn.Linear(10, 5)
+    # loaded_opt = torch.load("asd.txt")
+    # print(loaded_opt)
+    # opt1, opt2 = torch.optim.Adam(model2.parameters(), lr=0.1), torch.optim.Adam(model3.parameters(), lr=0.1)
+    # opt1.load_state_dict(loaded_opt)
+    # exit(1)
+
     model = nn.Linear(100,10)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    ot_sched = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=10)
     # sched = torch.optim.lr_scheduler.SWALR(optimizer, base_lr=0.0001, max_lr=0.01, step_size_up=1, step_size_down=10, mode='triangular')
-    sched = SWALR(optimizer, swa_lr=10e-5, anneal_strategy="linear", anneal_epochs=20)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
+    ot_sched.step()
+    ot_sched.step()
+    # sched = SWALR(optimizer, swa_lr=10e-5, anneal_strategy="linear", anneal_epochs=20)
+    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=10)
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, )
+    # schedd_ = torch.optim.lr_scheduler.CyclicLR(optimizer,)
     lrs = []
     for i in range(40):
+        # sched.step(i%5)
         lr_scheduler.step(i%5)
+        # ot_sched.step()
+        # lr_scheduler.step(i%5)
         lrs.append(optimizer.param_groups[0]['lr'])
-        # sched.step()
+        # sched.step(i%5)
     print(lrs)
     exit(1)
 
