@@ -881,7 +881,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
                         random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
-                        high_lr=False):
+                        high_lr=False, ):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -958,11 +958,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
 
     if tune_bert:
+        # BERT model always has this LR, as any higher lr worsens the results
         parameters = [
             {"params": model.classification_head.parameters()},
             {
                 "params": model.ProtBertBFD.parameters(),
-                "lr": lr,
+                "lr": 0.00001,
             },
         ]
         # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
@@ -1258,8 +1259,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             swa_model.module.to("cpu")
             # scheduler = SWALR(optimizer, swa_lr=0.000001, anneal_strategy="cos", anneal_epochs=10)
             eps = e + int(best_epoch * 0.5)
-            print("Started SWA training for {} more epochs".format(int(best_epoch*0.25)))
-            logging.info("Started SWA training for {} more epochs".format(int(best_epoch*0.25)))
+            print("Started SWA training for {} more epochs".format(int(best_epoch*0.5)))
+            logging.info("Started SWA training for {} more epochs".format(int(best_epoch*0.5)))
             # run for 1/4 * best_epoch_number more times using SWA
         else:
             warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
@@ -1327,6 +1328,19 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             pos_fp_info.extend(false_positives)
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert"):
+    model = nn.Linear(100,10)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+    # sched = torch.optim.lr_scheduler.SWALR(optimizer, base_lr=0.0001, max_lr=0.01, step_size_up=1, step_size_down=10, mode='triangular')
+    sched = SWALR(optimizer, swa_lr=10e-5, anneal_strategy="linear", anneal_epochs=20)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
+    lrs = []
+    for i in range(40):
+        lr_scheduler.step(i%5)
+        lrs.append(optimizer.param_groups[0]['lr'])
+        # sched.step()
+    print(lrs)
+    exit(1)
+
     folder = get_data_folder()
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
     # hard-code this for now to check some sequences

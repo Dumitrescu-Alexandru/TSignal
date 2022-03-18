@@ -2,7 +2,7 @@ from sklearn.metrics.pairwise import euclidean_distances as euclidian_distance
 import random
 from io import StringIO
 import requests as r
-
+from matplotlib.collections import LineCollection
 import torch.nn
 from scipy import stats
 import matplotlib.pyplot as plt
@@ -2973,10 +2973,22 @@ def visualize_inp_gradients():
     ayer_bertGrads_fold03l = pickle.load(open("3layer_bertGrads_fold0.bin", "rb"))
     ayer_bertGrads_fold13l = pickle.load(open("3layer_bertGrads_fold1.bin", "rb"))
     ayer_bertGrads_fold23l = pickle.load(open("3layer_bertGrads_fold2.bin", "rb"))
+    ayer_IEgrads_fold13l = pickle.load(open("full_word_embs_fold1.bin", "rb"))
+    ayer_IEgrads_fold23l = pickle.load(open("full_word_embs_fold2.bin", "rb"))
+    ayer_IEgrads_fold03l = pickle.load(open("full_word_embs_fold0.bin", "rb"))
     remake_ayer_bertGrads_fold23l = pickle.load(open("remake_3layer_bertGrads_fold1.bin", "rb"))
     all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
     letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
     labels = ['input embs', 'IE + PE', 'BERT']
+
+    swa_bert_grads_fold_0 = pickle.load(open("swa_trained_bert_grds_fold0.bin", "rb"))
+    swa_bert_grads_fold_1 = pickle.load(open("swa_trained_bert_grds_fold1.bin", "rb"))
+    swa_bert_grads_fold_2 = pickle.load(open("swa_trained_bert_grds_fold2.bin", "rb"))
+
+    swa_IEembs_grads_fold_0 = pickle.load(open("swa_trained_full_emb_grds_fold0.bin", "rb"))
+    swa_IEembs_grads_fold_1 = pickle.load(open("swa_trained_full_emb_grds_fold1.bin", "rb"))
+    swa_IEembs_grads_fold_2 = pickle.load(open("swa_trained_full_emb_grds_fold2.bin", "rb"))
+
     # sanity_check(preds_and_probs_IE_seetLOTTASEQS,preds_and_probs_IE_seetLOTTASEQS_sanityCheck)
     # for seq_ind in range(8):
 
@@ -3045,7 +3057,18 @@ def visualize_inp_gradients():
     tobetestd = ayer_bertGrads_fold03l.copy()
     tobetestd.extend(ayer_bertGrads_fold13l)
     tobetestd.extend(ayer_bertGrads_fold23l)
-    tobetestd = remake_ayer_bertGrads_fold23l
+    # tobetestd = ayer_IEgrads_fold13l.copy()
+    # tobetestd.extend(ayer_IEgrads_fold23l)
+    # tobetestd.extend(ayer_IEgrads_fold03l)
+    # tobetestd = swa_bert_grads_fold_0.copy()
+    # tobetestd.extend(swa_bert_grads_fold_1)
+    # tobetestd.extend(swa_bert_grads_fold_2)
+
+    tobetestd = swa_IEembs_grads_fold_0.copy()
+    tobetestd.extend(swa_IEembs_grads_fold_1)
+    tobetestd.extend(swa_IEembs_grads_fold_2)
+
+    # tobetestd = remake_ayer_bertGrads_fold23l
     # tobetestd = ongoing3lrunfold0
     # tobetestd = idkanymore
     ss = set()
@@ -3064,57 +3087,141 @@ def visualize_inp_gradients():
     counts_sp2 = 0
     normalized_Tat_values = []
     motif_test = "FLK"
+    seqs2glbl_lbl = {}
+    for t in ['train', 'test']:
+        for fold in [0,1,2]:
+            dict_ = pickle.load(open("../sp_data/random_folds_sp6_partitioned_data_{}_{}.bin".format(t,fold), "rb"))
+            seqs2glbl_lbl.update({k:v[-1] for k,v in dict_.items()})
+    avg_cs_pos = []
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
-        if lbls[0] == "T":# and seq2lbls[seq][0] == "T":
-            if motif_test in seq[:lbls.rfind("T")]:# and seq[-3+seq.find(motif_test):+seq.find(motif_test)-1] == "RR":
+        if lbls[0] == "T" and seqs2glbl_lbl[seq] == "TAT":# and seq2lbls[seq][0] == "T":
+            if motif_test in seq[:lbls.rfind("T")] and seq[-3+seq.find(motif_test):+seq.find(motif_test)-1] == "RR":
                 rr_seq = seq.find(motif_test)
                 normalized_C_cs_values = np.array(spTypeGrds) / np.sum(spTypeGrds)
                 # if 5<rr_seq <10:
                 #     normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+27])
                 norm_values[75-rr_seq:75+len(seq)-rr_seq]+=normalized_C_cs_values
                 counts[75-rr_seq:75+len(seq)-rr_seq]+= np.ones(len(seq))
+                avg_cs_pos.append(lbls.rfind("T")-rr_seq)
+                print(lbls.rfind("T"), rr_seq, seq[-3+seq.find(motif_test):+seq.find(motif_test)+3])
         if lbls[0] == "S" and seq2lbls[seq][0] == "S" and len(seq) >= 60:
             norm_values_sp1 += np.array(spTypeGrds[:60]) / np.sum(spTypeGrds[:60])
             counts_sp1 += 1
         if lbls[0] == "L" and seq2lbls[seq][0] == "L" and len(seq) >= 60:
             norm_values_sp2 += np.array(spTypeGrds[:60]) / np.sum(spTypeGrds[:60])
             counts_sp2 +=1
-    print(max(counts))
+    print(avg_cs_pos)
     start_ind, end_ind = 0, 0
     for i in range(150):
-        if norm_values[i] != 0 and start_ind==0:
+        if counts[i] not in [0, 1] and start_ind==0:
             start_ind = i
-        elif norm_values[i] == 0 and start_ind != 0 and end_ind == 0:
+        elif counts[i] in [0, 1] and start_ind != 0 and end_ind == 0:
             end_ind = i-1
+    print(max(counts), np.argmax(norm_values) - start_ind, counts[np.argmax(norm_values)])
     normalized_Tat_values = norm_values[start_ind:end_ind]/counts[start_ind:end_ind]
     xticks_str = " "*(75-start_ind - 3) + "RRXFLK" + " "* (len(normalized_Tat_values)- 75 + start_ind - 3)
     xticks = [s for s in xticks_str]
     motif_pos = xticks_str.find("RRXFLK")
-    plt.bar(range(len(normalized_Tat_values))[:motif_pos], normalized_Tat_values[:motif_pos], color='#1f77b4')
-    plt.bar(range(len(normalized_Tat_values))[motif_pos:motif_pos+6], normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
-    plt.bar(range(len(normalized_Tat_values))[motif_pos+6:], normalized_Tat_values[motif_pos+6:], color='#1f77b4')
-    for i in range(60):
-        if i == 0:
-            val = norm_values_sp1[i]/ counts_sp1
-            plt.plot([i-0.5,i+0.5], [val, val], color='green',
-                    label='sp1 comparison')
-        else:
-            val = norm_values_sp1[i]/ counts_sp1
-            plt.plot([i - 0.5, i + 0.5], [val, val] ,color='green')
-    for i in range(60):
-        if i == 0:
-            val = norm_values_sp2[i]/ counts_sp2
-            plt.plot([i-0.5,i+0.5], [val, val], color='black',
-                    label='sp2 comparison')
-        else:
-            val = norm_values_sp2[i]/ counts_sp2
-            plt.plot([i - 0.5, i + 0.5],[val, val], color='black')
-    # plt.bar(range(len(norm_values_sp2)), norm_values_sp2/counts_sp2, alpha=0.3, color='red', label='sp2 comparison')
-    plt.xticks(list(range(len(normalized_Tat_values))), xticks)
-    plt.show()
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
+    from matplotlib.ticker import MultipleLocator, AutoMinorLocator
+    fig, axs = plt.subplots(2, 1)
+    # plt.bar(range(len(normalized_Tat_values))[:motif_pos], normalized_Tat_values[:motif_pos], color='#1f77b4')
+    # plt.bar(range(len(normalized_Tat_values))[motif_pos:motif_pos+6], normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
+    # plt.bar(range(len(normalized_Tat_values))[motif_pos+6:], normalized_Tat_values[motif_pos+6:], color='#1f77b4')
+    left_segment, motif_segment, right_segment = [(x,y) for x,y in zip(range(motif_pos), normalized_Tat_values[:motif_pos])],\
+                                                 [(x, y) for x, y in zip(range(motif_pos-1, motif_pos + 7), normalized_Tat_values[motif_pos-1:motif_pos+7])],\
+                                                 [(x, y) for x, y in zip(range(motif_pos+6, len(normalized_Tat_values)), normalized_Tat_values[motif_pos + 6:])]
+    inbetween_residues_mean_1 = (normalized_Tat_values[motif_pos] + normalized_Tat_values[motif_pos-1])/2
+    inbetween_residues_mean_2 = (normalized_Tat_values[motif_pos+5] + normalized_Tat_values[motif_pos+6])/2
+
+    box = axs[0].get_position()
+    axs[0].set_position([box.x0 + box.width * 0.1, box.y0 + box.height * 0.3, box.width * 0.95, box.height * 0.85])
+    axs[0].plot(range(motif_pos), normalized_Tat_values[:motif_pos], color='#1f77b4', label='Other Tat SP residues')
+    axs[0].plot([motif_pos-1, motif_pos-0.5], [normalized_Tat_values[motif_pos-1], inbetween_residues_mean_1], color='#1f77b4')
+    axs[0].plot([motif_pos-0.5, motif_pos], [inbetween_residues_mean_1, normalized_Tat_values[motif_pos]], color='#ff7f0e')
+    axs[0].plot(range(motif_pos, motif_pos + 6), normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
+
+    axs[0].plot([motif_pos+5, motif_pos+5.5], [normalized_Tat_values[motif_pos+5], inbetween_residues_mean_2], color='#ff7f0e', label='Twin arginine motif')
+    axs[0].plot([motif_pos+5.5, motif_pos+6], [inbetween_residues_mean_2, normalized_Tat_values[motif_pos+6]], color='#1f77b4')#'#1f77b4')
+
+    axs[0].plot(range(motif_pos+6, len(normalized_Tat_values)), normalized_Tat_values[motif_pos + 6:], color='#1f77b4')
+    # axs[0].plot([motif_pos-0.5, motif_pos-0.5], [0,1.1*max(normalized_Tat_values)], color='black', linestyle='dashed',linewidth=0.5)
+    # axs[0].plot([motif_pos+5.5, motif_pos+5.5], [0,1.1*max(normalized_Tat_values)], color='black',linestyle='dashed',linewidth=0.5)
+    xtics = " _"*(motif_pos+2) + "RRXFLK_"+ " _"*(len(normalized_Tat_values)-motif_pos-4)
+    # axs[0].set_xticks(list(range(len(normalized_Tat_values))))
+    # axs[0].set_xticks(list(range(len(normalized_Tat_values))))
+    axs[0].set_ylabel('SP type (Tat/SPI)\nIE+PE scores',  fontsize=8)
+    axs[0].xaxis.set_major_locator(MultipleLocator(21))
+    axs[0].xaxis.set_major_formatter('{x:.0f}')
+    axs[0].xaxis.set_minor_locator(MultipleLocator(1))
+    axs[0].set_yticks([0, 0.01,0.02,0.03,0.04,0.05])
+    axs[0].set_yticklabels([0, 0.01,0.02,0.03,0.04,0.05], fontsize=8)
+    lbls =np.array(list(range(len(normalized_Tat_values)))) - motif_pos
+    lbls = [5, -21, 0, 21 ,42, 63]
+    axs[0].set_xticklabels([str(n) for n in lbls ],fontsize=8)
+    axs[0].set_xlim(-2, 89)
+    # axs[0].arrow(0,0,10,0.03, width=0.001)
+    # axs[0].arrow(42,0.03,-20,0, width=0.0001)
+    axs[0].annotate("RRXFLK", xy=(22.8, normalized_Tat_values[75-start_ind+1]), xytext=(1, 0.025),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#ff7f0e')
+    axs[0].annotate("", xy=(13, normalized_Tat_values[13]), xytext=(23, 0.005),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8)
+    axs[0].annotate("Other residues", xy=(34, normalized_Tat_values[34]), xytext=(21, 0.001),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#1f77b4')
+    # axs[0].arrow(-100,0,100,100, width=1)
+    # axs[0].arrow(-100,-100,100,100, width=1)
+    # axs[0].arrow(5,5,100,100, width=1)
+    # axs[0].arrow(5,5,100,100, width=1)
+    # axs[0].arrow(5,5,100,100, width=1)
+    # axs[0].text(14,14, "ASD")
+    # axs[0].annotate("", xy=(0.5, 0.5), xytext=(0, 0),
+    #             arrowprops=dict(arrowstyle="->"))
+    axs[0].set_ylim(0, 1.1 * max(normalized_Tat_values))
+    axs[0].set_xlabel("Residue position (relative to RRXFLK motif)", fontsize=8)
+    # plt.show()
+    # lc = LineCollection([left_segment, motif_segment, right_segment])
+    # axs.add_collection(lc)
+    # axs.set_ylim(0,0.2)
+    # axs.set_xlim(0,40)
+    # plt.show()
+    # plt.plot(range(len(normalized_Tat_values))[:motif_pos], normalized_Tat_values[:motif_pos], color='#1f77b4')
+    # plt.plot(range(len(normalized_Tat_values))[motif_pos:motif_pos+6], normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
+    # plt.plot(range(len(normalized_Tat_values))[motif_pos+6:], normalized_Tat_values[motif_pos+6:], color='#1f77b4')
+    #
+    # for i in range(60):
+    #     if i == 0:
+    #         val = norm_values_sp1[i]/ counts_sp1
+    #         plt.plot([i-0.5,i+0.5], [val, val], color='green',
+    #                 label='sp1 comparison')
+    #     else:
+    #         val = norm_values_sp1[i]/ counts_sp1
+    #         plt.plot([i - 0.5, i + 0.5], [val, val] ,color='green')
+    # for i in range(60):
+    #     if i == 0:
+    #         val = norm_values_sp2[i]/ counts_sp2
+    #         plt.plot([i-0.5,i+0.5], [val, val], color='black',
+    #                 label='sp2 comparison')
+    #     else:
+    #         val = norm_values_sp2[i]/ counts_sp2
+    #         plt.plot([i - 0.5, i + 0.5],[val, val], color='black')
+    # # plt.bar(range(len(norm_values_sp2)), norm_values_sp2/counts_sp2, alpha=0.3, color='red', label='sp2 comparison')
+    # plt.xticks(list(range(len(normalized_Tat_values))), xticks)
+    # plt.show()
     # tobetestd = simpler_mdl_word_embs
     # tobetestd = bert_embs_test
     # tobetestd = preds_and_probs_IE_seetLOTTASEQS_sanityCheck
+    tobetestd = ayer_IEgrads_fold13l.copy()
+    tobetestd.extend(ayer_IEgrads_fold23l)
+    tobetestd.extend(ayer_IEgrads_fold03l)
+
+    tobetestd = swa_IEembs_grads_fold_0.copy()
+    tobetestd.extend(swa_IEembs_grads_fold_1)
+    tobetestd.extend(swa_IEembs_grads_fold_2)
+
+    normalized_sp1_cs_values_pm_5aas = np.zeros(150)
+    normalized_sp1_cs_values_pm_5aas_counts = np.zeros(150)
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
         # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
         # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
@@ -3123,12 +3230,126 @@ def visualize_inp_gradients():
         #     print(seq)
         #     print(lbls)
         #     print(true_lbl)
-        if lbls[0] == "L" and seq2lbls[seq][0] == "L":
+        if lbls[0] == "S" and seq2lbls[seq][0] == "S":
             normalized_C_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
+            normalized_C_cs_values = normalized_C_cs_values[:len(seq)]
             # normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spCSgrds)
-            cs_pred = lbls.rfind("L") + 1
-            if 5 < cs_pred < len(lbls) - 5:
-                normalized_C_cs_values_pm_5aas.append(normalized_C_cs_values[cs_pred-5:cs_pred+7])
+            cs_pred = lbls[:-1].rfind("S") + 1
+            if cs_pred < 60:
+                normalized_sp1_cs_values_pm_5aas[75-cs_pred:75+len(seq)-cs_pred] += normalized_C_cs_values
+                normalized_sp1_cs_values_pm_5aas_counts[75-cs_pred:75+len(seq)-cs_pred] += 1
+    start_ind_sp1, end_ind_sp1 = 0, 0
+    for i in range(150):
+        if normalized_sp1_cs_values_pm_5aas_counts[i] not in [0,1,2] and start_ind_sp1==0:
+            start_ind_sp1 = i
+        elif normalized_sp1_cs_values_pm_5aas_counts[i] in [0,1,2] and start_ind_sp1 != 0 and end_ind_sp1 == 0:
+            end_ind_sp1 = i-1
+    # print(start_ind_sp1, end_ind_sp1)
+    # exit(1)
+    #
+    normalized_C_cs_values_pm_5aas = np.zeros(150)
+    normalized_C_cs_values_pm_5aas_counts = np.zeros(150)
+    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
+        # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
+        # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
+        #     true_lbl = seq2lbls[seq]
+        #     print(lbls[lbls.rfind("L") + 1])
+        #     print(seq)
+        #     print(lbls)
+        #     print(true_lbl)
+        if lbls[0] == "L" and seq2lbls[seq][0] == "L" and seq[lbls.rfind("L")+1] == "C":
+            normalized_C_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
+            normalized_C_cs_values = normalized_C_cs_values[:len(seq)]
+            # print(len(normalized_C_cs_values), len(seq))
+            # normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spCSgrds)
+            cs_pred = lbls[:-1].rfind("L") + 1
+            normalized_C_cs_values_pm_5aas[75-cs_pred:75+len(seq)-cs_pred] += normalized_C_cs_values
+            normalized_C_cs_values_pm_5aas_counts[75-cs_pred:75+len(seq)-cs_pred] += 1
+    start_ind, end_ind = 0, 0
+    for i in range(150):
+        if normalized_C_cs_values_pm_5aas[i] not in [0, 1] and start_ind==0:
+            start_ind = i
+        elif normalized_C_cs_values_pm_5aas[i] in [0, 1] and start_ind != 0 and end_ind == 0:
+            end_ind = i-1
+    normalized_C_cs_values_pm_5aas = normalized_C_cs_values_pm_5aas[start_ind:end_ind] / normalized_C_cs_values_pm_5aas_counts[start_ind:end_ind]
+    inbetween_cysteine1 = (normalized_C_cs_values_pm_5aas[75-start_ind-1]+normalized_C_cs_values_pm_5aas[75-start_ind])/2
+    inbetween_cysteine2 = (normalized_C_cs_values_pm_5aas[75-start_ind] + normalized_C_cs_values_pm_5aas[75-start_ind+1])/2
+
+    box = axs[1].get_position()
+    axs[1].set_position([box.x0 + box.width * 0.1, box.y0+box.height*0.1, box.width * 0.95, box.height * 0.85])
+
+    axs[1].set_ylabel('CS (Sec/SPI, Sec/SPII)\nIE+PE scores', fontsize=8)
+    axs[1].xaxis.set_major_locator(MultipleLocator(17))
+    axs[1].xaxis.set_major_formatter('{x:.0f}')
+    axs[1].xaxis.set_minor_locator(MultipleLocator(1))
+    axs[1].set_yticks([0,0.01,0.02,0.03])
+    axs[1].set_yticklabels([0,0.01,0.02,0.03], fontsize=8)
+    lbls =np.array(list(range(len(normalized_Tat_values)))) - motif_pos
+    lbls = [1,-34, -17, 0, 17 ,34, 51]
+    axs[1].set_xticklabels([str(n) for n in lbls ], fontsize=8)
+    axs[1].set_xlabel("Residue position (relative to Cys/+1 Sec/SPII)", fontsize=8)
+    axs[1].set_xlim(-2, 100)
+    axs[1].set_ylim(0,0.031)
+
+    axs[1].plot(range(75-start_ind), normalized_C_cs_values_pm_5aas[:75-start_ind], color='#1f77b4', label='Other Sec/SPII residues')
+    axs[1].plot([75-start_ind-1, 75-start_ind-0.5], [normalized_C_cs_values_pm_5aas[75-start_ind-1], inbetween_cysteine1], color='#1f77b4')#'#1f77b4')
+    axs[1].plot([75-start_ind-0.5, 75-start_ind], [inbetween_cysteine1, normalized_C_cs_values_pm_5aas[75-start_ind]], color='#ff7f0e')
+    axs[1].plot([75-start_ind,  75-start_ind + 0.5], [normalized_C_cs_values_pm_5aas[75-start_ind], inbetween_cysteine2],color='#ff7f0e')#, color='')
+    axs[1].plot([75-start_ind+0.5, 75-start_ind+1], [inbetween_cysteine2, normalized_C_cs_values_pm_5aas[75-start_ind+1]], color='#1f77b4')
+    axs[1].plot(range(75-start_ind+1, len(normalized_C_cs_values_pm_5aas)), normalized_C_cs_values_pm_5aas[75-start_ind+1:], color='#1f77b4', label='Other Sec/SPII residues')
+    normalized_sp1_cs_values_pm_5aas = normalized_sp1_cs_values_pm_5aas[start_ind_sp1:end_ind_sp1]/ normalized_sp1_cs_values_pm_5aas_counts[start_ind_sp1:end_ind_sp1]
+    inbetween_sp1cs_1 = (normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1-1]+normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1])/2
+    inbetween_sp1cs_2 = (normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1] + normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1+1])/2
+    axs[1].plot(range(75 - start_ind_sp1), normalized_sp1_cs_values_pm_5aas[:75 - start_ind_sp1], color='red',label='Other Sec/SPII residues')
+    axs[1].plot([75 - start_ind_sp1 - 1, 75 - start_ind_sp1 - 0.5],[normalized_sp1_cs_values_pm_5aas[75 - start_ind_sp1 - 1], inbetween_sp1cs_1], color='red')
+    axs[1].plot([75 - start_ind_sp1 - 0.5, 75 - start_ind_sp1],[inbetween_sp1cs_1, normalized_sp1_cs_values_pm_5aas[75 - start_ind_sp1]], color='#ff7f0e')
+    axs[1].plot([75 - start_ind_sp1, 75 - start_ind_sp1 + 0.5],[normalized_sp1_cs_values_pm_5aas[75 - start_ind_sp1], inbetween_sp1cs_2], color='#ff7f0e')
+    axs[1].plot([75 - start_ind_sp1 + 0.5, 75 - start_ind_sp1 + 1],[inbetween_sp1cs_2, normalized_sp1_cs_values_pm_5aas[75 - start_ind_sp1 + 1]], color='red')
+    axs[1].plot(range(75 - start_ind_sp1 + 1, len(normalized_sp1_cs_values_pm_5aas)),normalized_sp1_cs_values_pm_5aas[75 - start_ind_sp1 + 1:], color='red', label='Other Sec/SPII residues')
+    axs[1].annotate("Sec/SPII", xy=(44, normalized_C_cs_values_pm_5aas[44]), xytext=(34, 0.001),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#1f77b4')
+    axs[1].annotate("Cys (+1 Sec/SPII SP)", xy=(75-start_ind, normalized_C_cs_values_pm_5aas[75-start_ind]), xytext=(1, 0.027),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#ff7f0e')
+    axs[1].annotate("Sec/SPI", xy=(12, normalized_sp1_cs_values_pm_5aas[12]), xytext=(1, 0.001),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='red')
+    axs[1].annotate("+1 Sec/SPI SP", xy=(75-start_ind_sp1, normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1]), xytext=(68, 0.027),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#ff7f0e')
+
+    plt.show()
+
+
+
+
+    plt.plot(range(motif_pos, motif_pos + 6), normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
+
+    plt.plot([motif_pos+5, motif_pos+5.5], [normalized_Tat_values[motif_pos+5], inbetween_residues_mean_2], color='#ff7f0e', label='Twin arginine motif')
+    plt.plot([motif_pos+5.5, motif_pos+6], [inbetween_residues_mean_2, normalized_Tat_values[motif_pos+6]], color='#1f77b4')#'#1f77b4')
+
+    plt.plot(range(motif_pos+6, len(normalized_Tat_values)), normalized_Tat_values[motif_pos + 6:], color='#1f77b4')
+    plt.plot([motif_pos-0.5, motif_pos-0.5], [0,1.1*max(normalized_Tat_values)], color='black', linestyle='dashed',linewidth=0.5)
+    plt.plot([motif_pos+5.5, motif_pos+5.5], [0,1.1*max(normalized_Tat_values)], color='black',linestyle='dashed',linewidth=0.5)
+    plt.xticks([motif_pos+3], ["RRXFLK"])
+    plt.ylim(0, 1.1 * max(normalized_Tat_values))
+
+    plt.bar(list(range(end_ind-start_ind)),(normalized_C_cs_values_pm_5aas[start_ind:end_ind]/normalized_C_cs_values_pm_5aas_counts[start_ind:end_ind]))
+    plt.xticks([75-start_ind], ["Cysteine (+1 CS)"])
+    plt.show()
+    print(normalized_C_cs_values_pm_5aas_counts)
+    # normalized_C_cs_values_pm_5aas = []
+    # for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
+    #     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
+    #     # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
+    #     #     true_lbl = seq2lbls[seq]
+    #     #     print(lbls[lbls.rfind("L") + 1])
+    #     #     print(seq)
+    #     #     print(lbls)
+    #     #     print(true_lbl)
+    #     if lbls[0] == "S" and seq2lbls[seq][0] == "S":
+    #         normalized_C_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
+    #         # normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spCSgrds)
+    #         cs_pred = lbls[:-1].rfind("S") + 1
+    #         if 5 < cs_pred < len(lbls) - 7:
+    #             normalized_C_cs_values_pm_5aas.append(normalized_C_cs_values[cs_pred-5:cs_pred+7])
     plt.bar(list(range(12)), np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
     plt.title("sec/SPII cleavage site")
     plt.show()
@@ -3197,33 +3418,48 @@ def visualize_inp_gradients():
 
 
 if __name__ == "__main__":
+    visualize_inp_gradients()
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat1/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # ,restrict_types=["SP", "NO_SP"])
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_actual_swa/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
     exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_high_lr_only_decoder/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
     exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_only_decoder_swa_ctLR/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
     exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_repeat5NoDrop_only/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
 
     exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
@@ -3231,7 +3467,7 @@ if __name__ == "__main__":
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
 
     exit(1)
     visualize_inp_gradients()
@@ -3366,28 +3602,28 @@ if __name__ == "__main__":
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=False)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
     # BERT TUNING + TSIGNAL TUNING; PRIOR BEST MODEL
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_repeat_val_on_f1s/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=False)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
     # NO BERT TUNING
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_repeat_notuningBert/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=False)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
     # BEST MODEL W BEST RESULTS <- ADD ONLY AN ENCODER ON TOP
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_repeat2_only_decoder/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=False)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
 
     exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
@@ -3435,7 +3671,7 @@ if __name__ == "__main__":
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
     exit(1)
     lg_and_tol2_lg = extract_calibration_probs_for_mdl(model="repeat2_only_decoder_",
                                                        folder='tuning_bert_repeat2_only_decoder/',
@@ -3447,7 +3683,7 @@ if __name__ == "__main__":
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
-                                            # ,restrict_types=["SP", "NO_SP"])
+    # ,restrict_types=["SP", "NO_SP"])
     exit(1)
     #BEST MODEL YET
     # mdl2results = extract_all_param_results(only_cs_position=False,
