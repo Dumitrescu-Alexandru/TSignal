@@ -2919,7 +2919,14 @@ def sanity_check(a, b):
                 print("elem")
     print("Welp... :/")
     exit(1)
+
+def get_hydro_values():
+    hydro_vals = {"A":1.8, "C":2.5, "D":-3.5, "E":-3.5, "F":2.8, "G":-0.4, "H":-3.2, "I":4.5, "K":-3.9,"L":3.8, "M":1.9, "N":-3.5, "P":-1.6, "Q":-3.5,"R":-4.5,"S":-0.8,"T":-0.7,"V":4.2,"W":-0.9,"Y":-1.3}
+
 def visualize_inp_gradients():
+    hydro_vals = {"A":1.8, "C":2.5, "D":-3.5, "E":-3.5, "F":2.8, "G":-0.4, "H":-3.2, "I":4.5, "K":-3.9,"L":3.8, "M":1.9,
+                  "N":-3.5, "P":-1.6, "Q":-3.5,"R":-4.5,"S":-0.8,"T":-0.7,"V":4.2,"W":-0.9,"Y":-1.3}
+
     folder = get_data_folder()
     seq2lbls = {}
     for i in [0,1,2]:
@@ -3093,10 +3100,14 @@ def visualize_inp_gradients():
             dict_ = pickle.load(open("../sp_data/random_folds_sp6_partitioned_data_{}_{}.bin".format(t,fold), "rb"))
             seqs2glbl_lbl.update({k:v[-1] for k,v in dict_.items()})
     avg_cs_pos = []
+    right5_hydro_vals = []
+    right5_hydro_aas = []
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
         if lbls[0] == "T" and seqs2glbl_lbl[seq] == "TAT":# and seq2lbls[seq][0] == "T":
             if motif_test in seq[:lbls.rfind("T")] and seq[-3+seq.find(motif_test):+seq.find(motif_test)-1] == "RR":
                 rr_seq = seq.find(motif_test)
+                right5_hydro_vals.append([hydro_vals[s_] for s_ in seq[rr_seq:rr_seq+15]])
+                right5_hydro_aas.append(seq[rr_seq:rr_seq+5])
                 normalized_C_cs_values = np.array(spTypeGrds) / np.sum(spTypeGrds)
                 # if 5<rr_seq <10:
                 #     normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+27])
@@ -3110,7 +3121,6 @@ def visualize_inp_gradients():
         if lbls[0] == "L" and seq2lbls[seq][0] == "L" and len(seq) >= 60:
             norm_values_sp2 += np.array(spTypeGrds[:60]) / np.sum(spTypeGrds[:60])
             counts_sp2 +=1
-    print(avg_cs_pos)
     start_ind, end_ind = 0, 0
     for i in range(150):
         if counts[i] not in [0, 1] and start_ind==0:
@@ -3169,6 +3179,8 @@ def visualize_inp_gradients():
     axs[0].annotate("", xy=(13, normalized_Tat_values[13]), xytext=(23, 0.005),
                 arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8)
     axs[0].annotate("Other residues", xy=(34, normalized_Tat_values[34]), xytext=(21, 0.001),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#1f77b4')
+    axs[0].annotate("Hydrophobic residue (KD=2.09)", xy=(26, normalized_Tat_values[26]), xytext=(41, 0.025),
                 arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#1f77b4')
     # axs[0].arrow(-100,0,100,100, width=1)
     # axs[0].arrow(-100,-100,100,100, width=1)
