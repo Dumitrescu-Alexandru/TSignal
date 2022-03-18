@@ -1005,7 +1005,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     iter_no = 0
     while patience != 0:
         if type(optimizer) == list:
-            print("LR:", optimizer[0].param_groups[0]['lr'])
+            print("LR:", optimizer[0].param_groups[0]['lr'], "LR_bert:", optimizer[1].param_groups[0]['lr'])
         if tune_bert and frozen_epochs > e:
             model.eval()
             model.classification_head.train()
