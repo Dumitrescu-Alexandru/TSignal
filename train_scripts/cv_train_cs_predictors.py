@@ -975,7 +975,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             # attach a schduler only on classification_head_optimizer
             classification_head_optimizer = optim.Adam(model.classification_head.parameters(),  lr=lr * 10 if high_lr
                                                                 else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
-            bert_optimizer =  optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001 if high_lr else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
+            bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
         else:
             # BERT model always has this LR, as any higher lr worsens the results
@@ -1291,8 +1291,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             model, optimizer_state_d = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                tune_bert=tune_bert, opt=True)
             if type(optimizer) == list:
-                classification_head_optimizer = optim.Adam(model.ProtBertBFD.parameters(), lr=0.0002, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
-                bert_optimizer = optim.Adam(model.classification_head.parameters(), lr=0.00001, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
+                classification_head_optimizer = optim.Adam(model.classification_head.parameters(), lr=0.0002, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
+                bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(), lr=0.00001, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
                 # dont know how to set the optimizer for StepLR to start with 0.0002 lr but have the rest of the states
                 # the same (momentum...
                 # classification_head_optimizer.load_state_dict(optimizer_state_d[0])
