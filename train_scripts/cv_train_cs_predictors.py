@@ -889,7 +889,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
                         random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
-                        high_lr=False, ):
+                        high_lr=False, cycle_length=5):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -1002,8 +1002,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     current_sptype_f1 = 0
     warmup_epochs = warmup_epochs if validate_on_mcc else 0
     e = -1
+    iter_no = 0
     while patience != 0:
-        print("LR:", optimizer.param_groups[0]['lr'])
+        if type(optimizer) == list:
+            print("LR:", optimizer[0].param_groups[0]['lr'])
         if tune_bert and frozen_epochs > e:
             model.eval()
             model.classification_head.train()
@@ -1018,6 +1020,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         losses = 0
         losses_glbl = 0
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
+            if scheduler is not None and e >= swa_start:
+                scheduler.step(iter_no % cycle_length)
+                if iter_no % cycle_length == 1:
+                    # if the last training step was the one corresponding to training with the lowest lr, update swa
+                    swa_model.to("cuda:0")
+                    swa_model.update_parameters(model)
+                    swa_model.to("cpu")
+                iter_no += 1
             seqs, lbl_seqs, _, glbl_lbls = batch
             # if augment_trimmed_seqs:
             cuts = np.random.randint(0,10,len(seqs))
@@ -1126,12 +1136,16 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 optimizer[1].step()
             else:
                 optimizer.step()
-        if use_swa and e >= swa_start:
+        if use_swa and e >= swa_start and lr_scheduler is None:
             swa_model.to("cuda:0")
-            swa_model.update_parameters(model)
+            if lr_scheduler is None:
+                # when lr_scheduler is not None, I currently update the per/step_cycle with lr sched update approach
+                swa_model.update_parameters(model)
             update_bn(dataset_loader, swa_model)
             swa_model.to("cpu")
-        if scheduler is not None and not high_lr:
+        if scheduler is not None and not use_swa:
+            # "and not use_swa" because currently when Im training swa mdl with scheduler, I average swa weights after
+            # training steps (and do lr_sched.step after no_steps also)
             if e < lr_sched_warmup and lr_sched_warmup > 2:
                 warmup_scheduler.step()
             else:
@@ -1277,13 +1291,15 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             model, optimizer_state_d = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                tune_bert=tune_bert, opt=True)
             if type(optimizer) == list:
-                classification_head_optimizer = optim.Adam(model.ProtBertBFD.parameters(), lr=0.00001, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
-                bert_optimizer = optim.Adam(model.classification_head.parameters(), lr=lr * 10 if high_lr else lr, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
+                classification_head_optimizer = optim.Adam(model.ProtBertBFD.parameters(), lr=0.0002, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
+                bert_optimizer = optim.Adam(model.classification_head.parameters(), lr=0.00001, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
                 # dont know how to set the optimizer for StepLR to start with 0.0002 lr but have the rest of the states
                 # the same (momentum...
                 # classification_head_optimizer.load_state_dict(optimizer_state_d[0])
                 bert_optimizer.load_state_dict(optimizer_state_d[1])
-
+                optimizer = [classification_head_optimizer, bert_optimizer]
+                # set the cycle s.t. after cycle_length steps, the lr will be decreased at 10^-5 from 2*10*-4
+                scheduler = torch.optim.lr_scheduler.StepLR(optimizer[0], step_size=1, gamma=np.exp(np.log(1/20)/cycle_length))
                 swa_model = AveragedModel(model)
                 swa_model.module.to("cpu")
                 eps = e + 50
@@ -1303,8 +1319,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 optimizer.load_state_dict(optimizer_state_d)
                 scheduler = None
                 warmup_scheduler = None
-        else:
-            warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
     if use_swa:
         update_bn(dataset_loader, swa_model.to(device))
         save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
@@ -1380,22 +1394,23 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # exit(1)
 
     model = nn.Linear(100,10)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-    ot_sched = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=10)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0002)
+    c_l = 10
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/20)/c_l))
     # sched = torch.optim.lr_scheduler.SWALR(optimizer, base_lr=0.0001, max_lr=0.01, step_size_up=1, step_size_down=10, mode='triangular')
-    ot_sched.step()
-    ot_sched.step()
+    # ot_sched.step()
+    # ot_sched.step()
     # sched = SWALR(optimizer, swa_lr=10e-5, anneal_strategy="linear", anneal_epochs=20)
     # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=10)
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, )
+    # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, )
     # schedd_ = torch.optim.lr_scheduler.CyclicLR(optimizer,)
     lrs = []
     for i in range(40):
         # sched.step(i%5)
-        lr_scheduler.step(i%5)
+        lr_scheduler.step(i % c_l)
         # ot_sched.step()
         # lr_scheduler.step(i%5)
-        lrs.append(optimizer.param_groups[0]['lr'])
+        lrs.append([i%c_l, optimizer.param_groups[0]['lr']])
         # sched.step(i%5)
     print(lrs)
     exit(1)

@@ -104,6 +104,7 @@ def parse_arguments():
     parser.add_argument("--augment_trimmed_seqs", default=False, action="store_true")
     parser.add_argument("--saliency_map_save_fn", default="save.bin", type=str)
     parser.add_argument("--hook_layer", default="bert", type=str)
+    parser.add_argument("--cycle_length", default=5, type=int)
 
     return parser.parse_args()
 
@@ -234,7 +235,7 @@ if __name__ == "__main__":
                                 tune_bert=args.tune_bert, frozen_epochs=args.frozen_epochs, extended_sublbls=args.extended_sublbls,
                                 random_folds=args.random_folds, train_on_subset=args.train_on_subset, train_only_decoder=args.train_only_decoder,
                                 remove_bert_layers=args.remove_bert_layers, augment_trimmed_seqs=args.augment_trimmed_seqs,
-                                high_lr=args.high_lr)
+                                high_lr=args.high_lr, cycle_length=args.cycle_length)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
