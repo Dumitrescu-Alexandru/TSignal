@@ -966,7 +966,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
 
     if tune_bert:
-        if use_swa and lr_scheduler != "none":
+        if use_swa:
             # in this case, we will use a cyclic scheduler on the best model found based on early stopping. few problems:
             # 1. the BERT lr is much more sensitive than classification_head optimizer
             # 2. We need to load the optimizer(best_model) found in early stopping to resume training
