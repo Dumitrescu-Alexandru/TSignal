@@ -3064,9 +3064,6 @@ def visualize_inp_gradients():
     tobetestd = ayer_bertGrads_fold03l.copy()
     tobetestd.extend(ayer_bertGrads_fold13l)
     tobetestd.extend(ayer_bertGrads_fold23l)
-    # tobetestd = ayer_IEgrads_fold13l.copy()
-    # tobetestd.extend(ayer_IEgrads_fold23l)
-    # tobetestd.extend(ayer_IEgrads_fold03l)
     # tobetestd = swa_bert_grads_fold_0.copy()
     # tobetestd.extend(swa_bert_grads_fold_1)
     # tobetestd.extend(swa_bert_grads_fold_2)
@@ -3074,6 +3071,17 @@ def visualize_inp_gradients():
     tobetestd = swa_IEembs_grads_fold_0.copy()
     tobetestd.extend(swa_IEembs_grads_fold_1)
     tobetestd.extend(swa_IEembs_grads_fold_2)
+    # print(len(tobetestd))
+
+    # tobetestd = ayer_IEgrads_fold13l.copy()
+    # tobetestd.extend(ayer_IEgrads_fold23l)
+    # tobetestd.extend(ayer_IEgrads_fold03l)
+    # print(len(tobetestd))
+
+
+    # tobetestd = swa_IEembs_grads_fold_1.copy()
+    # tobetestd.extend(swa_IEembs_grads_fold_1)
+    # tobetestd.extend(swa_IEembs_grads_fold_2)
 
     # tobetestd = remake_ayer_bertGrads_fold23l
     # tobetestd = ongoing3lrunfold0
@@ -3122,6 +3130,7 @@ def visualize_inp_gradients():
             norm_values_sp2 += np.array(spTypeGrds[:60]) / np.sum(spTypeGrds[:60])
             counts_sp2 +=1
     start_ind, end_ind = 0, 0
+    print(avg_cs_pos,np.mean(np.stack(right5_hydro_vals), axis=0),right5_hydro_aas)
     for i in range(150):
         if counts[i] not in [0, 1] and start_ind==0:
             start_ind = i
@@ -3430,6 +3439,18 @@ def visualize_inp_gradients():
 
 
 if __name__ == "__main__":
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat1/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_cycle_lr_swa_only_decoder/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     visualize_inp_gradients()
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat1/",

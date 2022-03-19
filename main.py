@@ -105,6 +105,7 @@ def parse_arguments():
     parser.add_argument("--saliency_map_save_fn", default="save.bin", type=str)
     parser.add_argument("--hook_layer", default="bert", type=str)
     parser.add_argument("--cycle_length", default=5, type=int)
+    parser.add_argument("--lr_multiplier_swa", default=20, type=int, help="number to multiply the maximum swa lr")
 
     return parser.parse_args()
 
@@ -235,7 +236,7 @@ if __name__ == "__main__":
                                 tune_bert=args.tune_bert, frozen_epochs=args.frozen_epochs, extended_sublbls=args.extended_sublbls,
                                 random_folds=args.random_folds, train_on_subset=args.train_on_subset, train_only_decoder=args.train_only_decoder,
                                 remove_bert_layers=args.remove_bert_layers, augment_trimmed_seqs=args.augment_trimmed_seqs,
-                                high_lr=args.high_lr, cycle_length=args.cycle_length)
+                                high_lr=args.high_lr, cycle_length=args.cycle_length,lr_multiplier_swa=args.lr_multiplier_swa)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
