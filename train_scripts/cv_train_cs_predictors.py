@@ -1020,7 +1020,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         losses = 0
         losses_glbl = 0
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
-            if scheduler is not None and e >= swa_start:
+            if lr_scheduler != "none" and e >= swa_start:
                 scheduler.step(iter_no % cycle_length)
                 if iter_no % (cycle_length+1) == 1:
                     # if the last training step was the one corresponding to training with the lowest lr, update swa
@@ -1136,12 +1136,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 optimizer[1].step()
             else:
                 optimizer.step()
-        if use_swa and e >= swa_start and lr_scheduler is None:
+        if use_swa and e >= swa_start and lr_scheduler == "none":
             swa_model.to("cuda:0")
-            if lr_scheduler is None:
-                # when lr_scheduler is not None, I currently update the per/step_cycle with lr sched update approach
-                swa_model.update_parameters(model)
-            update_bn(dataset_loader, swa_model)
+            swa_model.update_parameters(model)
             swa_model.to("cpu")
         if scheduler is not None and not use_swa:
             # "and not use_swa" because currently when Im training swa mdl with scheduler, I average swa weights after
@@ -1300,7 +1297,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 bert_optimizer.load_state_dict(optimizer_state_d[1])
                 optimizer = [classification_head_optimizer, bert_optimizer]
                 # set the cycle s.t. after cycle_length steps, the lr will be decreased at 10^-5 from 2*10*-4
-                scheduler = torch.optim.lr_scheduler.StepLR(optimizer[0], step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/cycle_length))
+                if lr_scheduler == "none":
+                    # if lr scheduler is none, simply load the optimizer and continue training...
+                    classification_head_optimizer.load_state_dict(optimizer_state_d[0])
+                else:
+                    scheduler = torch.optim.lr_scheduler.StepLR(optimizer[0], step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/cycle_length))
                 swa_model = AveragedModel(model)
                 swa_model.module.to("cpu")
                 eps = e + 30
@@ -1393,12 +1394,37 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # opt1, opt2 = torch.optim.Adam(model2.parameters(), lr=0.1), torch.optim.Adam(model3.parameters(), lr=0.1)
     # opt1.load_state_dict(loaded_opt)
     # exit(1)
+    # def a(epoch):
+    #
+    #     swa_start = 70
+    #     swa_lr=0.05
+    #     lr_init=0.1
+    #     t = epoch / swa_start
+    #     lr_ratio = swa_lr / lr_init
+    #     swa_lr = 0.05
+    #     lr_init = 0.1
+    #     if t <= 0.5:
+    #         factor = 1.0
+    #     elif t <= 0.9:
+    #         factor = 1.0 - (1.0 - lr_ratio) * (t - 0.5) / 0.4
+    #     else:
+    #         factor = lr_ratio
+    #     return lr_init * factor
+    #
+    # lrs =[]
+    # for e in range(150):
+    #     lrs.append(a(e))
+    # print(lrs)
+    # j = [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
+    # print(len(j))
+    # exit(1)
     lr_multiplier_swa = 100
     model = nn.Linear(100,10)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.00001 * lr_multiplier_swa)
     c_l = 5
     # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
+    swa_scheduler = SWALR(optimizer, swa_lr=0.0005, anneal_epochs=20)
     # sched = torch.optim.lr_scheduler.SWALR(optimizer, base_lr=0.0001, max_lr=0.01, step_size_up=1, step_size_down=10, mode='triangular')
     # ot_sched.step()
     # ot_sched.step()
@@ -1409,10 +1435,11 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     lrs = []
     for i in range(40):
         # sched.step(i%5)
-        lr_scheduler.step(i % (c_l+1))
+        # lr_scheduler.step(i % (c_l+1))
+        lrs.append([i, optimizer.param_groups[0]['lr']])
+        swa_scheduler.step()
         # ot_sched.step()
         # lr_scheduler.step(i%5)
-        lrs.append([i%c_l, optimizer.param_groups[0]['lr']])
         # sched.step(i%5)
     print(lrs)
     exit(1)

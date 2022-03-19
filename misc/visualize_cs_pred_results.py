@@ -3439,6 +3439,8 @@ def visualize_inp_gradients():
 
 
 if __name__ == "__main__":
+    visualize_validation(run="cycle_lr_swa_only_decoder_", folds=[1, 2],
+                         folder="tuning_bert_cycle_lr_swa_only_decoder/")
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat1/",
                                             compare_mdl_plots=False,
