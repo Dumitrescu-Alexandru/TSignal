@@ -1327,6 +1327,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 optimizer.load_state_dict(optimizer_state_d)
                 scheduler = None
                 warmup_scheduler = None
+            # since we dont use early stopping anymore, add these seqs
+            sp_dataset.add_test_seqs()
+            dataset_loader = torch.utils.data.DataLoader(sp_dataset,
+                                                         batch_size=bs, shuffle=True,
+                                                         num_workers=4, collate_fn=collate_fn)
     if use_swa:
         update_bn(dataset_loader, swa_model.to(device))
         save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)

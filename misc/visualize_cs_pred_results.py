@@ -869,7 +869,8 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
                 best_ep = int(l.split(":")[2].split("epoch")[-1].replace(" ", ""))
                 avg_last_5 = []
                 for i in range(5):
-                    best_mcc = ep2mcc[best_ep - i]
+                    # best_mcc = 0
+                    # best_mcc = ep2mcc[best_ep - i]
                     avg_last_5.append(best_mcc)
                 best_mcc = np.mean(avg_last_5)
         all_best_mccs.append(best_mcc)
@@ -3659,19 +3660,26 @@ def rename():
 
 
 if __name__ == "__main__":
-    plot_sp6_vs_tnmt_violin()
-    exit(1)
+    # plot_sp6_vs_tnmt_violin()
+    # exit(1)
     # plot_compare_pos_nopos()
     # plot_comparative_performance_sp1_mdls()
     # extract_performance_over_tolerance()
     # compare_experiment_results()
-    plot_sp6_vs_tnmt()
+    # plot_sp6_vs_tnmt()
     # plot_perf_over_data_perc
     # rename()
     # exit(1)
     # visualize_validation(run="fixed_high_lr_swa_only_decoder_", folds=[0, 1],
     #                      folder="tuning_bert_fixed_high_lr_swa_only_repeat1/")
     # visualize_inp_gradients()
+    # exit(1)
+    # repeat7_swa_onlyDec_1_2 w dropout, but quite random; stopped early etc 0.8066
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat7/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
     # exit(1)
     # wo dropout 0.8133
     # mdl2results = extract_all_param_results(only_cs_position=False,

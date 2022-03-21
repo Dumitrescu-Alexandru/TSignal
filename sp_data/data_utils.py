@@ -351,6 +351,11 @@ class CSPredsDataset(Dataset):
                  train_on_subset=1., pick_seqs=False):
         extended_pref = "extended_" if extended_sublbls else ""
         self.life_grp, self.seqs, self.lbls, self.glbl_lbl = [], [], [], []
+        self.partitions = partitions
+        self.extended_pref = extended_pref
+        self.form_sp_reg_data = form_sp_reg_data
+        self.lbl2inds = lbl2inds
+        self.glbl_lbl_2ind =glbl_lbl_2ind
         if partitions is not None:
             # when using partitions, the sp6 data partition files will be used in train/testing
             for p in partitions:
@@ -403,6 +408,17 @@ class CSPredsDataset(Dataset):
     def __getitem__(self, item):
         return {"seq": self.seqs[item], "lbl": self.lbls[item], "lg": self.life_grp[item],
                 "glbl_lbl": self.glbl_lbl[item]}
+
+    def add_test_seqs(self):
+        for p in self.partitions:
+            for s in ['test']:
+                d_file = "sp6_partitioned_data_sublbls_" + self.extended_pref + "{}_{}.bin".format(s, p) \
+                    if self.form_sp_reg_data else "sp6_partitioned_data_" + self.extended_pref + "{}_{}.bin".format(s, p)
+                data_dict = pickle.load(open(data_folder + d_file, "rb"))
+                self.seqs.extend(list(data_dict.keys()))
+                self.lbls.extend([[self.lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
+                self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
+                self.glbl_lbl.extend([self.glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
 
     def extract_subset(self, data_dict, train_on_subset, lbl2inds, glbl_lbl_2ind):
         lg_and_sptyp2_inds = {}
