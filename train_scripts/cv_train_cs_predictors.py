@@ -889,7 +889,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
                         random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
-                        high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False):
+                        high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -1328,10 +1328,11 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 scheduler = None
                 warmup_scheduler = None
             # since we dont use early stopping anymore, add these seqs
-            sp_dataset.add_test_seqs()
-            dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                         batch_size=bs, shuffle=True,
-                                                         num_workers=4, collate_fn=collate_fn)
+            if add_val_data_on_swa:
+                sp_dataset.add_test_seqs()
+                dataset_loader = torch.utils.data.DataLoader(sp_dataset,
+                                                             batch_size=bs, shuffle=True,
+                                                             num_workers=4, collate_fn=collate_fn)
     if use_swa:
         update_bn(dataset_loader, swa_model.to(device))
         save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)

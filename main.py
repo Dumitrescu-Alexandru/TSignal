@@ -107,6 +107,7 @@ def parse_arguments():
     parser.add_argument("--cycle_length", default=5, type=int)
     parser.add_argument("--lr_multiplier_swa", default=20, type=int, help="number to multiply the maximum swa lr")
     parser.add_argument("--change_swa_decoder_optimizer", default=False, action="store_true", help="change decoder optimizer when starting swa from Adam to SGD")
+    parser.add_argument("--add_val_data_on_swa", default=False, action="store_true", help="SWA isnt based on early stopping, so the validation data can also be used for training")
 
     return parser.parse_args()
 
@@ -238,7 +239,7 @@ if __name__ == "__main__":
                                 random_folds=args.random_folds, train_on_subset=args.train_on_subset, train_only_decoder=args.train_only_decoder,
                                 remove_bert_layers=args.remove_bert_layers, augment_trimmed_seqs=args.augment_trimmed_seqs,
                                 high_lr=args.high_lr, cycle_length=args.cycle_length,lr_multiplier_swa=args.lr_multiplier_swa,
-                                change_swa_decoder_optimizer=args.change_swa_decoder_optimizer)
+                                change_swa_decoder_optimizer=args.change_swa_decoder_optimizer, add_val_data_on_swa=args.add_val_data_on_swa)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
