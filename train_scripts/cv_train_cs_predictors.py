@@ -1304,10 +1304,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     scheduler = torch.optim.lr_scheduler.StepLR(optimizer[0], step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/cycle_length))
                 swa_model = AveragedModel(model)
                 swa_model.module.to("cpu")
-                eps = e + 30
+                eps = e + best_epoch * 0.5
                 # eps = e + int(best_epoch * 0.5)
-                print("Started SWA training for {} more epochs".format(30))
-                logging.info("Started SWA training for {} more epochs".format(30))
+                print("Started SWA training for {} more epochs".format(best_epoch* 0.5))
+                logging.info("Started SWA training for {} more epochs".format(best_epoch * 0.5))
             else:
                 parameters = [
                     {"params": model.classification_head.parameters()},

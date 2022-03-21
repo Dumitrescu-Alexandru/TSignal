@@ -556,36 +556,78 @@ def plot_mcc(mccs, name="param_search_0.2_2048_0.0001_"):
 
 def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.2_2048_0.0001_", sp_type_f1=[[]]):
     cs_res_euk, cs_res_neg, cs_res_pos, cs_res_arc = results
-    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
+    fig, axs = plt.subplots(2, 2)
+
     for i in range(4):
-        axs[0, 0].plot(cs_res_euk[i], label="Eukaryote {} tol={}".format(metric, i))
+        if i == 0:
+            for j in range(4):
+                box = axs[j//2, j%2].get_position()
+                axs[j//2, j%2].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1, box.height * 0.75])
+
         if i == 0 and metric == "f1"  and len(sp_type_f1[0]) != 0:
-            axs[0, 0].plot(sp_type_f1[0], color='black', label="Eukaryote sp type F1")
-        axs[0, 0].set_ylabel(metric)
-        axs[0, 0].legend()
+            axs[0, 0].plot(sp_type_f1[0], color='black', label="SP type F1", linewidth=0.8)
+        axs[0, 0].plot(cs_res_euk[i], label="CS tol={}".format(i), linewidth=0.8)
+        axs[0, 0].set_ylabel(metric, fontsize=8)
+        # axs[0, 0].legend()
         axs[0, 0].set_ylim(-0.1, 1.1)
+        axs[0,0].set_yticks([0,0.2,0.4,0.6,0.8,1])
+        axs[0,0].set_yticklabels([0,0.2,0.4,0.6,0.8,1], fontsize=8)
+        axs[0, 0].set_xticks([0, 25, 50, 75])
+        axs[0, 0].set_xticklabels([0, 25, 50, 75], fontsize=8)
+        axs[0, 0].set_title("eukarya", fontsize=8)
+        if i == 0:
+            axs[0, 0].annotate("SWA start", xy=(60, cs_res_euk[0][60]), xytext=(50, 0.001),
+                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=8, color='black')
 
-        axs[0, 1].plot(cs_res_neg[i], label="Negative {} tol={}".format(metric, i))
+        axs[0, 1].plot(cs_res_neg[i], linewidth=0.8)
         if i == 0 and metric == "f1" and len(sp_type_f1[0]) != 0:
-            axs[0, 1].plot(sp_type_f1[1], color='black' , label="Negative sp type F1")
-        axs[0, 1].legend()
+            axs[0, 1].plot(sp_type_f1[1], color='black', linewidth=0.8)
+        # axs[0, 1].legend()
         axs[0, 1].set_ylim(-0.1, 1.1)
+        if i == 0:
+            axs[0, 1].annotate("SWA start", xy=(60, cs_res_neg[0][60]), xytext=(50, 0.001),
+                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=8, color='black')
+        axs[0, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        axs[0, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+        axs[0, 1].set_xticks([0, 25, 50, 75])
+        axs[0, 1].set_xticklabels([0, 25, 50, 75], fontsize=8)
+        axs[0, 1].set_title("gn bacteria", fontsize=8)
 
-        axs[1, 0].plot(cs_res_pos[i], label="Positive {} tol={}".format(metric, i))
+        axs[1, 0].plot(cs_res_pos[i], linewidth=0.8)
         if i == 0  and metric == "f1"  and len(sp_type_f1[0]) != 0:
-            axs[1, 0].plot(sp_type_f1[2], color='black', label="Positive sp type F1")
-        axs[1, 0].legend()
-        axs[1, 0].set_xlabel("epochs")
+            axs[1, 0].plot(sp_type_f1[2], color='black', linewidth=0.8)
+        # axs[1, 0].legend()
+        axs[1, 0].set_xlabel("epoch", fontsize=8)
         axs[1, 0].set_ylim(-0.1, 1.1)
-        axs[1, 0].set_ylabel(metric)
+        axs[1, 0].set_ylabel(metric, fontsize=8)
+        if i == 0:
+            axs[1, 0].annotate("SWA start", xy=(60, cs_res_pos[0][60]), xytext=(50, 0.001),
+                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=8, color='black')
+        axs[1, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        axs[1, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+        axs[1, 0].set_xticks([0, 25, 50, 75])
+        axs[1, 0].set_xticklabels([0, 25, 50, 75], fontsize=8)
+        axs[1, 0].set_title("gp bacteria", fontsize=8)
 
-        axs[1, 1].plot(cs_res_arc[i], label="Archaea {} tol={}".format(metric, i))
+        axs[1, 1].plot(cs_res_arc[i], linewidth=0.8)
         if i == 0  and metric == "f1" and len(sp_type_f1[0]) != 0:
-            axs[1, 1].plot(sp_type_f1[3], color='black', label="Archaea sp type F1")
-        axs[1, 1].legend()
-        axs[1, 1].set_xlabel("epochs")
-
+            axs[1, 1].plot(sp_type_f1[3], color='black', linewidth=0.8)
+        # axs[1, 1].legend()
+        axs[1, 1].set_xlabel("epoch", fontsize=8)
         axs[1, 1].set_ylim(-0.1, 1.1)
+        if i == 0:
+            axs[1, 1].annotate("SWA start", xy=(60, cs_res_arc[0][60]), xytext=(50, 0.001),
+                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=8, color='black')
+        axs[1, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        axs[1, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+        axs[1, 1].set_xticks([0, 25, 50, 75])
+        axs[1, 1].set_xticklabels([0, 25, 50, 75], fontsize=8)
+        axs[1, 1].set_title("archaea", fontsize=8)
+
+    fig.legend(loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=5, fontsize=8)
 
     # plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, metric))
     plt.show()
@@ -2929,10 +2971,13 @@ def visualize_inp_gradients():
 
     folder = get_data_folder()
     seq2lbls = {}
+    seq2lg = {}
+    ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     for i in [0,1,2]:
         for t in ["train", "test"]:
             a = pickle.load(open(folder+"random_folds_sp6_partitioned_data_{}_{}.bin".format(t,i), "rb"))
             seq2lbls.update({seq:lbls[1] for seq,lbls in a.items()})
+            seq2lg.update({seq:lbls[-1] for seq,lbls in a.items()})
     preds_and_probs_BERT = pickle.load(open("using_bert_grds_input_gradients_for_cs_preds_1.bin", "rb"))
     preds_and_probs_IEPE = pickle.load(open("using_posEncOut_grds_input_gradients_for_cs_preds_1.bin", "rb"))
     preds_and_probs_IE = pickle.load(open("input_gradients_for_cs_preds_1.bin", "rb"))
@@ -3068,9 +3113,23 @@ def visualize_inp_gradients():
     # tobetestd.extend(swa_bert_grads_fold_1)
     # tobetestd.extend(swa_bert_grads_fold_2)
 
+
+    # this is for tuning_bert_fixed_high_lr_swa_only_repeat1/fixed_high_lr_swa_only_decoder_0_1_sptype.bin mdl. Load the
+    # glbl labels as well to look at the TatLipo
     tobetestd = swa_IEembs_grads_fold_0.copy()
     tobetestd.extend(swa_IEembs_grads_fold_1)
     tobetestd.extend(swa_IEembs_grads_fold_2)
+
+    sp_type_preds = {k: ind2glbl_lbl[v] for k,v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
+                                      "fixed_high_lr_swa_only_decoder_0_1_best_sptype.bin", "rb")).items()}
+    sp_type_preds.update({k: ind2glbl_lbl[v] for k, v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
+                                                                     "fixed_high_lr_swa_only_decoder_0_2_best_sptype.bin",
+                                                                     "rb")).items()})
+
+    sp_type_preds.update({k: ind2glbl_lbl[v] for k, v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
+                                                                     "fixed_high_lr_swa_only_decoder_1_2_best_sptype.bin",
+                                                                     "rb")).items()})
+
     # print(len(tobetestd))
 
     # tobetestd = ayer_IEgrads_fold13l.copy()
@@ -3113,6 +3172,7 @@ def visualize_inp_gradients():
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
         if lbls[0] == "T" and seqs2glbl_lbl[seq] == "TAT":# and seq2lbls[seq][0] == "T":
             if motif_test in seq[:lbls.rfind("T")] and seq[-3+seq.find(motif_test):+seq.find(motif_test)-1] == "RR":
+                print(seq)
                 rr_seq = seq.find(motif_test)
                 right5_hydro_vals.append([hydro_vals[s_] for s_ in seq[rr_seq:rr_seq+15]])
                 right5_hydro_aas.append(seq[rr_seq:rr_seq+5])
@@ -3251,6 +3311,10 @@ def visualize_inp_gradients():
         #     print(seq)
         #     print(lbls)
         #     print(true_lbl)
+
+        # if seq2lg[seq] == "TATLIPO" and sp_type_preds[seq] == "TATLIPO":
+        #     print(lbls, seq2lbls[seq][0])
+        #     exit(1)
         if lbls[0] == "S" and seq2lbls[seq][0] == "S":
             normalized_C_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
             normalized_C_cs_values = normalized_C_cs_values[:len(seq)]
@@ -3292,6 +3356,7 @@ def visualize_inp_gradients():
             start_ind = i
         elif normalized_C_cs_values_pm_5aas[i] in [0, 1] and start_ind != 0 and end_ind == 0:
             end_ind = i-1
+    print(max(normalized_C_cs_values_pm_5aas_counts))
     normalized_C_cs_values_pm_5aas = normalized_C_cs_values_pm_5aas[start_ind:end_ind] / normalized_C_cs_values_pm_5aas_counts[start_ind:end_ind]
     inbetween_cysteine1 = (normalized_C_cs_values_pm_5aas[75-start_ind-1]+normalized_C_cs_values_pm_5aas[75-start_ind])/2
     inbetween_cysteine2 = (normalized_C_cs_values_pm_5aas[75-start_ind] + normalized_C_cs_values_pm_5aas[75-start_ind+1])/2
@@ -3439,6 +3504,52 @@ def visualize_inp_gradients():
 
 
 if __name__ == "__main__":
+    # visualize_validation(run="fixed_high_lr_swa_only_decoder_", folds=[0, 1],
+    #                      folder="tuning_bert_fixed_high_lr_swa_only_repeat1/")
+    # visualize_inp_gradients()
+    # exit(1)
+    # wo dropout
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat6/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat5/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # w dropout 8.12
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat4/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    #
+    # w dropout 8.13
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat3/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    # w dropout 8.2 but different (more random) approach I think. had the number of epochs_swa=0.5 * epochs_best_mdl
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat1/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    # no dropout 8.18
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat2/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     visualize_validation(run="cycle_lr_swa_only_decoder_", folds=[1, 2],
                          folder="tuning_bert_cycle_lr_swa_only_decoder/")
     mdl2results = extract_all_param_results(only_cs_position=False,
