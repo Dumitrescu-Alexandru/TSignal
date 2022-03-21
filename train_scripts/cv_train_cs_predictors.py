@@ -1303,7 +1303,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 if lr_scheduler == "none" and not change_swa_decoder_optimizer:
                     # if lr scheduler is none, simply load the optimizer and continue training...
                     classification_head_optimizer.load_state_dict(optimizer_state_d[0])
-                else:
+                elif lr_scheduler != "none":
                     scheduler = torch.optim.lr_scheduler.StepLR(optimizer[0], step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/cycle_length))
                 swa_model = AveragedModel(model)
                 swa_model.module.to("cpu")
