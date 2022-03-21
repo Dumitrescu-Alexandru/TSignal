@@ -1299,6 +1299,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 bert_optimizer.load_state_dict(optimizer_state_d[1])
                 optimizer = [classification_head_optimizer, bert_optimizer]
                 # set the cycle s.t. after cycle_length steps, the lr will be decreased at 10^-5 from 2*10*-4
+
                 if lr_scheduler == "none" and not change_swa_decoder_optimizer:
                     # if lr scheduler is none, simply load the optimizer and continue training...
                     classification_head_optimizer.load_state_dict(optimizer_state_d[0])
