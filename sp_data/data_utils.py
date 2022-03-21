@@ -356,6 +356,7 @@ class CSPredsDataset(Dataset):
         self.form_sp_reg_data = form_sp_reg_data
         self.lbl2inds = lbl2inds
         self.glbl_lbl_2ind =glbl_lbl_2ind
+        self.data_folder = data_folder
         if partitions is not None:
             # when using partitions, the sp6 data partition files will be used in train/testing
             for p in partitions:
@@ -414,7 +415,7 @@ class CSPredsDataset(Dataset):
             for s in ['test']:
                 d_file = "sp6_partitioned_data_sublbls_" + self.extended_pref + "{}_{}.bin".format(s, p) \
                     if self.form_sp_reg_data else "sp6_partitioned_data_" + self.extended_pref + "{}_{}.bin".format(s, p)
-                data_dict = pickle.load(open(data_folder + d_file, "rb"))
+                data_dict = pickle.load(open(self.data_folder + d_file, "rb"))
                 self.seqs.extend(list(data_dict.keys()))
                 self.lbls.extend([[self.lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
                 self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
