@@ -75,6 +75,9 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     cnt1, cnt2 = 0, 0
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         lg, sp_info = l.split("|")
+        # if p == "L" and s[p.rfind("L")+1] != "C":
+        #     sp_info = "NO_SP"
+        #     p = "I" * len(p)
         ind = 0
         predicted_sp = p[0]
         is_sp = predicted_sp in sp_types
@@ -1082,7 +1085,7 @@ def get_f1_scores(rec, prec):
 
 
 def extract_all_param_results(result_folder="results_param_s_2/", only_cs_position=False, compare_mdl_plots=False,
-                              remove_test_seqs=False, benchmark=True, restrict_types=None, return_results=False):
+                              remove_test_seqs=False, benchmark=True, restrict_types=None, return_results=False, prints=True):
     sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
                        0.556, 0.583]
     sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
@@ -1181,97 +1184,97 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
             dos = mdl_params[mdl_params.find("dos"):].split("_")[1]
             params += "_{}".format(dos)
         mdlind2mdlparams[mdl_ind] = params
+    if prints:
+        print("\n\nMCC SEC/SPI TABLE\n\n")
+        for mdl_ind in best_to_worst_mdls:
+            mdl_params = " & ".join(mdlind2mdlparams[mdl_ind].split("_"))
+            print(mdl_params, " & ", " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][0]]), "&",
+                  " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][1][1:]]), " & ",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nMCC SEC/SPI TABLE\n\n")
-    for mdl_ind in best_to_worst_mdls:
-        mdl_params = " & ".join(mdlind2mdlparams[mdl_ind].split("_"))
-        print(mdl_params, " & ", " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][0]]), "&",
-              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][1][1:]]), " & ",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nF1 table SEC/SPI\n\n")
+        no_of_params = len(mdlind2mdlparams[best_to_worst_mdls[0]].split("_"))
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_sp1), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print("total f1 for {}: {} compared to sp6: {}".format(mdl_ind, mdl2summarized_results[mdl_ind]/4, sp6_summarized/4))
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-5])]), " & ",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nF1 table SEC/SPI\n\n")
-    no_of_params = len(mdlind2mdlparams[best_to_worst_mdls[0]].split("_"))
-    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_sp1), " & \\\\ \\hline")
-    for mdl_ind in best_to_worst_mdls:
-        print("total f1 for {}: {} compared to sp6: {}".format(mdl_ind, mdl2summarized_results[mdl_ind]/4, sp6_summarized/4))
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-5])]), " & ",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nRecall table SEC/SPI\n\n")
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_sp1), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][6]]), " & ",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nPrec table SEC/SPI\n\n")
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_sp1), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][7]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nRecall table SEC/SPI\n\n")
-    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_sp1), " & \\\\ \\hline")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][6]]), " & ",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
-    print("\n\nPrec table SEC/SPI\n\n")
-    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_sp1), " & \\\\ \\hline")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][7]]), "&",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nF1 table SEC/SPII \n\n")
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_sp2), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-4])]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nF1 table SEC/SPII \n\n")
-    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_sp2), " & \\\\ \\hline")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-4])]), "&",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nRecall table SEC/SPII \n\n")
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_sp2), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][8]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nRecall table SEC/SPII \n\n")
-    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_sp2), " & \\\\ \\hline")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][8]]), "&",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nPrec table SEC/SPII \n\n")
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_sp2), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][9]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nPrec table SEC/SPII \n\n")
-    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_sp2), " & \\\\ \\hline")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][9]]), "&",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nF1 table TAT/SPI \n\n")
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_tat), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-3])]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nF1 table TAT/SPI \n\n")
-    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_tat), " & \\\\ \\hline")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-3])]), "&",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nRecall table TAT/SPI \n\n")
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_tat), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][10]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nRecall table TAT/SPI \n\n")
-    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_tat), " & \\\\ \\hline")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][10]]), "&",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nPrec table TAT/SPI \n\n")
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_tat), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][11]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nPrec table TAT/SPI \n\n")
-    print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_tat), " & \\\\ \\hline")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][11]]), "&",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nMCC SEC/SPII TABLE\n\n")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][2]]), "&",
+                  " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][3]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nMCC SEC/SPII TABLE\n\n")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][2]]), "&",
-              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][3]]), "&",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nMCC TAT/SPI TABLE\n\n")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][4]]), "&",
+                  " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][5]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
-    print("\n\nMCC TAT/SPI TABLE\n\n")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][4]]), "&",
-              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][5]]), "&",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
-
-    print("\n\nSP-type preds F1\n\n")
-    for mdl_ind in best_to_worst_mdls:
-        print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-              " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][-2]]), "&",
-              round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+        print("\n\nSP-type preds F1\n\n")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(mcc, 3)) for mcc in mdl2results[mdl_ind][-2]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
     return mdl2results
 
@@ -2035,6 +2038,153 @@ def plot_performance():
     # plt.xlabel("Life group, SP/NO-SP; No. of datapoints")
     # plt.ylabel("Percentage from that life group")
     # plt.show()
+
+def plot_sp6_vs_tnmt_violin():
+    import matplotlib.patches as mpatches
+    all_mdl_2results = []
+    sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
+    tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
+    runs = 7
+    for run_no in range(1,runs):
+        print("Computing results for run number {}".format(run_no))
+        run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
+        mdl2results = extract_all_param_results(only_cs_position=False,
+                                                result_folder=run_results_folder,
+                                                compare_mdl_plots=False,
+                                                remove_test_seqs=False,
+                                                benchmark=True,
+                                                prints=False)
+        mdl_ind = 0
+        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
+        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][6]]))
+        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][7]]))
+        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-4])]))
+        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][8]]))
+        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][9]]))
+        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-3])]))
+        tat_f1s.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
+        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        mcc1_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][0]]))
+        mcc2_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][1][1:]]))
+        mcc1_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][2]]))
+        mcc2_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
+        mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
+        mcc2_tat.append([mcc for mcc in mdl2results[mdl_ind][5]])
+    print(sp1_f1s)
+    tnmt_f1 = [[0.692, 0.737, 0.769, 0.782 ], [0.462, 0.564, 0.59, 0.59 ], [0.526, 0.684, 0.684, 0.684],
+               [0.606, 0.697, 0.667, 0.727]]
+    tnmt_f1_sp2 = [[0.906 , 0.912 , 0.914 ,  0.917] , [0.927 , 0.933 , 0.933 , 0.933] , [0.75 , 0.75 , 0.75 , 0.75]]
+    tnmt_f1_tat = [[0.613 , 0.79 , 0.806 , 0.855] , [0.634 , 0.732 ,  0.829 ,  0.829] , [ 0.3 , 0.5 , 0.7 , 0.7]]
+    sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
+                       0.556, 0.583]
+    sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
+    sp6_recalls_tat = [0.706, 0.765, 0.784, 0.804, 0.556, 0.556, 0.667, 0.667, 0.333, 0.444, 0.444, 0.444]
+    sp6_precs_sp1 = [0.661, 0.685, 0.715, 0.733, 0.534, 0.562, 0.575, 0.603, 0.632, 0.632, 0.632, 0.632, 0.643, 0.714,
+                     0.714, 0.75]
+    sp6_precs_sp2 = [0.913, 0.913, 0.917, 0.925, 0.929, 0.938, 0.938, 0.938, 0.583, 0.583, 0.583, 0.583]
+    sp6_precs_tat = [0.679, 0.736, 0.755, 0.774, 0.714, 0.714, 0.857, 0.857, 0.375, 0.5, 0.5, 0.5]
+    sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
+    sp6_f1_sp2 = get_f1_scores(sp6_recalls_sp2, sp6_precs_sp2)
+    sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
+    sp6_results = [sp6_f1_sp1, sp6_f1_sp2, sp6_f1_tat]
+    arrange_tol_lg_sp1 = []
+    for lg_ind in [0, 4, 8, 12]:
+        arrange_tol_lg_ = []
+        for tol in range(4):
+            arrange_tol_lg_ = [sp1_f1s[run_no][lg_ind+tol] for run_no in range(runs-1)]
+            arrange_tol_lg_sp1.append(arrange_tol_lg_)
+    arrange_tol_lg_sp2 = []
+    for lg_ind in [0, 4, 8]:
+        arrange_tol_lg_ = []
+        for tol in range(4):
+            arrange_tol_lg_ = [sp2_f1s[run_no][lg_ind+tol] for run_no in range(runs-1)]
+            arrange_tol_lg_sp2.append(arrange_tol_lg_)
+    arrange_tol_lg_tat = []
+    for lg_ind in [0, 4, 8]:
+        arrange_tol_lg_ = []
+        for tol in range(4):
+            arrange_tol_lg_ = [tat_f1s[run_no][lg_ind+tol] for run_no in range(runs-1)]
+            arrange_tol_lg_tat.append(arrange_tol_lg_)
+    arrange_sptype_tol_lg = [arrange_tol_lg_sp1, arrange_tol_lg_sp2, arrange_tol_lg_tat]
+    print(arrange_tol_lg_sp1, len(arrange_tol_lg_sp2))
+    names = ["TSignal", "SignalP6", "LipoP", "DeepSig", "Phobius"]
+    colors = ["c", "orage", "green", "black", "purple"]
+    titles = ["eukarya", "gn-bacteria", "gp-bacteria", "archaea"]
+    x_positions = []
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
+    fig, ax = plt.subplots(3, 4)
+    line_w = 0.3
+    offsets = [-line_w * 0.5, line_w * 0.5]
+    sptypes = ["Sec/SPI", "Sec/SPII", "Tat/SP1"]
+    for ind in range(3):
+        for ind2 in range(4):
+            if ind2 == 0:
+                ax[ind, ind2].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=8)
+                ax[ind, ind2].yaxis.set_label_coords(-0.6, 0.42)
+            if ind !=0 and ind2 == 0:
+                if ind ==2:
+                    ax[ind,ind2].set_xlabel(titles[ind2],fontsize=8)
+                box = ax[ind, ind2].get_position()
+                ax[ind, ind2].set_position([box.x0+box.width * 0.15, box.y0 + box.height * 0.65, box.width * 0.8, box.height * 0.75])
+                ax[ind, ind2].set_xticks([0, 1])
+                ax[ind, ind2].set_xticklabels([" ", " "], fontsize=8)
+                ax[ind, ind2].set_yticks([0, 1])
+                ax[ind, ind2].set_yticklabels([" ", " "], fontsize=8)
+
+                # ax[ind, ind2].tick_params( axis='y', which='both', bottom=False, top=False, labelbottom=False)
+                # ax[ind, ind2].tick_params( axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                # ax[ind, ind2].tick_params( axis='y', which='both', bottom=False, top=False, labelbottom=False)
+                continue
+
+            second_index = ind2 if ind == 0 else ind2-1
+            ax[ind, ind2].violinplot(arrange_sptype_tol_lg[ind][second_index*4:(second_index+1)*4], positions=list(range(1,5)), widths=0.5, showmeans=True)
+            ranges = range(1,5)
+            min_max_val = np.array(arrange_sptype_tol_lg[ind][second_index*4:(second_index+1)*4]).reshape(-1)
+            min_max_val = np.append(min_max_val, sp6_results[ind][second_index * 4])
+            min_max_val = np.append(min_max_val, sp6_results[ind][second_index * 4 + 3])
+            min_, max_ = np.min(min_max_val), np.max(min_max_val)
+            for idn, (region, sp6result) in enumerate(zip(ranges, sp6_results[ind][second_index*4:(second_index+1)*4])):
+                if idn == 0:
+                    ax[ind, ind2].plot([region-0.25, region+0.25], [sp6result, sp6result], linewidth=0.5, color='orange', label='SP6 results')
+                else:
+                    ax[ind, ind2].plot([region-0.25, region+0.25], [sp6result, sp6result], linewidth=0.5, color='orange')
+            box = ax[ind,ind2].get_position()
+            ax[ind,ind2].set_xlim(0.5, 4.5)
+            ax[ind,ind2].set_position([box.x0+box.width * 0.15, box.y0 + box.height * 0.65, box.width * 0.8, box.height * 0.75])
+            ax[ind,ind2].set_ylim([min_-(max_-min_)*0.1, max_+(max_-min_)*0.1])
+
+            # ax[ind].set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            # ax[ind].legend(loc='center left', bbox_to_anchor=(1, 0.5, ), fontsize=26)
+            ax[ind,ind2].set_xticks([1,2,3,4])
+            if ind == 2 and ind2 == 2:
+                handles, labels = ax[ind, ind2].get_legend_handles_labels()
+            ax[ind,ind2].set_xticklabels([0,1,2,3], fontsize=8)
+            ax[ind,ind2].set_yticks([min_, (min_+max_)/2, max_])
+            ax[ind,ind2].set_yticklabels([round(min_,2), round((min_+max_)/2, 2), round(max_,2)], fontsize=8)
+            if ind == 2:
+                ax[ind, ind2].set_xlabel(titles[ind2], fontsize=8)
+        # if ind == 0:
+        #     ax[ind].set_title("Weighted F1 scores for TSignal/SignalP6: 0.8132/0.7976", fontsize=8, y=1.1)
+    handles.append(mpatches.Patch(color='#1f77b4'))
+    labels.append("TSignal")
+    fig.text(0.5, 0.04, 'Tolerance/Life group', ha='center', fontsize=8)
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=8)
+    fig.suppressComposite = False
+    from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
+    mini_line = Arrow(569, 100, 0, 100 + 800, color='black', alpha=1)
+    # dotted_line(569,100, patches=fig.patches)
+    # dotted_line(910,100, patches=fig.patches)
+    # dotted_line(1251,100, patches=fig.patches)
+    # ax[2].set_xlabel("eukarya                    gn bacteria             gp bacteria                    archaea\n\n "
+    #                  "tolerance/life group", fontsize=8)
+
+    # with plt.rc_context({'image.composite_image': False}):
+    #     fig.savefig('t.pdf', dpi=350)
+
+    plt.show()
+    exit(1)
 
 def plot_sp6_vs_tnmt():
     # enc+dec arch
@@ -3502,26 +3652,42 @@ def visualize_inp_gradients():
             plt.title(letter2type[l_[0]] + " SP type")
             plt.show()
 
+def rename():
+    names = os.listdir("tuning_bert_fixed_high_lr_swa_only_repeat2")
+    for n in names:
+        os.rename("tuning_bert_fixed_high_lr_swa_only_repeat2/"+n, "tuning_bert_fixed_high_lr_swa_only_repeat2/"+n.replace("cycle_lr_s","repeat2_fixed_high_lr_"))
+
 
 if __name__ == "__main__":
+    plot_sp6_vs_tnmt_violin()
+    exit(1)
+    # plot_compare_pos_nopos()
+    # plot_comparative_performance_sp1_mdls()
+    # extract_performance_over_tolerance()
+    # compare_experiment_results()
+    plot_sp6_vs_tnmt()
+    # plot_perf_over_data_perc
+    # rename()
+    # exit(1)
     # visualize_validation(run="fixed_high_lr_swa_only_decoder_", folds=[0, 1],
     #                      folder="tuning_bert_fixed_high_lr_swa_only_repeat1/")
     # visualize_inp_gradients()
     # exit(1)
-    # wo dropout
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat6/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat5/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # w dropout 8.12
+    # wo dropout 0.8133
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat6/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    # wo dropout 0.8139
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat5/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    # w dropout 8.128
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat4/",
     #                                         compare_mdl_plots=False,
@@ -3536,7 +3702,8 @@ if __name__ == "__main__":
     #                                         remove_test_seqs=False,
     #                                         benchmark=True)
     # exit(1)
-    # w dropout 8.2 but different (more random) approach I think. had the number of epochs_swa=0.5 * epochs_best_mdl
+    # w dropout 8.2 but different (more random) approach I think. had the number of epochs_swa=0.5 * epochs_best_mdl;
+    # possibly also had lr = 0.0002
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat1/",
     #                                         compare_mdl_plots=False,
