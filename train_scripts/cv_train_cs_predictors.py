@@ -994,16 +994,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
     else:
         warmup_scheduler, scheduler = None, None
-    print([n for n, _ in model.classification_head.named_parameters()])
-    model.classification_head.transformer.decoder.layers[0].dropout.p = 0
-    model.classification_head.transformer.decoder.layers[0].dropout1.p = 0
-    model.classification_head.transformer.decoder.layers[0].dropout2.p = 0
-    model.classification_head.transformer.decoder.layers[0].dropout3.p = 0
-    print(model.classification_head.transformer.decoder.layers[0].dropout)
-    print(model.classification_head.transformer.decoder.layers[0].dropout1)
-    print(model.classification_head.transformer.decoder.layers[0].dropout2)
-    print(model.classification_head.transformer.decoder.layers[0].dropout3)
-    exit(1)
 
     best_valid_loss = 5 ** 10
     best_valid_mcc_and_recall = -1
