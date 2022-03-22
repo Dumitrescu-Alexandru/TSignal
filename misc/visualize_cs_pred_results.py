@@ -2045,7 +2045,7 @@ def plot_sp6_vs_tnmt_violin():
     all_mdl_2results = []
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
-    runs = 7
+    runs = 9
     for run_no in range(1,runs):
         print("Computing results for run number {}".format(run_no))
         run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
@@ -3660,7 +3660,7 @@ def rename():
 
 
 if __name__ == "__main__":
-    # plot_sp6_vs_tnmt_violin()
+    plot_sp6_vs_tnmt_violin()
     # exit(1)
     # plot_compare_pos_nopos()
     # plot_comparative_performance_sp1_mdls()
@@ -3674,6 +3674,28 @@ if __name__ == "__main__":
     #                      folder="tuning_bert_fixed_high_lr_swa_only_repeat1/")
     # visualize_inp_gradients()
     # exit(1)
+    # 0.8079
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat10/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    # 0.7979 same, need to rerun.. ( these 2 below are probably with change-OPT as SGD)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat9/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat8/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+
+
     # repeat7_swa_onlyDec_1_2 w dropout, but quite random; stopped early etc 0.8066
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat7/",

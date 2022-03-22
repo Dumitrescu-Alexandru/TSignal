@@ -889,7 +889,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
                         random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
-                        high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False):
+                        high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False,
+                        reinint_swa_decoder=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -1296,14 +1297,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 # dont know how to set the optimizer for StepLR to start with 0.0002 lr but have the rest of the states
                 # the same (momentum...
                 # classification_head_optimizer.load_state_dict(optimizer_state_d[0])
-                bert_optimizer.load_state_dict(optimizer_state_d[1])
-                optimizer = [classification_head_optimizer, bert_optimizer]
-                # set the cycle s.t. after cycle_length steps, the lr will be decreased at 10^-5 from 2*10*-4
-
-                if lr_scheduler == "none" and not change_swa_decoder_optimizer:
+                if not reinint_swa_decoder:
+                    bert_optimizer.load_state_dict(optimizer_state_d[1])
+                if not change_swa_decoder_optimizer and not reinint_swa_decoder:
                     # if lr scheduler is none, simply load the optimizer and continue training...
                     classification_head_optimizer.load_state_dict(optimizer_state_d[0])
-                elif lr_scheduler != "none":
+                optimizer = [classification_head_optimizer, bert_optimizer]
+                # set the cycle s.t. after cycle_length steps, the lr will be decreased at 10^-5 from 2*10*-4
+                if lr_scheduler != "none":
                     scheduler = torch.optim.lr_scheduler.StepLR(optimizer[0], step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/cycle_length))
                 swa_model = AveragedModel(model)
                 swa_model.module.to("cpu")
