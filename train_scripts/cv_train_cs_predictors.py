@@ -1000,6 +1000,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             anneal_scheduler = None
         else:
             anneal_scheduler = SWALR(optimizer[0], swa_lr=annealed_lr, anneal_epochs=anneal_epochs, anneal_strategy='linear')
+            print("Using annealing LR ({}-{}) from epochs ({}-{})".format(lr, annealed_lr, anneal_start,anneal_epochs+anneal_start))
+            logging.info("Using annealing LR ({}-{}) from epochs ({}-{})".format(lr, annealed_lr, anneal_start,anneal_epochs+anneal_start))
     else:
         anneal_scheduler = None
     # if not use_swa and lr_scheduler_swa != "none":
