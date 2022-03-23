@@ -10,9 +10,9 @@ import logging
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
-    # parameters = { "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],fparam_set_search_number
+    # parameters = { "lr_scheduler_swa":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],fparam_set_search_number
     #               "run_number":list(range(5))}
-    # parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
+    # parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler_swa":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
     #               "run_number":list(range(5))}
     # parameters = {'run_number':list(range(5)), "train_folds":[[0,1],[1,2],[0,2]],
     #               'run_name':["glbl_lbl_search_"], 'use_glbl_lbls':[1], 'glbl_lbl_weight':[0.1, 1],
@@ -48,6 +48,9 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--use_aa_len", default=200, type=int)
     parser.add_argument("--lr", default=0.00001, type=float)
+    parser.add_argument("--anneal_start", default=-1, type=int)
+    parser.add_argument("--anneal_epochs", default=-1, type=int)
+    parser.add_argument("--annealed_lr", default=0.00002, type=float)
     parser.add_argument("--high_lr", default=False, action="store_true", help="increase 10x the lr until swa stars")
     parser.add_argument("--data", default="mammal", type=str)
     parser.add_argument("--param_set_search_number", default=-1, type=int)
@@ -68,7 +71,7 @@ def parse_arguments():
     parser.add_argument("--deployment_model", default=False, action="store_true")
     parser.add_argument("--test_seqs", default="", type=str)
     parser.add_argument("--test_mdl", default="", type=str)
-    parser.add_argument("--lr_scheduler", default="none", type=str)
+    parser.add_argument("--lr_scheduler_swa", default="none", type=str)
     parser.add_argument("--lr_sched_warmup", default=0, type=int)
     parser.add_argument("--ff_d", default=4096, type=int, help='Expanding dimension')
     parser.add_argument("--test_beam", default=False, action="store_true")
@@ -156,8 +159,8 @@ def modify_param_search_args(args):
     if 'wd' in param_set:
         args.wd = param_set['wd']
         run_name += "wd_{}_".format(args.wd)
-    if 'lr_scheduler' in param_set:
-        args.lr_sceduler = param_set['lr_scheduler']
+    if 'lr_scheduler_swa' in param_set:
+        args.lr_sceduler = param_set['lr_scheduler_swa']
         run_name += "lrsched_{}_".format(args.lr_sceduler)
     if 'lr_sched_warmup' in param_set:
         args.lr_sched_warmup = param_set['lr_sched_warmup']
@@ -225,7 +228,7 @@ if __name__ == "__main__":
         a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
                                 lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
                                 ff_d=args.ff_d, partitions=args.train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
-                                train_oh=args.train_oh, deployment_model=args.deployment_model, lr_scheduler=args.lr_scheduler,
+                                train_oh=args.train_oh, deployment_model=args.deployment_model, lr_scheduler_swa=args.lr_scheduler_swa,
                                 lr_sched_warmup=args.lr_sched_warmup, test_beam=args.test_beam, wd=args.wd,
                                 glbl_lbl_weight=args.glbl_lbl_weight,glbl_lbl_version=args.glbl_lbl_version,
                                 validate_on_test=args.validate_on_test, form_sp_reg_data=args.form_sp_reg_data,
@@ -241,7 +244,8 @@ if __name__ == "__main__":
                                 remove_bert_layers=args.remove_bert_layers, augment_trimmed_seqs=args.augment_trimmed_seqs,
                                 high_lr=args.high_lr, cycle_length=args.cycle_length,lr_multiplier_swa=args.lr_multiplier_swa,
                                 change_swa_decoder_optimizer=args.change_swa_decoder_optimizer, add_val_data_on_swa=args.add_val_data_on_swa,
-                                reinint_swa_decoder=args.reinint_swa_decoder)
+                                reinint_swa_decoder=args.reinint_swa_decoder,anneal_start=args.anneal_start,
+                                anneal_epochs=args.anneal_epochs,annealed_lr=args.annealed_lr)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):

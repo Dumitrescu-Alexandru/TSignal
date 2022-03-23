@@ -852,7 +852,7 @@ def log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, 
         test_on + "_ONLY_CS" if only_cs else test_on, ep, *sptype_f1))
 
 
-def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0, use_swa=False):
+def get_lr_scheduler_swa(opt, lr_scheduler_swa=False, lr_sched_warmup=0, use_swa=False):
     def get_schduler_type(op, lr_sched):
         if use_swa:
             return CosineAnnealingWarmRestarts(optimizer=op, T_0=10)
@@ -863,16 +863,16 @@ def get_lr_scheduler(opt, lr_scheduler=False, lr_sched_warmup=0, use_swa=False):
         elif lr_sched == "cos":
             return CosineAnnealingWarmRestarts(optimizer=op)
 
-    if lr_scheduler == "none":
+    if lr_scheduler_swa == "none":
         return None, None
     elif lr_sched_warmup >= 2:
-        scheduler = get_schduler_type(opt, lr_scheduler)
+        scheduler = get_schduler_type(opt, lr_scheduler_swa)
         # in lr_sched_warmup epochs, the learning rate will be increased by 10. 1e-5 is the stable lr found. This
         # lr will increase to 1e-4 after lr_sched_warmup steps
         warmup_scheduler = ExponentialLR(opt, gamma=10 ** (1 / lr_sched_warmup))
         return warmup_scheduler, scheduler
     else:
-        return None, get_schduler_type(opt, lr_scheduler)
+        return None, get_schduler_type(opt, lr_scheduler_swa)
 
 
 def euk_importance_avg(cs_mcc):
@@ -881,7 +881,7 @@ def euk_importance_avg(cs_mcc):
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
-                        patience=30, train_oh=False, deployment_model=False, lr_scheduler=False, lr_sched_warmup=0,
+                        patience=30, train_oh=False, deployment_model=False, lr_scheduler_swa=False, lr_sched_warmup=0,
                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False,
                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
                         validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
@@ -890,7 +890,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
                         random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
                         high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False,
-                        reinint_swa_decoder=False):
+                        reinint_swa_decoder=False,anneal_start=-1,anneal_epochs=20,annealed_lr=0.00002):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -991,8 +991,19 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             optimizer = optim.Adam(parameters,  lr=lr * 10 if high_lr else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
-    if not use_swa and lr_scheduler != "none":
-        warmup_scheduler, scheduler = get_lr_scheduler(optimizer, lr_scheduler, lr_sched_warmup, use_swa)
+    if anneal_start != -1:
+        if type(optimizer) != list:
+            print("WARNING!!!: You tried to use annealing lr on both BERT and class_head; Only the classification_head "
+                         "may be annealed, as BERT parameters are much more sensitive. Check implementation; Currently this only works with SWA (--use_swa)")
+            logging.info("WARNING!!!: You tried to use annealing lr on both BERT and class_head; Only the classification_head "
+                         "may be annealed, as BERT parameters are much more sensitive. Check implementation; Currently this only works with SWA (--use_swa)")
+            anneal_scheduler = None
+        else:
+            anneal_scheduler = SWALR(optimizer[0], swa_lr=annealed_lr, anneal_epochs=anneal_epochs, anneal_strategy='linear')
+    else:
+        anneal_scheduler = None
+    if not use_swa and lr_scheduler_swa != "none":
+        warmup_scheduler, scheduler = get_lr_scheduler_swa(optimizer, lr_scheduler_swa, lr_sched_warmup, use_swa)
     else:
         warmup_scheduler, scheduler = None, None
 
@@ -1021,7 +1032,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         losses = 0
         losses_glbl = 0
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
-            if lr_scheduler != "none" and e >= swa_start:
+            if lr_scheduler_swa != "none" and e >= swa_start:
                 scheduler.step(iter_no % cycle_length)
                 if iter_no % (cycle_length+1) == 1:
                     # if the last training step was the one corresponding to training with the lowest lr, update swa
@@ -1029,6 +1040,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     swa_model.update_parameters(model)
                     swa_model.to("cpu")
                 iter_no += 1
+            if anneal_scheduler is not None and anneal_start < e <= swa_start:
+                anneal_scheduler.step()
             seqs, lbl_seqs, _, glbl_lbls = batch
             # if augment_trimmed_seqs:
             cuts = np.random.randint(0,10,len(seqs))
@@ -1137,7 +1150,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 optimizer[1].step()
             else:
                 optimizer.step()
-        if use_swa and e >= swa_start and lr_scheduler == "none":
+        if use_swa and e >= swa_start and lr_scheduler_swa == "none":
             swa_model.to("cuda:0")
             swa_model.update_parameters(model)
             swa_model.to("cpu")
@@ -1304,8 +1317,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     classification_head_optimizer.load_state_dict(optimizer_state_d[0])
                 optimizer = [classification_head_optimizer, bert_optimizer]
                 # set the cycle s.t. after cycle_length steps, the lr will be decreased at 10^-5 from 2*10*-4
-                if lr_scheduler != "none":
-                    scheduler = torch.optim.lr_scheduler.StepLR(optimizer[0], step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/cycle_length))
+                if lr_scheduler_swa != "none":
+                    scheduler = torch.optim.lr_scheduler_swa.StepLR(optimizer[0], step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/cycle_length))
                 swa_model = AveragedModel(model)
                 swa_model.module.to("cpu")
                 eps = e + int(best_epoch * 0.5)
@@ -1431,28 +1444,29 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # j = [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
     # print(len(j))
     # exit(1)
-    lr_multiplier_swa = 100
+    lr_multiplier_swa = 20
     model = nn.Linear(100,10)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.00001 * lr_multiplier_swa)
     c_l = 5
-    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
-    swa_scheduler = SWALR(optimizer, swa_lr=0.0005, anneal_epochs=20)
-    # sched = torch.optim.lr_scheduler.SWALR(optimizer, base_lr=0.0001, max_lr=0.01, step_size_up=1, step_size_down=10, mode='triangular')
+    # lr_scheduler_swa = torch.optim.lr_scheduler_swa.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
+    lr_scheduler_swa = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
+    swa_scheduler = SWALR(optimizer, swa_lr=0.00002, anneal_epochs=30, anneal_strategy='linear')
+    # sched = torch.optim.lr_scheduler_swa.SWALR(optimizer, base_lr=0.0001, max_lr=0.01, step_size_up=1, step_size_down=10, mode='triangular')
     # ot_sched.step()
     # ot_sched.step()
     # sched = SWALR(optimizer, swa_lr=10e-5, anneal_strategy="linear", anneal_epochs=20)
-    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=10)
-    # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, )
-    # schedd_ = torch.optim.lr_scheduler.CyclicLR(optimizer,)
+    # lr_scheduler_swa = torch.optim.lr_scheduler_swa.StepLR(optimizer, step_size=1, gamma=10)
+    # lr_scheduler_swa = torch.optim.lr_scheduler_swa.MultiStepLR(optimizer, )
+    # schedd_ = torch.optim.lr_scheduler_swa.CyclicLR(optimizer,)
     lrs = []
-    for i in range(40):
+    for i in range(50):
         # sched.step(i%5)
-        # lr_scheduler.step(i % (c_l+1))
+        # lr_scheduler_swa.step(i % (c_l+1))
         lrs.append([i, optimizer.param_groups[0]['lr']])
-        swa_scheduler.step()
+        if i > 10:
+            swa_scheduler.step()
         # ot_sched.step()
-        # lr_scheduler.step(i%5)
+        # lr_scheduler_swa.step(i%5)
         # sched.step(i%5)
     print(lrs)
     exit(1)
