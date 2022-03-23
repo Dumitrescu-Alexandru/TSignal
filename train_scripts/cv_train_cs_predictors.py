@@ -1156,21 +1156,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             swa_model.to("cuda:0")
             swa_model.update_parameters(model)
             swa_model.to("cpu")
-        if scheduler is not None and not use_swa:
-            # "and not use_swa" because currently when Im training swa mdl with scheduler, I average swa weights after
-            # training steps (and do lr_sched.step after no_steps also)
-            if e < lr_sched_warmup and lr_sched_warmup > 2:
-                warmup_scheduler.step()
-            else:
-                if use_swa and e + 1 >= swa_start:
-                    scheduler.step()
-                elif not use_swa:
-                    scheduler.step()
-                if use_swa and e + 1>= swa_start:
-                    swa_model.update_parameters(model)
-                    update_bn(dataset_loader, swa_model)
-                if use_swa and e+1 == swa_start:
-                    patience = 20
 
         if validate_on_test:
             validate_partitions = list(test_partition)

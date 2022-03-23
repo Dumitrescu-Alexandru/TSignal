@@ -3273,15 +3273,15 @@ def visualize_inp_gradients():
     tobetestd.extend(swa_IEembs_grads_fold_1)
     tobetestd.extend(swa_IEembs_grads_fold_2)
 
-    sp_type_preds = {k: ind2glbl_lbl[v] for k,v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
-                                      "fixed_high_lr_swa_only_decoder_0_1_best_sptype.bin", "rb")).items()}
-    sp_type_preds.update({k: ind2glbl_lbl[v] for k, v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
-                                                                     "fixed_high_lr_swa_only_decoder_0_2_best_sptype.bin",
-                                                                     "rb")).items()})
-
-    sp_type_preds.update({k: ind2glbl_lbl[v] for k, v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
-                                                                     "fixed_high_lr_swa_only_decoder_1_2_best_sptype.bin",
-                                                                     "rb")).items()})
+    # sp_type_preds = {k: ind2glbl_lbl[v] for k,v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
+    #                                   "fixed_high_lr_swa_only_decoder_0_1_best_sptype.bin", "rb")).items()}
+    # sp_type_preds.update({k: ind2glbl_lbl[v] for k, v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
+    #                                                                  "fixed_high_lr_swa_only_decoder_0_2_best_sptype.bin",
+    #                                                                  "rb")).items()})
+    #
+    # sp_type_preds.update({k: ind2glbl_lbl[v] for k, v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
+    #                                                                  "fixed_high_lr_swa_only_decoder_1_2_best_sptype.bin",
+    #                                                                  "rb")).items()})
 
     # print(len(tobetestd))
 
@@ -3322,10 +3322,12 @@ def visualize_inp_gradients():
     avg_cs_pos = []
     right5_hydro_vals = []
     right5_hydro_aas = []
+    all_norm_values = []
+    all_cs_positions = []
+    all_tat_seqs = []
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
         if lbls[0] == "T" and seqs2glbl_lbl[seq] == "TAT":# and seq2lbls[seq][0] == "T":
             if motif_test in seq[:lbls.rfind("T")] and seq[-3+seq.find(motif_test):+seq.find(motif_test)-1] == "RR":
-                print(seq)
                 rr_seq = seq.find(motif_test)
                 right5_hydro_vals.append([hydro_vals[s_] for s_ in seq[rr_seq:rr_seq+15]])
                 right5_hydro_aas.append(seq[rr_seq:rr_seq+5])
@@ -3334,7 +3336,12 @@ def visualize_inp_gradients():
                 #     normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+27])
                 norm_values[75-rr_seq:75+len(seq)-rr_seq]+=normalized_C_cs_values
                 counts[75-rr_seq:75+len(seq)-rr_seq]+= np.ones(len(seq))
+                current_norm_val = np.zeros(150)
+                current_norm_val[75-rr_seq:75+len(seq)-rr_seq] += normalized_C_cs_values
+                all_norm_values.append(current_norm_val)
+                all_cs_positions.append(lbls.rfind("T"))
                 avg_cs_pos.append(lbls.rfind("T")-rr_seq)
+                all_tat_seqs.append(seq)
                 print(lbls.rfind("T"), rr_seq, seq[-3+seq.find(motif_test):+seq.find(motif_test)+3])
         if lbls[0] == "S" and seq2lbls[seq][0] == "S" and len(seq) >= 60:
             norm_values_sp1 += np.array(spTypeGrds[:60]) / np.sum(spTypeGrds[:60])
@@ -3343,7 +3350,6 @@ def visualize_inp_gradients():
             norm_values_sp2 += np.array(spTypeGrds[:60]) / np.sum(spTypeGrds[:60])
             counts_sp2 +=1
     start_ind, end_ind = 0, 0
-    print(avg_cs_pos,np.mean(np.stack(right5_hydro_vals), axis=0),right5_hydro_aas)
     for i in range(150):
         if counts[i] not in [0, 1] and start_ind==0:
             start_ind = i
@@ -3370,6 +3376,79 @@ def visualize_inp_gradients():
 
     box = axs[0].get_position()
     axs[0].set_position([box.x0 + box.width * 0.1, box.y0 + box.height * 0.3, box.width * 0.95, box.height * 0.85])
+    # print(all_norm_values)
+    # exit(1)
+    def norm_seq(vals):
+        s_ind = 0
+        e_ind = 0
+        for index_, v in enumerate(vals):
+            if v != 0 and s_ind == 0:
+                s_ind = index_
+            if s_ind != 0 and v == 0 and e_ind == 0:
+                e_ind = index_
+
+        norm_val = 0.02
+        max_, min_ = np.max(vals), np.min(vals[s_ind:e_ind])
+        new_vals = [0 for _ in range(s_ind)]
+        new_vals.extend([norm_val*(nv_-min_)/(max_-min_) for nv_ in vals[s_ind:e_ind]])
+        left_inds = 150-len(new_vals)
+        new_vals.extend([0 for _ in range(left_inds)])
+        return new_vals
+
+    # for ajk, n_v in enumerate(all_norm_values):
+    #     no = random.random()
+    #     # if 0.4 <= no <= 1:
+    #     #     continue
+    #     strt_ind_indiv, end_ind_indiv = 0, 0
+    #     for ind_, n_v_ in enumerate(n_v):
+    #         if n_v_ != 0 and strt_ind_indiv == 0:
+    #             strt_ind_indiv = ind_
+    #         if n_v_ == 0 and strt_ind_indiv != 0 and  end_ind_indiv == 0:
+    #             end_ind_indiv = ind_
+    #     if strt_ind_indiv >= start_ind and end_ind_indiv <= end_ind:
+    #         # print(len(n_v),n_v)
+    #         # n_v = norm_seq(n_v)
+    #         # print(len(n_v),n_v)
+    #         plt_start = strt_ind_indiv - start_ind
+    #         motif_start = motif_pos-3
+    #
+    #         # axs[0].scatter(range(motif_pos, motif_pos+6),n_v[72:78], color=plt_[0].get_color(), alpha=0.3,s=1)
+    #         plt_ = axs[0].plot(range(plt_start,plt_start+(end_ind_indiv-strt_ind_indiv)), n_v[strt_ind_indiv:end_ind_indiv],linewidth=0.3,alpha=0.5)
+    #         plt_ = axs[0].plot(range(plt_start, motif_pos), n_v[strt_ind_indiv:75-3], alpha=0.5, linewidth=0.15,color=plt_[0].get_color())
+    #
+    #         axs[0].plot([motif_pos-0.5, motif_pos], [(n_v[71]+n_v[72])/2,n_v[72]], color=plt_[0].get_color(), alpha=0.7, linewidth=0.5)
+    #         axs[0].plot(range(motif_pos, motif_pos+6), n_v[72:78], color=plt_[0].get_color(), alpha=0.5, linewidth=0.7)
+    #         axs[0].plot([motif_pos+5, motif_pos+5.5], [n_v[77],(n_v[77]+n_v[78])/2], color=plt_[0].get_color(), alpha=0.7, linewidth=0.5)
+    #         axs[0].scatter([plt_start+all_cs_positions[ajk]], [n_v[strt_ind_indiv+all_cs_positions[ajk]]],s=2,color=plt_[0].get_color())
+    #         residues = all_tat_seqs[ajk][all_tat_seqs[ajk].find("FLK")+3:all_tat_seqs[ajk].find("FLK")+15]
+    #         hydros = [hydro_vals[r_] for r_ in residues]
+    #         print(hydros,residues)
+    #         if hydros[0] >= 2.5:
+    #             axs[0].scatter([motif_pos+6], [n_v[78]],
+    #                         color=plt_[0].get_color(), alpha=0.7, s=0.2)
+    #         elif hydros[1] >=2.5 and hydros[1] > hydros[0]:
+    #             axs[0].scatter([motif_pos+7], [n_v[79]],
+    #                         color=plt_[0].get_color(), alpha=0.7, s=0.2)
+    #         elif hydros[2]  >= 2.5 and hydros[2] > hydros[1] > hydros[0]:
+    #             axs[0].scatter([motif_pos + 8], [n_v[80]],
+    #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
+    #         elif hydros[3]  >= 2.5 and hydros[3] > hydros[2] > hydros[1]> hydros[0]:
+    #             axs[0].scatter([motif_pos + 9], [n_v[81]],
+    #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
+    #         elif hydros[4]  >= 2.5 and hydros[4] > hydros[3] > hydros[2]> hydros[1]> hydros[0]:
+    #             axs[0].scatter([motif_pos + 10], [n_v[82]],
+    #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
+    #         elif hydros[5]  >= 2.5 and hydros[5] > hydros[4] > hydros[3]> hydros[2]> hydros[1]> hydros[0]:
+    #             axs[0].scatter([motif_pos + 11], [n_v[83]],
+    #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
+    #         elif hydros[6]  >= 2.5 and  hydros[6] > hydros[5] > hydros[4] > hydros[3]> hydros[2]> hydros[1]> hydros[0]:
+    #             axs[0].scatter([motif_pos + 12], [n_v[83]],
+    #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
+    #         else:
+    #             print(hydros[1])
+    #
+    #         # axs[0].plot(range(plt_end-motif_pos-6, end_ind_indiv), n_v[78:end_ind_indiv], color=plt_[0].get_color(), alpha=0.3)
+    # axs[0].set_xlim(15,30)
     axs[0].plot(range(motif_pos), normalized_Tat_values[:motif_pos], color='#1f77b4', label='Other Tat SP residues')
     axs[0].plot([motif_pos-1, motif_pos-0.5], [normalized_Tat_values[motif_pos-1], inbetween_residues_mean_1], color='#1f77b4')
     axs[0].plot([motif_pos-0.5, motif_pos], [inbetween_residues_mean_1, normalized_Tat_values[motif_pos]], color='#ff7f0e')
@@ -3396,28 +3475,74 @@ def visualize_inp_gradients():
     axs[0].set_xlim(-2, 89)
     # axs[0].arrow(0,0,10,0.03, width=0.001)
     # axs[0].arrow(42,0.03,-20,0, width=0.0001)
-    axs[0].annotate("RRXFLK", xy=(22.8, normalized_Tat_values[75-start_ind+1]), xytext=(1, 0.025),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#ff7f0e')
-    axs[0].annotate("", xy=(13, normalized_Tat_values[13]), xytext=(23, 0.005),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8)
-    axs[0].annotate("Other residues", xy=(34, normalized_Tat_values[34]), xytext=(21, 0.001),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#1f77b4')
-    axs[0].annotate("Hydrophobic residue (KD=2.09)", xy=(26, normalized_Tat_values[26]), xytext=(41, 0.025),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#1f77b4')
-    # axs[0].arrow(-100,0,100,100, width=1)
-    # axs[0].arrow(-100,-100,100,100, width=1)
-    # axs[0].arrow(5,5,100,100, width=1)
-    # axs[0].arrow(5,5,100,100, width=1)
-    # axs[0].arrow(5,5,100,100, width=1)
-    # axs[0].text(14,14, "ASD")
+    for ind_ in range(0,50):
+        top_val = (normalized_Tat_values[ind_]+normalized_Tat_values[ind_+1])/2
+        axs[0].plot([ind_+0.5, ind_+0.5],[-0.02,top_val], linestyle='--', color='black', linewidth=0.3,alpha=0.3)
+    text = "RRXFLK"
+    max_motif,min_motif = 0, 0
+    motif_positions = []
+    seqs = ["MQRRHFLKNAAAALAALGLPTLPQWALAAKAVGLRRLGQPQPFDYAWLKGQARELANAPYKSHKQLLPGP",
+            "MPNRRDFLKTAAFATLGSGIAVSQVLAGECMPSAIHINKYGIGGKMKMTFFPYELKLRHVFTVATYSRTT",
+            "MLMYRRDFLKSVTAAWVAFGLPNPLGGAFATNRVIPLRRLGQSQRFDYEWLKERARALAATPYHSRKRVL",
+            ["..."]*50,
+            "MNTNNEETFYQAMRRKGVSRRSFLKYCSLAATSLGLGAAMTPRIAWALENKPRIPVVWIHGLECTCCTES",
+            ]
+    for s in all_tat_seqs:
+        motif_positions.append(s.find("FLK"))
+    for i_ in np.argsort(motif_pos):
+        print(all_tat_seqs[i_])
+    for seq_ind, s in enumerate(seqs):
+        start = motif_pos - s.find("FLK")+2 if "FLK" in s else -1
+        dotdotdot = type(s) == list
+        for ind_, s_ in enumerate(s[:60]):
+            if dotdotdot:
+                if 17 < start+ind_ < 24:
+                    axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]),
+                                    xytext=(start + ind_ + 0.80, 0.0035 * (1 - seq_ind)), fontsize=4,color='#ff7f0e')
+                elif start+ind_ < 39:
+                    axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, 0.0035*(1-seq_ind)), fontsize=4)
+            else:
+                if 17 < start+ind_ < 24:
+                    axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]),
+                                    xytext=(start + ind_ + 0.80, -0.001 + 0.0035 * (1 - seq_ind)), fontsize=4,color='#ff7f0e')
+                elif start+ind_ < 38:
+                    axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, -0.001+0.0035*(1-seq_ind)), fontsize=4)
+                elif start+ind_ == 38:
+                    axs[0].annotate("...", xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, 0.0035*(1-seq_ind)), fontsize=4)
+
+
+    # for ind_ in range(18,18+len(text)):
+    #     axs[0].annotate(text[ind_-18], xy=(13, normalized_Tat_values[13]), xytext=(ind_+0.6, 0.005), fontsize=5)
+    #     axs[0].annotate(r'$\sigma$', xy=(13, normalized_Tat_values[13]), xytext=(ind_+0.6, 0), fontsize=5)
+    # print(all_tat_seqs)
+    # for i in range(6):
+    #     axs[0].annotate("RRXFLK", xy=(22.8, normalized_Tat_values[75 - start_ind + 1]), xytext=(1, 0.025),
+    #                     arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=8, color='#ff7f0e')
+    #
+    # axs[0].annotate("RRXFLK", xy=(22.8, normalized_Tat_values[75-start_ind+1]), xytext=(1, 0.025),
+    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#ff7f0e')
+    # axs[0].annotate("", xy=(13, normalized_Tat_values[13]), xytext=(23, 0.005),
+    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8)
+    # axs[0].annotate("Other residues", xy=(34, normalized_Tat_values[34]), xytext=(21, 0.001),
+    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#1f77b4')
+    axs[0].annotate("Hydrophobic residue (KD=2.09)", xy=(26, normalized_Tat_values[26]), xytext=(29, 0.025),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#1f77b4')
+    # # axs[0].arrow(-100,0,100,100, width=1)
+    # # axs[0].arrow(-100,-100,100,100, width=1)
+    # # axs[0].arrow(5,5,100,100, width=1)
+    # # axs[0].arrow(5,5,100,100, width=1)
+    # # axs[0].arrow(5,5,100,100, width=1)
+    # # axs[0].text(14,14, "ASD")
     # axs[0].annotate("", xy=(0.5, 0.5), xytext=(0, 0),
     #             arrowprops=dict(arrowstyle="->"))
-    axs[0].set_ylim(0, 1.1 * max(normalized_Tat_values))
+    # axs[0].set_ylim(0, 1.1 * max(normalized_Tat_values))
+    axs[0].set_ylim(-0.02,0.03)
+
+    axs[0].set_xlim(-1,40)
     axs[0].set_xlabel("Residue position (relative to RRXFLK motif)", fontsize=8)
     # plt.show()
     # lc = LineCollection([left_segment, motif_segment, right_segment])
     # axs.add_collection(lc)
-    # axs.set_ylim(0,0.2)
     # axs.set_xlim(0,40)
     # plt.show()
     # plt.plot(range(len(normalized_Tat_values))[:motif_pos], normalized_Tat_values[:motif_pos], color='#1f77b4')
@@ -3523,7 +3648,6 @@ def visualize_inp_gradients():
     axs[1].xaxis.set_minor_locator(MultipleLocator(1))
     axs[1].set_yticks([0,0.01,0.02,0.03])
     axs[1].set_yticklabels([0,0.01,0.02,0.03], fontsize=8)
-    lbls =np.array(list(range(len(normalized_Tat_values)))) - motif_pos
     lbls = [1,-34, -17, 0, 17 ,34, 51]
     axs[1].set_xticklabels([str(n) for n in lbls ], fontsize=8)
     axs[1].set_xlabel("Residue position (relative to Cys/+1 Sec/SPII)", fontsize=8)
@@ -3680,7 +3804,9 @@ if __name__ == "__main__":
     #                                         remove_test_seqs=False,
     #                                         benchmark=True)
     # exit(1)
-    plot_sp6_vs_tnmt_violin()
+    # visualize_inp_gradients()
+    #
+    # plot_sp6_vs_tnmt_violin()
     # exit(1)
     # plot_compare_pos_nopos()
     # plot_comparative_performance_sp1_mdls()
@@ -3692,9 +3818,15 @@ if __name__ == "__main__":
     # exit(1)
     # visualize_validation(run="fixed_high_lr_swa_only_decoder_", folds=[0, 1],
     #                      folder="tuning_bert_fixed_high_lr_swa_only_repeat1/")
-    # visualize_inp_gradients()
     # exit(1)
-    # repeat8_wValData_swa_onl
+    # reinit optimizer for swa training 0.815 ID  ONT KNOW
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat14/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # repeat8_wValData_swa_onl reeat 0.0001 constant lr, adding val data  to training; pretty bad result
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat11/",
                                             compare_mdl_plots=False,
