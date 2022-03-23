@@ -1002,10 +1002,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             anneal_scheduler = SWALR(optimizer[0], swa_lr=annealed_lr, anneal_epochs=anneal_epochs, anneal_strategy='linear')
     else:
         anneal_scheduler = None
-    if not use_swa and lr_scheduler_swa != "none":
-        warmup_scheduler, scheduler = get_lr_scheduler_swa(optimizer, lr_scheduler_swa, lr_sched_warmup, use_swa)
-    else:
-        warmup_scheduler, scheduler = None, None
+    # if not use_swa and lr_scheduler_swa != "none":
+    #     warmup_scheduler, scheduler = get_lr_scheduler_swa(optimizer, lr_scheduler_swa, lr_sched_warmup, use_swa)
+    # else:
+    warmup_scheduler = None
 
     best_valid_loss = 5 ** 10
     best_valid_mcc_and_recall = -1
