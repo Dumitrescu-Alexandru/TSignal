@@ -3464,13 +3464,13 @@ def visualize_inp_gradients():
     # axs[0].set_xticks(list(range(len(normalized_Tat_values))))
     # axs[0].set_xticks(list(range(len(normalized_Tat_values))))
     axs[0].set_ylabel('SP type (Tat/SPI)\nIE+PE scores',  fontsize=8)
-    axs[0].xaxis.set_major_locator(MultipleLocator(21))
+    axs[0].xaxis.set_major_locator(MultipleLocator(11))
     axs[0].xaxis.set_major_formatter('{x:.0f}')
     axs[0].xaxis.set_minor_locator(MultipleLocator(1))
     axs[0].set_yticks([0, 0.01,0.02,0.03,0.04,0.05])
     axs[0].set_yticklabels([0, 0.01,0.02,0.03,0.04,0.05], fontsize=8)
     lbls =np.array(list(range(len(normalized_Tat_values)))) - motif_pos
-    lbls = [5, -21, 0, 21 ,42, 63]
+    lbls = [5, -22, -11, 00 ,11, 22]
     axs[0].set_xticklabels([str(n) for n in lbls ],fontsize=8)
     axs[0].set_xlim(-2, 89)
     # axs[0].arrow(0,0,10,0.03, width=0.001)
@@ -3538,7 +3538,7 @@ def visualize_inp_gradients():
     # axs[0].set_ylim(0, 1.1 * max(normalized_Tat_values))
     axs[0].set_ylim(-0.02,0.03)
 
-    axs[0].set_xlim(-1,40)
+    axs[0].set_xlim(7,40)
     axs[0].set_xlabel("Residue position (relative to RRXFLK motif)", fontsize=8)
     # plt.show()
     # lc = LineCollection([left_segment, motif_segment, right_segment])
@@ -3643,12 +3643,12 @@ def visualize_inp_gradients():
     axs[1].set_position([box.x0 + box.width * 0.1, box.y0+box.height*0.1, box.width * 0.95, box.height * 0.85])
 
     axs[1].set_ylabel('CS (Sec/SPI, Sec/SPII)\nIE+PE scores', fontsize=8)
-    axs[1].xaxis.set_major_locator(MultipleLocator(17))
+    axs[1].xaxis.set_major_locator(MultipleLocator(18))
     axs[1].xaxis.set_major_formatter('{x:.0f}')
     axs[1].xaxis.set_minor_locator(MultipleLocator(1))
     axs[1].set_yticks([0,0.01,0.02,0.03])
     axs[1].set_yticklabels([0,0.01,0.02,0.03], fontsize=8)
-    lbls = [1,-34, -17, 0, 17 ,34, 51]
+    lbls = [1,-36, -18, 0, 18 ,36, 51]
     axs[1].set_xticklabels([str(n) for n in lbls ], fontsize=8)
     axs[1].set_xlabel("Residue position (relative to Cys/+1 Sec/SPII)", fontsize=8)
     axs[1].set_xlim(-2, 100)
@@ -3661,6 +3661,12 @@ def visualize_inp_gradients():
     axs[1].plot([75-start_ind+0.5, 75-start_ind+1], [inbetween_cysteine2, normalized_C_cs_values_pm_5aas[75-start_ind+1]], color='#1f77b4')
     axs[1].plot(range(75-start_ind+1, len(normalized_C_cs_values_pm_5aas)), normalized_C_cs_values_pm_5aas[75-start_ind+1:], color='#1f77b4', label='Other Sec/SPII residues')
     normalized_sp1_cs_values_pm_5aas = normalized_sp1_cs_values_pm_5aas[start_ind_sp1:end_ind_sp1]/ normalized_sp1_cs_values_pm_5aas_counts[start_ind_sp1:end_ind_sp1]
+    align_sp1sp2 = start_ind-start_ind_sp1
+    start_ind_sp1 = start_ind_sp1 + align_sp1sp2
+    print(start_ind_sp1,start_ind,len(normalized_sp1_cs_values_pm_5aas))
+
+    normalized_sp1_cs_values_pm_5aas = normalized_sp1_cs_values_pm_5aas[align_sp1sp2:]
+
     inbetween_sp1cs_1 = (normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1-1]+normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1])/2
     inbetween_sp1cs_2 = (normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1] + normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1+1])/2
     axs[1].plot(range(75 - start_ind_sp1), normalized_sp1_cs_values_pm_5aas[:75 - start_ind_sp1], color='red',label='Other Sec/SPII residues')
@@ -3669,15 +3675,16 @@ def visualize_inp_gradients():
     axs[1].plot([75 - start_ind_sp1, 75 - start_ind_sp1 + 0.5],[normalized_sp1_cs_values_pm_5aas[75 - start_ind_sp1], inbetween_sp1cs_2], color='#ff7f0e')
     axs[1].plot([75 - start_ind_sp1 + 0.5, 75 - start_ind_sp1 + 1],[inbetween_sp1cs_2, normalized_sp1_cs_values_pm_5aas[75 - start_ind_sp1 + 1]], color='red')
     axs[1].plot(range(75 - start_ind_sp1 + 1, len(normalized_sp1_cs_values_pm_5aas)),normalized_sp1_cs_values_pm_5aas[75 - start_ind_sp1 + 1:], color='red', label='Other Sec/SPII residues')
-    axs[1].annotate("Sec/SPII", xy=(44, normalized_C_cs_values_pm_5aas[44]), xytext=(34, 0.001),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#1f77b4')
-    axs[1].annotate("Cys (+1 Sec/SPII SP)", xy=(75-start_ind, normalized_C_cs_values_pm_5aas[75-start_ind]), xytext=(1, 0.027),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#ff7f0e')
-    axs[1].annotate("Sec/SPI", xy=(12, normalized_sp1_cs_values_pm_5aas[12]), xytext=(1, 0.001),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='red')
-    axs[1].annotate("+1 Sec/SPI SP", xy=(75-start_ind_sp1, normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1]), xytext=(68, 0.027),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#ff7f0e')
 
+    axs[1].annotate("+1 Sec/SPI SP", xy=(75-start_ind_sp1, normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1]), xytext=(34, 0.001),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#ff7f0e')
+    axs[1].annotate("Sec/SPII", xy=(5, normalized_C_cs_values_pm_5aas[5]), xytext=(1, 0.027),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#1f77b4')
+    axs[1].annotate("Cys (+1 Sec/SPII SP)", xy=(75-start_ind, normalized_C_cs_values_pm_5aas[75-start_ind]), xytext=(35, 0.027),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#ff7f0e')
+    axs[1].annotate("Sec/SPI", xy=(5, normalized_sp1_cs_values_pm_5aas[5]), xytext=(1, 0.001),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='red')
+    axs[1].set_xlim(0,50)
     plt.show()
 
 
@@ -3804,7 +3811,7 @@ if __name__ == "__main__":
     #                                         remove_test_seqs=False,
     #                                         benchmark=True)
     # exit(1)
-    # visualize_inp_gradients()
+    visualize_inp_gradients()
     #
     # plot_sp6_vs_tnmt_violin()
     # exit(1)

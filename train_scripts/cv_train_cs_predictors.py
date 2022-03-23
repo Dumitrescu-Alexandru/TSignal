@@ -1033,6 +1033,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         e += 1
         losses = 0
         losses_glbl = 0
+        if anneal_scheduler is not None and anneal_start < e <= swa_start:
+            anneal_scheduler.step()
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
             if lr_scheduler_swa != "none" and e >= swa_start:
                 scheduler.step(iter_no % cycle_length)
@@ -1042,8 +1044,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     swa_model.update_parameters(model)
                     swa_model.to("cpu")
                 iter_no += 1
-            if anneal_scheduler is not None and anneal_start < e <= swa_start:
-                anneal_scheduler.step()
             seqs, lbl_seqs, _, glbl_lbls = batch
             # if augment_trimmed_seqs:
             cuts = np.random.randint(0,10,len(seqs))
