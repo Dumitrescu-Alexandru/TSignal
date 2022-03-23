@@ -105,7 +105,7 @@ def parse_arguments():
     parser.add_argument("--saliency_map_save_fn", default="save.bin", type=str)
     parser.add_argument("--hook_layer", default="bert", type=str)
     parser.add_argument("--cycle_length", default=5, type=int)
-    parser.add_argument("--lr_multiplier_swa", default=20, type=int, help="number to multiply the maximum swa lr")
+    parser.add_argument("--lr_multiplier_swa", default=1, type=int, help="number to multiply the maximum swa lr")
     parser.add_argument("--change_swa_decoder_optimizer", default=False, action="store_true", help="change decoder optimizer when starting swa from Adam to SGD")
     parser.add_argument("--reinint_swa_decoder", default=False, action="store_true", help="Use the same (Adam) optimizer when SWA starts, but reinitialize it")
     parser.add_argument("--add_val_data_on_swa", default=False, action="store_true", help="SWA isnt based on early stopping, so the validation data can also be used for training")

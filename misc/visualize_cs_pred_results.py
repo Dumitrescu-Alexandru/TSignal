@@ -2045,7 +2045,8 @@ def plot_sp6_vs_tnmt_violin():
     all_mdl_2results = []
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
-    runs = 9
+    runs = 13
+    # for run_no in [1,1]:
     for run_no in range(1,runs):
         print("Computing results for run number {}".format(run_no))
         run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
@@ -2071,10 +2072,9 @@ def plot_sp6_vs_tnmt_violin():
         mcc2_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
         mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
         mcc2_tat.append([mcc for mcc in mdl2results[mdl_ind][5]])
-    print(sp1_f1s)
     tnmt_f1 = [[0.692, 0.737, 0.769, 0.782 ], [0.462, 0.564, 0.59, 0.59 ], [0.526, 0.684, 0.684, 0.684],
                [0.606, 0.697, 0.667, 0.727]]
-    tnmt_f1_sp2 = [[0.906 , 0.912 , 0.914 ,  0.917] , [0.927 , 0.933 , 0.933 , 0.933] , [0.75 , 0.75 , 0.75 , 0.75]]
+    tnmt_f1_sp2 = [[0.906, 0.912, 0.914, 0.917] , [0.927 , 0.933 , 0.933 , 0.933] , [0.75 , 0.75 , 0.75 , 0.75]]
     tnmt_f1_tat = [[0.613 , 0.79 , 0.806 , 0.855] , [0.634 , 0.732 ,  0.829 ,  0.829] , [ 0.3 , 0.5 , 0.7 , 0.7]]
     sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
                        0.556, 0.583]
@@ -2108,6 +2108,8 @@ def plot_sp6_vs_tnmt_violin():
             arrange_tol_lg_tat.append(arrange_tol_lg_)
     arrange_sptype_tol_lg = [arrange_tol_lg_sp1, arrange_tol_lg_sp2, arrange_tol_lg_tat]
     print(arrange_tol_lg_sp1, len(arrange_tol_lg_sp2))
+    print(arrange_tol_lg_sp2, len(arrange_tol_lg_sp2))
+    print(arrange_tol_lg_tat, len(arrange_tol_lg_sp2))
     names = ["TSignal", "SignalP6", "LipoP", "DeepSig", "Phobius"]
     colors = ["c", "orage", "green", "black", "purple"]
     titles = ["eukarya", "gn-bacteria", "gp-bacteria", "archaea"]
@@ -3660,6 +3662,24 @@ def rename():
 
 
 if __name__ == "__main__":
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat13/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat12/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
+    # mdl2results = extract_all_param_results(only_cs_position=False,
+    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat6/",
+    #                                         compare_mdl_plots=False,
+    #                                         remove_test_seqs=False,
+    #                                         benchmark=True)
+    # exit(1)
     plot_sp6_vs_tnmt_violin()
     # exit(1)
     # plot_compare_pos_nopos()
@@ -3674,6 +3694,13 @@ if __name__ == "__main__":
     #                      folder="tuning_bert_fixed_high_lr_swa_only_repeat1/")
     # visualize_inp_gradients()
     # exit(1)
+    # repeat8_wValData_swa_onl
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat11/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     # 0.8079
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat10/",
