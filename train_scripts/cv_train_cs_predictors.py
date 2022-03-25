@@ -126,7 +126,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             if not model.classification_head.train_only_decoder:
                 memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
             else:
-                memory = memory_bfd
+                _, _, _, _, memory = model.classification_head.input_encoder(memory_bfd, inp_seqs=[s.replace(" ","") for s in seqs])
+                memory = torch.nn.utils.rnn.pad_sequence(memory, batch_first=True)
         else:
             memory = model.encode(src)
         if second_model is not None:
@@ -162,12 +163,16 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 input_ids = torch.tensor(inputs['input_ids'], device=model.device)
                 attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
                 memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
+                seqs = src
                 # memory_bfd = model(input_ids=input_ids, attention_mask=attention_mask,
                 #                    token_type_ids=inputs['token_type_ids'],return_embeddings=True)[0]
                 if not model.classification_head.train_only_decoder:
                     memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
                 else:
-                    memory = memory_bfd
+                    _, _, padding_mask_src, _, memory = model.classification_head.input_encoder(memory_bfd,
+                                                                                 inp_seqs=[s.replace(" ", "") for s in
+                                                                                           seqs])
+                    memory = torch.nn.utils.rnn.pad_sequence(memory, batch_first=True)
             else:
                 memory = model.encode(src)
             if second_model is not None:
@@ -205,7 +210,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         tgt_mask = (generate_square_subsequent_mask(1))
         if tune_bert:
             if model.classification_head.train_only_decoder:
-                out = model.classification_head.forward_only_decoder(ys, memory.to(device), tgt_mask.to(device))
+                out = model.classification_head.forward_only_decoder(ys, memory.to(device), tgt_mask.to(device), padding_mask_src=padding_mask_src)
             else:
                 out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
         else:
@@ -913,7 +918,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
     swa_start = 60
-    anneal_epochs = 10
     if len(sp_data.lg2ind.keys()) <= 1 or not use_lg_info:
         lg2ind = None
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:

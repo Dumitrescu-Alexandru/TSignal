@@ -95,7 +95,8 @@ class InputEmbeddingEncoder(nn.Module):
         aa_embedding = torch.tensor(self.seq2emb[seq], device=self.device) if inp_seqs is None else seq
         bos = self.eos_bos_cls_embs(torch.tensor(0, device=self.device)).reshape(1, -1)
         eos = self.eos_bos_cls_embs(torch.tensor(1, device=self.device)).reshape(1, -1)
-        input_tensor = [bos]
+        # input_tensor = [bos]
+        input_tensor = [aa_embedding[:len(inp_seqs)]]
         if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             cls_emb = self.eos_bos_cls_embs(torch.tensor(2, device=self.device)).reshape(1,-1)
             input_tensor.append(cls_emb)
@@ -103,8 +104,7 @@ class InputEmbeddingEncoder(nn.Module):
             lg_emb = self.lg_embs(torch.tensor([self.seq2lg[seq]], device=self.device)) if inp_seqs is None else \
                 self.lg_embs(torch.tensor([self.seq2lg[inp_seqs]], device=self.device))
             input_tensor.append(lg_emb)
-        input_tensor.append(aa_embedding)
-        input_tensor.append(eos)
+        # input_tensor.append(eos)
         return torch.cat(input_tensor, dim=0)
 
     def oh_forward(self, seqs):
@@ -144,15 +144,17 @@ class InputEmbeddingEncoder(nn.Module):
             tensor_inputs = [self.add_bos_eos_lg_glb_cls_tkns(s, inp_seqs=is_) for (s, is_) in zip(seqs, inp_seqs)]
         else:
             tensor_inputs = [self.add_bos_eos_lg_glb_cls_tkns(s) for s in seqs]
-
-        input_lens = [ti.shape[0] for ti in tensor_inputs]
+        if inp_seqs is None:
+            input_lens = [ti.shape[0] for ti in tensor_inputs]
+        else:
+            input_lens = [len(i) if not self.use_lg else len(i) + 1 for i in inp_seqs]
         # additional inputs BOS tokens, glbl_lbl (<cls> token), and lg
         additional_inp_tkns = 1
         if self.use_lg:
             additional_inp_tkns +=1
         if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             additional_inp_tkns +=1
-        output_lens = [ti.shape[0] - additional_inp_tkns for ti in tensor_inputs]
+        output_lens = [ti.shape[0] - additional_inp_tkns + 2 for ti in tensor_inputs]
         max_len = max(input_lens)
         max_len_out = max(output_lens)
         padding_mask_src = torch.arange(max_len)[None, :] < torch.tensor(input_lens)[:, None]
@@ -236,9 +238,9 @@ class TransformerModel(nn.Module):
         return self.transformer.encoder(self.pos_encoder(src, scale=self.scale_input, no_pos_enc=self.no_pos_enc),
                                         src_mask, padding_mask_src)
 
-    def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
+    def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor, padding_mask_src:Tensor):
         tgt = self.pos_encoder(self.label_encoder(tgt).transpose(0,1))
-        return self.transformer.decoder(tgt, memory, tgt_mask)
+        return self.transformer.decoder(tgt, memory, tgt_mask, memory_key_padding_mask=padding_mask_src)
 
     def forward_glb_lbls(self, src, tgt):
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src)
@@ -263,13 +265,15 @@ class TransformerModel(nn.Module):
         padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
         return self.glbl_generator(padded_src_glbl.transpose(2, 1))
 
-    def forward_only_decoder(self, src, tgt, inp_seqs, tgt_mask=None):
+    def forward_only_decoder(self, src, tgt, inp_seqs, tgt_mask=None, padding_mask_src=None):
         if tgt_mask is None:
-            src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, _ = self.input_encoder(src, inp_seqs=inp_seqs)
+            src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src, inp_seqs=inp_seqs)
+        else:
+            src_mask, _, padding_mask_src, padding_mask_tgt, _ = self.input_encoder(src, inp_seqs=inp_seqs)
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
-        padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input, no_pos_enc=self.no_pos_enc)
+        padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input, no_pos_enc=self.no_pos_enc, add_lg_info=self.add_lg_info)
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
-        outs = self.decode(tgt, padded_src, tgt_mask)
+        outs = self.decode(tgt, padded_src, tgt_mask, padding_mask_src)
         return self.generator(outs)
 
     def forward(self, src: Tensor, tgt: list, inp_seqs=None) -> Tensor:
@@ -333,7 +337,7 @@ class PositionalEncoding(nn.Module):
         if self.linear_pos_enc:
             self.pos_enc = torch.nn.Embedding(100, 1024).to(self.device)
 
-    def forward(self, x: Tensor, scale=False, no_pos_enc=False) -> Tensor:
+    def forward(self, x: Tensor, scale=False, no_pos_enc=False, add_lg_info=False) -> Tensor:
         """
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
@@ -351,6 +355,11 @@ class PositionalEncoding(nn.Module):
         if scale:
             x = self.dropout(x * np.sqrt(1024)+ self.pe[:x.size(0)])
         else:
+            # if add_lg_info:
+            #     pe_ = self.pe[:x.size(0)-1]
+            #     pe_ = torch.cat([pe_, torch.zeros(1,1,x.shape[-1]).to(self.device)],dim=0)
+            #     x = self.dropout(x + pe_)
+            # else:
             x = self.dropout(x + self.pe[:x.size(0)])
         return x
 

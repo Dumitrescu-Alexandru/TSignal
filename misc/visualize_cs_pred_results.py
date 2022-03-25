@@ -3811,7 +3811,7 @@ if __name__ == "__main__":
     #                                         remove_test_seqs=False,
     #                                         benchmark=True)
     # exit(1)
-    visualize_inp_gradients()
+    # visualize_inp_gradients()
     #
     # plot_sp6_vs_tnmt_violin()
     # exit(1)
@@ -3826,7 +3826,27 @@ if __name__ == "__main__":
     # visualize_validation(run="fixed_high_lr_swa_only_decoder_", folds=[0, 1],
     #                      folder="tuning_bert_fixed_high_lr_swa_only_repeat1/")
     # exit(1)
+    # no lg 0.818 very nice; reinit swa decoder
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat17/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # 0.799; lr sched eps. Lr start 0.0002, end on /20 smaller; eps anneal 10-20
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat16/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     # reinit optimizer for swa training 0.815 ID  ONT KNOW
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat15/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat14/",
                                             compare_mdl_plots=False,
