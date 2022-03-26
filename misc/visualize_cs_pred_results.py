@@ -3826,6 +3826,14 @@ if __name__ == "__main__":
     # visualize_validation(run="fixed_high_lr_swa_only_decoder_", folds=[0, 1],
     #                      folder="tuning_bert_fixed_high_lr_swa_only_repeat1/")
     # exit(1)
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat18/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+
     # no lg 0.818 very nice; reinit swa decoder
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat17/",

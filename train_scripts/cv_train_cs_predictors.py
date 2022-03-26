@@ -20,7 +20,7 @@ from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summa
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights
 from models.transformer_nmt import TransformerModel
 
-def init_model(ntoken, lbl2ind={}, lg2ind={}, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
+def init_model(ntoken, lbl2ind={}, lg2ind=None, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
                form_sp_reg_data=False, version2_agregation="max", input_drop=False, no_pos_enc=False,
                linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix="", tune_bert=False,train_only_decoder=False):
@@ -89,6 +89,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     sp_predicted_batch_elements = []
     sp_predicted_batch_elements_extracated_cs = []
     sp_pred_inds_CS_spType = []
+    padding_mask_src = None
     if saliency_map:
         def hook_(self, grad_inp, grad_out):
             retain_grads.append((grad_out[0].cpu()))
@@ -1343,7 +1344,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
-    model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
+    # model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
     if not deployment_model and not validate_partition is not None or (
             validate_partition is not None and other_mdl_name):
         if separate_save_sptype_preds:

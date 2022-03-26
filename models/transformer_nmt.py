@@ -269,7 +269,14 @@ class TransformerModel(nn.Module):
         if tgt_mask is None:
             src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src, inp_seqs=inp_seqs)
         else:
-            src_mask, _, padding_mask_src, padding_mask_tgt, _ = self.input_encoder(src, inp_seqs=inp_seqs)
+            if padding_mask_src is not None:
+                src_mask, _, _, padding_mask_tgt, _ = self.input_encoder(src, inp_seqs=inp_seqs)
+            else:
+                src_mask, _, padding_mask_src, padding_mask_tgt, _ = self.input_encoder(src, inp_seqs=inp_seqs)
+        # print(src[0].shape, self.add_lg_info)
+        # for ind, is_ in enumerate(inp_seqs):
+        #     if len(is_) < 70:
+        #         print(len(is_), padding_mask_src[ind],)
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
         padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input, no_pos_enc=self.no_pos_enc, add_lg_info=self.add_lg_info)
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
@@ -355,12 +362,12 @@ class PositionalEncoding(nn.Module):
         if scale:
             x = self.dropout(x * np.sqrt(1024)+ self.pe[:x.size(0)])
         else:
-            # if add_lg_info:
-            #     pe_ = self.pe[:x.size(0)-1]
-            #     pe_ = torch.cat([pe_, torch.zeros(1,1,x.shape[-1]).to(self.device)],dim=0)
-            #     x = self.dropout(x + pe_)
-            # else:
-            x = self.dropout(x + self.pe[:x.size(0)])
+            if add_lg_info:
+                pe_ = self.pe[:x.size(0)-1]
+                pe_ = torch.cat([pe_, torch.zeros(1,1,x.shape[-1]).to(self.device)],dim=0)
+                x = self.dropout(x + pe_)
+            else:
+                x = self.dropout(x + self.pe[:x.size(0)])
         return x
 
 
