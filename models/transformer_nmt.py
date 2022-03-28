@@ -191,6 +191,7 @@ class TransformerModel(nn.Module):
                  version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False,
                  tuned_bert_embs_prefix="", tuning_bert=False,train_only_decoder=False):
         super().__init__()
+        self.bert_pe_for_decoder = False
         self.train_only_decoder = train_only_decoder
         self.add_lg_info = lg2ind is not None
         self.form_sp_reg_data = form_sp_reg_data
@@ -226,6 +227,14 @@ class TransformerModel(nn.Module):
         elif self.use_glbl_lbls and self.glbl_lbl_version == 3 and self.glbl_lbl_version != 4:
             self.glbl_generator = CNN3(input_size=1024, output_size=no_glbl_lbls).to(self.device)
             # self.glbl_generator = BinarySPClassifier(input_size=1024, output_size=no_glbl_lbls).to(self.device)
+
+
+    def update_pe(self, pe):
+        # For now, we only add positional encoding to the decoder (not the encoder also), since the encoder (BERT)
+        # already adds this same pe in the beginning
+        self.no_pos_enc = True
+        self.bert_pe_for_decoder = True
+        self.pos_encoder.update_pe(pe)
 
     def encode(self, src, inp_seqs=None):
         if inp_seqs is not None:
@@ -344,12 +353,17 @@ class PositionalEncoding(nn.Module):
         if self.linear_pos_enc:
             self.pos_enc = torch.nn.Embedding(100, 1024).to(self.device)
 
+    def update_pe(self, pe):
+        self.linear_pos_enc = True
+        self.pos_enc = torch.nn.Embedding(40000, 1024).to(self.device)
+        self.pos_enc.load_state_dict(pe.state_dict())
+
     def forward(self, x: Tensor, scale=False, no_pos_enc=False, add_lg_info=False) -> Tensor:
         """
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        if self.linear_pos_enc:
+        if self.linear_pos_enc and not no_pos_enc:
             pos_enc = self.pos_enc(torch.tensor(list(range(x.shape[0]))).to(self.device))
             pos_enc = pos_enc.repeat(1, x.shape[1]).reshape(x.shape[0], x.shape[1], x.shape[2])
             if scale:

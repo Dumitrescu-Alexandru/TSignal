@@ -108,6 +108,7 @@ def parse_arguments():
     parser.add_argument("--saliency_map_save_fn", default="save.bin", type=str)
     parser.add_argument("--hook_layer", default="bert", type=str)
     parser.add_argument("--cycle_length", default=5, type=int)
+    parser.add_argument("--bert_pe_for_decoder", default=False, action="store_true")
     parser.add_argument("--lr_multiplier_swa", default=1, type=int, help="number to multiply the maximum swa lr")
     parser.add_argument("--change_swa_decoder_optimizer", default=False, action="store_true", help="change decoder optimizer when starting swa from Adam to SGD")
     parser.add_argument("--reinint_swa_decoder", default=False, action="store_true", help="Use the same (Adam) optimizer when SWA starts, but reinitialize it")
@@ -245,7 +246,7 @@ if __name__ == "__main__":
                                 high_lr=args.high_lr, cycle_length=args.cycle_length,lr_multiplier_swa=args.lr_multiplier_swa,
                                 change_swa_decoder_optimizer=args.change_swa_decoder_optimizer, add_val_data_on_swa=args.add_val_data_on_swa,
                                 reinint_swa_decoder=args.reinint_swa_decoder,anneal_start=args.anneal_start,
-                                anneal_epochs=args.anneal_epochs,annealed_lr=args.annealed_lr)
+                                anneal_epochs=args.anneal_epochs,annealed_lr=args.annealed_lr, bert_pe_for_decoder=args.bert_pe_for_decoder)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):

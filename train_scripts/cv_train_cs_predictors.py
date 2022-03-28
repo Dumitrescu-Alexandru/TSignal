@@ -896,7 +896,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
                         random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
                         high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False,
-                        reinint_swa_decoder=False,anneal_start=-1,anneal_epochs=20,annealed_lr=0.00002):
+                        reinint_swa_decoder=False,anneal_start=-1,anneal_epochs=20,annealed_lr=0.00002,bert_pe_for_decoder=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -952,6 +952,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                            glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
                            version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
                            linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+
+    if bert_pe_for_decoder:
+        model.classification_head.update_pe(model.ProtBertBFD.embeddings.position_embeddings)
     if weight_class_loss:
         glbl_lbl_2weights = get_sp_type_loss_weights()
         ind2glbl_lbl = {v:k for k,v in sp_data.glbl_lbl_2ind.items()}

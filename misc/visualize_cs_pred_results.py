@@ -1,3 +1,4 @@
+import pandas as pd
 from sklearn.metrics.pairwise import euclidean_distances as euclidian_distance
 import random
 from io import StringIO
@@ -2045,9 +2046,9 @@ def plot_sp6_vs_tnmt_violin():
     all_mdl_2results = []
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
-    runs = 13
+    runs = 4
     # for run_no in [1,1]:
-    for run_no in range(1,runs):
+    for run_no in [21,22,23]:
         print("Computing results for run number {}".format(run_no))
         run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
         mdl2results = extract_all_param_results(only_cs_position=False,
@@ -2186,10 +2187,83 @@ def plot_sp6_vs_tnmt_violin():
     # with plt.rc_context({'image.composite_image': False}):
     #     fig.savefig('t.pdf', dpi=350)
 
-    plt.show()
+    plt.savefig("some_plot.pdf")
     exit(1)
 
 def plot_sp6_vs_tnmt():
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
+
+    # plt.show()
+    all_mdl_2results = []
+
+    sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
+    tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
+    runs = [21,22,23]
+    for run_no in runs:
+        print("Computing results for run number {}".format(run_no))
+        run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
+        mdl2results = extract_all_param_results(only_cs_position=False,
+                                                result_folder=run_results_folder,
+                                                compare_mdl_plots=False,
+                                                remove_test_seqs=False,
+                                                benchmark=True,
+                                                prints=False)
+        mdl_ind = 0
+        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
+        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][6]]))
+        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][7]]))
+        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-4])]))
+        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][8]]))
+        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][9]]))
+        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-3])]))
+        tat_f1s.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
+        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        mcc1_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][0]]))
+        mcc2_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][1][1:]]))
+        mcc1_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][2]]))
+        mcc2_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
+        mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
+        mcc2_tat.append([mcc for mcc in mdl2results[mdl_ind][5]])
+    tnmt_f1 = [[0.692, 0.737, 0.769, 0.782 ], [0.462, 0.564, 0.59, 0.59 ], [0.526, 0.684, 0.684, 0.684],
+               [0.606, 0.697, 0.667, 0.727]]
+    tnmt_f1_sp2 = [[0.906, 0.912, 0.914, 0.917] , [0.927 , 0.933 , 0.933 , 0.933] , [0.75 , 0.75 , 0.75 , 0.75]]
+    tnmt_f1_tat = [[0.613 , 0.79 , 0.806 , 0.855] , [0.634 , 0.732 ,  0.829 ,  0.829] , [ 0.3 , 0.5 , 0.7 , 0.7]]
+    sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
+                       0.556, 0.583]
+    sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
+    sp6_recalls_tat = [0.706, 0.765, 0.784, 0.804, 0.556, 0.556, 0.667, 0.667, 0.333, 0.444, 0.444, 0.444]
+    sp6_precs_sp1 = [0.661, 0.685, 0.715, 0.733, 0.534, 0.562, 0.575, 0.603, 0.632, 0.632, 0.632, 0.632, 0.643, 0.714,
+                     0.714, 0.75]
+    sp6_precs_sp2 = [0.913, 0.913, 0.917, 0.925, 0.929, 0.938, 0.938, 0.938, 0.583, 0.583, 0.583, 0.583]
+    sp6_precs_tat = [0.679, 0.736, 0.755, 0.774, 0.714, 0.714, 0.857, 0.857, 0.375, 0.5, 0.5, 0.5]
+    sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
+    sp6_f1_sp2 = get_f1_scores(sp6_recalls_sp2, sp6_precs_sp2)
+    sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
+    arrange_tol_lg_sp1 = []
+    for lg_ind in [0, 4, 8, 12]:
+        arrange_tol_lg_ = []
+        for tol in range(4):
+            arrange_tol_lg_ = [sp1_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_sp1.append(arrange_tol_lg_)
+    arrange_tol_lg_sp2 = []
+    for lg_ind in [0, 4, 8]:
+        arrange_tol_lg_ = []
+        for tol in range(4):
+            arrange_tol_lg_ = [sp2_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_sp2.append(arrange_tol_lg_)
+    arrange_tol_lg_tat = []
+    for lg_ind in [0, 4, 8]:
+        arrange_tol_lg_ = []
+        for tol in range(4):
+            arrange_tol_lg_ = [tat_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_tat.append(arrange_tol_lg_)
+    arrange_sptype_tol_lg = [np.array(arrange_tol_lg_sp1), np.array(arrange_tol_lg_sp2), np.array(arrange_tol_lg_tat)]
+    resulted_dict = {}
+    f1s = []
+    names = []
+
     # enc+dec arch
     # tnmt_f1 = [[0.693, 0.733, 0.759, 0.779 ], [0.493, 0.563, 0.592, 0.606 ], [0.486, 0.541, 0.541, 0.541],
     #            [0.533, 0.633, 0.667, 0.667]]
@@ -2217,25 +2291,23 @@ def plot_sp6_vs_tnmt():
     tnmt_prec = [[0.669, 0.707, 0.732, 0.752], [0.745, 0.851, 0.894, 0.915], [0.818, 0.909, 0.909, 0.909],
                  [0.727, 0.864, 0.909, 0.909]]
 
-    all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"])
-    all_recalls, all_precisions, f1_predtat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP"])
-    all_recalls, all_precisions, f1_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP"])
-    all_recalls, all_precisions, f1_phobius = extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"])
-    all_f1s = [tnmt_f1, f1_predtat, f1_lipop, f1_deepsig, f1_phobius]
-    all_f1s_sp1 = [np.array(tnmt_f1).reshape(-1), np.array([sp6_f1_sp1[i*4:(i+1)*4] for i in range(4)]).reshape(-1)]
-    all_f1s_sp2 = [np.array(tnmt_f1_sp2).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
-    all_f1s_tat = [np.array(tnmt_f1_tat).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
+    all_sptypes_all_mean = [np.mean(arrange_sptype_tol_lg[0],axis=1), np.mean(arrange_sptype_tol_lg[1], axis=1), np.mean(arrange_sptype_tol_lg[2], axis=1)]
+    all_sptypes_all_std = [np.std(arrange_sptype_tol_lg[0],axis=1), np.std(arrange_sptype_tol_lg[1], axis=1), np.std(arrange_sptype_tol_lg[2], axis=1)]
+    all_f1s_sp1 = [np.array(all_sptypes_all_mean[0]).reshape(-1), np.array([sp6_f1_sp1[i * 4:(i + 1) * 4] for i in range(4)]).reshape(-1)]
+    all_f1s_sp2 = [np.array(all_sptypes_all_mean[1]).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
+    all_f1s_tat = [np.array(all_sptypes_all_mean[2]).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
     all_sptypes_all_f1s = [all_f1s_sp1, all_f1s_sp2, all_f1s_tat]
+    print(all_sptypes_all_f1s)
 
     names = ["TSignal", "SignalP6", "LipoP", "DeepSig", "Phobius"]
-    colors = ["c", "orage", "green", "black", "purple"]
+    colors = ["mediumblue", "saddlebrown", "green", "black", "purple"]
     titles = ["", "", "", ""]
     x_positions = []
 
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
     mpl.rcParams['font.family'] = "Arial"
-    fig, ax = plt.subplots(3, 1)
+    fig, ax = plt.subplots(3, 1,figsize=(8, 6),dpi=350)
     line_w = 0.3
     offsets = [-line_w*0.5, line_w*0.5]
     sptypes=["Sec/SPI", "Sec/SPII", "Tat/SP1"]
@@ -2248,71 +2320,39 @@ def plot_sp6_vs_tnmt():
         ax[ind].plot([8.5,8.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
         ax[ind].plot([12.5,12.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
         for j in range(2):
+            print(colors[j])
             ax[ind].bar([i + offsets[j] for i in range(lower_lim_plots, 17)], all_f1s[j],  label=names[j],
-                   width=line_w)
+                   width=line_w,alpha=0.6, color=colors[j])
+        for i in range(lower_lim_plots, 17):
+            print(all_sptypes_all_mean[ind],all_sptypes_all_std[ind])
+            print("ind", ind)
+
+            low,high = all_sptypes_all_mean[ind][i - lower_lim_plots] - 2 * all_sptypes_all_std[ind][i - lower_lim_plots],\
+                       all_sptypes_all_mean[ind][i - lower_lim_plots] + 2 *  all_sptypes_all_std[ind][i - lower_lim_plots]
+            ax[ind].plot([i+offsets[0],i+offsets[0]],[low,max(high,low+0.001)], color='black')
         box = ax[ind].get_position()
         ax[ind].set_xlim(0.5,16.5)
-        ax[ind].set_position([box.x0, box.y0 + box.height * 0.65, box.width * 1.1, box.height * 0.75])
-        ax[ind].set_yticks([0, 0.5, 1])
+        ax[ind].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1.1, box.height * 0.95])
+        ax[ind].set_yticks([0,0.2,0.4,0.6,0.8,1])
         ax[ind].set_ylim([0, 1.1])
-
-        # ax[ind].set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        # ax[ind].legend(loc='center left', bbox_to_anchor=(1, 0.5, ), fontsize=26)
+        ax[ind].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
         ax[ind].set_xticks(list(range(lower_lim_plots, 17)))
         if ind == 2:
             handles, labels = ax[ind].get_legend_handles_labels()
         ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=8)
         ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=8)
         ax[ind].yaxis.set_label_coords(-0.07, 0.42)
-        ax[ind].set_yticklabels([0,0.5,1],fontsize=8)
-        # if ind == 0:
-        #     ax[ind].set_title("Weighted F1 scores for TSignal/SignalP6: 0.8132/0.7976", fontsize=8, y=1.1)
+        ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=8)
     fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=8)
     fig.suppressComposite = False
     from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
-    mini_line = Arrow(569,100, 0, 100+800, color='black', alpha=1)
-    # dotted_line(569,100, patches=fig.patches)
-    # dotted_line(910,100, patches=fig.patches)
-    # dotted_line(1251,100, patches=fig.patches)
-    ax[2].set_xlabel("eukarya                    gn bacteria             gp bacteria                    archaea\n\n "
+    ax[2].set_xlabel("eukarya                                        gn bacteria                                 gp bacteria                                        archaea\n\n "
                      "tolerance/life group",fontsize=8)
-
-    # with plt.rc_context({'image.composite_image': False}):
-    #     fig.savefig('t.pdf', dpi=350)
-
-    plt.show()
-
-    # all_f1s = [np.array(tnmt_f1_sp2).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
-    # line_w = 0.15
-    # offsets = [-line_w*0.5, line_w*0.5]
-    # ax = plt.subplot(111)
-    # for j in range(2):
-    #     ax.bar([i + offsets[j] for i in range(1, 13)], all_f1s[j],  label=names[j],
-    #            width=line_w)
-    # box = ax.get_position()
-    # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=26)
-    # ax.set_xticks(list(range(1, 13)))
-    # ax.set_xticklabels(['{}\ntol {}'.format(titles[1 + i//4], i%4) for i in range(12)])
-    # ax.set_title("SPII Performance", fontsize=8)
-    # ax.set_ylabel("F1 score")
+    plt.savefig("some_plot.pdf")
+    exit(1)
     # plt.show()
 
-    # all_f1s = [np.array(tnmt_f1_tat).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
-    # line_w = 0.15
-    # offsets = [-line_w*0.5, line_w*0.5]
-    # ax = plt.subplot(111)
-    # for j in range(2):
-    #     ax.bar([i + offsets[j] for i in range(1, 13)], all_f1s[j],  label=names[j],
-    #            width=line_w)
-    # box = ax.get_position()
-    # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=26)
-    # ax.set_xticks(list(range(1, 13)))
-    # ax.set_xticklabels(['{}\ntol {}'.format(titles[1 + i//4], i%4) for i in range(12)])
-    # ax.set_title("TAT Performance", fontsize=26)
-    # ax.set_ylabel("F1 score")
-    # plt.show()
+
 
 def plot_comparative_performance_sp1_mdls():
     # enc-dec model
@@ -2335,11 +2375,62 @@ def plot_comparative_performance_sp1_mdls():
 
     # names = ["TSignal", "PredTAT", "LipoP", "DeepSig", "Phobius"]
     names = ["TSignal", "DeepSig", "Phobius", "LipoP", "PredTAT"]
-    colors = ["red", "blue", "green", "black", "purple"]
+    colors = ["navy", "red", "green", "black", "purple"]
     titles = ["eukarya", "negative", "positive", "archaea"]
     x_positions = []
 
+    sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
+    tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
+    runs = [1,2,3,4,5]
+    for run_no in runs:
+        print("Computing results for run number {}".format(run_no))
+        run_results_folder = "tuning_bert_only_decoder_rf_noswa_run{}/".format(run_no)
+        mdl2results = extract_all_param_results(only_cs_position=False,
+                                                result_folder=run_results_folder,
+                                                compare_mdl_plots=False,
+                                                remove_test_seqs=False,
+                                                benchmark=True,
+                                                prints=False,
+                                                restrict_types=["SP", "NO_SP"])
+        mdl_ind = 0
+        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
+        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][6]]))
+        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][7]]))
+        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-4])]))
+        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][8]]))
+        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][9]]))
+        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-3])]))
+        tat_f1s.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
+        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        mcc1_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][0]]))
+        mcc2_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][1][1:]]))
+        mcc1_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][2]]))
+        mcc2_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
+        mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
+    arrange_tol_lg_sp1 = []
+    for lg_ind in [0, 4, 8, 12]:
+        arrange_tol_lg_ = []
+        for tol in range(4):
+            arrange_tol_lg_ = [sp1_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_sp1.append(arrange_tol_lg_)
+    arrange_tol_lg_sp2 = []
+    for lg_ind in [0, 4, 8]:
+        arrange_tol_lg_ = []
+        for tol in range(4):
+            arrange_tol_lg_ = [sp2_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_sp2.append(arrange_tol_lg_)
+    arrange_tol_lg_tat = []
+    for lg_ind in [0, 4, 8]:
+        arrange_tol_lg_ = []
+        for tol in range(4):
+            arrange_tol_lg_ = [tat_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_tat.append(arrange_tol_lg_)
+    arrange_sptype_tol_lg = [np.array(arrange_tol_lg_sp1), np.array(arrange_tol_lg_sp2), np.array(arrange_tol_lg_tat)]
 
+    all_sptypes_all_mean = [np.mean(arrange_sptype_tol_lg[0],axis=1), np.mean(arrange_sptype_tol_lg[1], axis=1), np.mean(arrange_sptype_tol_lg[2], axis=1)]
+    all_sptypes_all_std = [np.std(arrange_sptype_tol_lg[0],axis=1), np.std(arrange_sptype_tol_lg[1], axis=1), np.std(arrange_sptype_tol_lg[2], axis=1)]
+    # print(all_sptypes_all_mean)
+    # exit(1)
     # non_restricted deepsig/TNMT comparison
     # all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=None)
     # tnmt_f1 = [[0.693, 0.733, 0.759, 0.779], [0.493, 0.563, 0.592, 0.606], [0.486, 0.541, 0.541, 0.541], [0.533, 0.633, 0.667, 0.667]]
@@ -2370,14 +2461,24 @@ def plot_comparative_performance_sp1_mdls():
     line_w = 0.15
     offsets = [-2 * line_w, - 1 * line_w,0, 1 * line_w, line_w * 2]
     # ax = plt.subplot(111)
-    fig, ax = plt.subplots(4, 1)
-    fig.set_size_inches(18.5, 5, forward=True)
+    # fig, ax = plt.subplots(4, 1)
+    # fig.set_size_inches(18.5, 5, forward=True)
+    fig, ax = plt.subplots(4, 1,figsize=(8, 6),dpi=350)
 
     for ind in range(4):
         for j in range(5):
-            ax[ind].bar([i + offsets[j] for i in range(1,5)], all_f1s[j][ind], color=colors[j], label=names[j], width=line_w)
+            if j == 0:
+                ax[ind].bar([i+offsets[j] for i in range(1,5)],all_sptypes_all_mean[0][ind*4:(ind+1)*4], color=colors[j], label=names[j], width=line_w, alpha=0.6)
+                for std_ind in range(1,5):
+                    low, high = all_sptypes_all_mean[0][std_ind +ind * 4 -1] - 2 * all_sptypes_all_std[0][std_ind + ind * 4 -1], \
+                                all_sptypes_all_mean[0][std_ind + ind * 4 -1] + 2 * all_sptypes_all_std[0][std_ind + ind * 4 -1]
+                    ax[ind].plot([std_ind + offsets[0], std_ind + offsets[0]], [low, max(high, low + 0.001)], color='black')
+
+
+            else:
+                ax[ind].bar([i + offsets[j] for i in range(1,5)], all_f1s[j][ind], color=colors[j], label=names[j], width=line_w, alpha=0.6)
         box = ax[ind].get_position()
-        ax[ind].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.75, box.width * 0.9, box.height * 0.75])
+        ax[ind].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.35, box.width * 0.9, box.height])
         if ind == 3:
             # ax[ind].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=14)
             handles, labels = ax[ind].get_legend_handles_labels()
@@ -2387,19 +2488,21 @@ def plot_comparative_performance_sp1_mdls():
         # else:
         ax[ind].set_xticks(list(range(1,5)))
         ax[ind].set_xticklabels(['{}'.format(i) for i in range(4)], fontsize=8)
-        ax[ind].set_yticks([0, 0.5, 1])
-        ax[ind].set_yticklabels(labels=[0, 0.5, 1],fontsize=8)
+        ax[ind].set_yticks([0, 0.2,0.4,0.6,0.8, 1])
+        ax[ind].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
+        ax[ind].set_yticklabels(labels=[0, 0.2,0.4,0.6,0.8, 1],fontsize=8)
         # plt.yticks(fontsize=10)
         # if ind == 0:
         #     ax[ind].set_title("F1 score", fontsize=14)
         ax[ind].set_ylabel(titles[ind] + "\nF1", fontsize=8, rotation=0)
-        ax[ind].yaxis.set_label_coords(-0.18, 0)
+        ax[ind].yaxis.set_label_coords(-0.1, 0.25)
         ax[ind].set_xlim(0.6, 4.4)
         if ind == 3:
             ax[ind].set_xlabel("tolerance", fontsize=8)
 
     fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.12, 0.045), ncol=5, fontsize=8)
-    plt.show()
+    plt.savefig("some_plot.pdf")
+    exit(1)
 
 def create_random_split_fold_data():
     all_data = []
@@ -3813,13 +3916,14 @@ if __name__ == "__main__":
     # exit(1)
     # visualize_inp_gradients()
     #
-    # plot_sp6_vs_tnmt_violin()
+    plot_comparative_performance_sp1_mdls()
+    plot_sp6_vs_tnmt()
+    plot_sp6_vs_tnmt_violin()
+
     # exit(1)
     # plot_compare_pos_nopos()
-    # plot_comparative_performance_sp1_mdls()
     # extract_performance_over_tolerance()
     # compare_experiment_results()
-    plot_sp6_vs_tnmt()
     # plot_perf_over_data_perc
     # rename()
     # exit(1)
