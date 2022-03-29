@@ -897,7 +897,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
                         high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False,
                         reinint_swa_decoder=False,anneal_start=-1,anneal_epochs=20,annealed_lr=0.00002,bert_pe_for_decoder=False,
-                        frozen_pe_epochs=-1):
+                        frozen_pe_epochs=-1, no_bert_pe_training=False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -1034,7 +1034,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             model.eval()
             model.classification_head.train()
         elif tune_bert and frozen_epochs == e:
-            model.unfreeze_encoder()
+            model.unfreeze_encoder(no_bert_pe_training)
             model.train()
         elif frozen_epochs > e:
             model.train()

@@ -3918,7 +3918,7 @@ if __name__ == "__main__":
     # visualize_inp_gradients()
     #
     # plot_comparative_performance_sp1_mdls()
-    plot_sp6_vs_tnmt()
+    # plot_sp6_vs_tnmt()
     # plot_sp6_vs_tnmt_violin()
 
     # exit(1)
@@ -3928,6 +3928,12 @@ if __name__ == "__main__":
     # plot_perf_over_data_perc
     # rename()
     # exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat27/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat26/",
                                             compare_mdl_plots=False,

@@ -100,6 +100,7 @@ def parse_arguments():
     parser.add_argument("--tune_bert", default=False, action="store_true", help="Tune BERT and TSignal together")
     parser.add_argument("--frozen_epochs", default=3, type=int)
     parser.add_argument("--frozen_pe_epochs", default=-1, type=int)
+    parser.add_argument("--no_bert_pe_training", default=False, action="store_true")
     parser.add_argument("--extended_sublbls", default=False, action="store_true")
     parser.add_argument("--random_folds", default=False, action="store_true")
     parser.add_argument("--train_on_subset", default=1., type=float)
@@ -248,7 +249,7 @@ if __name__ == "__main__":
                                 change_swa_decoder_optimizer=args.change_swa_decoder_optimizer, add_val_data_on_swa=args.add_val_data_on_swa,
                                 reinint_swa_decoder=args.reinint_swa_decoder,anneal_start=args.anneal_start,
                                 anneal_epochs=args.anneal_epochs,annealed_lr=args.annealed_lr, bert_pe_for_decoder=args.bert_pe_for_decoder,
-                                frozen_pe_epochs=args.frozen_pe_epochs)
+                                frozen_pe_epochs=args.frozen_pe_epochs,no_bert_pe_training=args.no_bert_pe_training)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):

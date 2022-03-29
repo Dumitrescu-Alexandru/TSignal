@@ -537,13 +537,14 @@ class ProtBertClassifier(pl.LightningModule):
         else:
             self._loss = nn.CrossEntropyLoss()
 
-    def unfreeze_encoder(self) -> None:
+    def unfreeze_encoder(self, no_bert_pe_training=False) -> None:
         """ un-freezes the encoder layer. """
         self.train_BFD= True
         if self._frozen:
             log.info(f"\n-- Encoder model fine-tuning")
             for name, param in self.ProtBertBFD.named_parameters():
-                param.requires_grad = True
+                if "position_embeddings" not in name or not no_bert_pe_training:
+                    param.requires_grad = True
             self._frozen = False
 
     def freeze_encoder(self) -> None:
