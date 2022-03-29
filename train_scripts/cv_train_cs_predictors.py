@@ -1040,7 +1040,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             model.train()
         else:
             model.train()
-        if frozen_pe_epochs >= e:
+        if frozen_pe_epochs == e and frozen_pe_epochs != -1:
             if tune_bert:
                 for name, param in model.classification_head.pos_encoder.pos_enc.named_parameters():
                     param.requires_grad = True
