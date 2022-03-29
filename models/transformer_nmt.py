@@ -229,12 +229,14 @@ class TransformerModel(nn.Module):
             # self.glbl_generator = BinarySPClassifier(input_size=1024, output_size=no_glbl_lbls).to(self.device)
 
 
-    def update_pe(self, pe):
+    def update_pe(self, pe, freeze_pe):
         # For now, we only add positional encoding to the decoder (not the encoder also), since the encoder (BERT)
         # already adds this same pe in the beginning
         self.no_pos_enc = True
         self.bert_pe_for_decoder = True
         self.pos_encoder.update_pe(pe)
+        for name, param in self.pos_encoder.pos_enc.named_parameters():
+            param.requires_grad = False
 
     def encode(self, src, inp_seqs=None):
         if inp_seqs is not None:
