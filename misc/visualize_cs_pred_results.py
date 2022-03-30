@@ -2201,7 +2201,6 @@ def plot_sp6_vs_tnmt():
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
     runs = [21,22,23,24,25]
-    runs = [26]
     for run_no in runs:
         print("Computing results for run number {}".format(run_no))
         run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
@@ -3918,16 +3917,18 @@ if __name__ == "__main__":
     # visualize_inp_gradients()
     #
     # plot_comparative_performance_sp1_mdls()
-    # plot_sp6_vs_tnmt()
+    plot_sp6_vs_tnmt()
     # plot_sp6_vs_tnmt_violin()
 
     # exit(1)
-    # plot_compare_pos_nopos()
+    plot_compare_pos_nopos()
     # extract_performance_over_tolerance()
     # compare_experiment_results()
     # plot_perf_over_data_perc
     # rename()
     # exit(1)
+    # --anneal_epochs 20 --anneal_start 20, train for longer. Still not good, will try without fine-tuning
+    # PE at all
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat27/",
                                             compare_mdl_plots=False,
