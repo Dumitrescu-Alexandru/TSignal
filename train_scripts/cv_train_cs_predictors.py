@@ -54,6 +54,7 @@ def padd_add_eos_tkn(lbl_seqs, lbl2ind):
         tokenized_seq = []
         tokenized_seq.extend(l_s)
         tokenized_seq.append(lbl2ind["ES"])
+        tokenized_seq.append(lbl2ind["PD"])
         tokenized_seq.extend([lbl2ind["PD"]] * (1 + max_len - len(tokenized_seq)))
         label_outpus_tensors.append(torch.tensor(tokenized_seq, device=device))
     return torch.vstack(label_outpus_tensors)
