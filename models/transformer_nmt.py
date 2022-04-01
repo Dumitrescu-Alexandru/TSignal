@@ -189,9 +189,13 @@ class TransformerModel(nn.Module):
                  data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
                  version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False,
-                 tuned_bert_embs_prefix="", tuning_bert=False,train_only_decoder=False):
+                 tuned_bert_embs_prefix="", tuning_bert=False,train_only_decoder=False, add_bert_pe_from_dec_to_bert_out=False,
+                 concat_pos_enc=False, pe_extra_dims=64):
         super().__init__()
         self.bert_pe_for_decoder = False
+        self.pe_extra_dims = pe_extra_dims
+        self.concat_pos_enc = concat_pos_enc
+        self.add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out
         self.train_only_decoder = train_only_decoder
         self.add_lg_info = lg2ind is not None
         self.form_sp_reg_data = form_sp_reg_data
@@ -201,8 +205,8 @@ class TransformerModel(nn.Module):
         self.scale_input = scale_input
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.pos_encoder = PositionalEncoding(d_model, dropout=dropout if input_drop else 0, no_pos_enc=no_pos_enc,
-                                              linear_pos_enc=linear_pos_enc)
-        self.transformer = Transformer(d_model=d_hid,
+                                              linear_pos_enc=linear_pos_enc, concat_pos_enc=concat_pos_enc,pe_extra_dims=pe_extra_dims)
+        self.transformer = Transformer(d_model=d_hid + pe_extra_dims if concat_pos_enc else d_hid,
                                        nhead=nhead,
                                        num_encoder_layers=nlayers,
                                        num_decoder_layers=nlayers,
@@ -217,7 +221,7 @@ class TransformerModel(nn.Module):
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
         self.label_encoder = TokenEmbedding(ntoken, d_hid, lbl2ind=lbl2ind)
         self.d_model = d_model
-        self.generator = nn.Linear(d_model, ntoken).to(self.device)
+        self.generator = nn.Linear(d_model + pe_extra_dims if concat_pos_enc else d_model, ntoken).to(self.device)
         self.use_glbl_lbls = use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
         if self.form_sp_reg_data and not use_glbl_lbls:
@@ -289,7 +293,8 @@ class TransformerModel(nn.Module):
         #     if len(is_) < 70:
         #         print(len(is_), padding_mask_src[ind],)
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
-        padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input, no_pos_enc=self.no_pos_enc, add_lg_info=self.add_lg_info)
+        no_pos_enc = False if self.add_bert_pe_from_dec_to_bert_out else self.no_pos_enc
+        padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input, no_pos_enc=no_pos_enc, add_lg_info=self.add_lg_info)
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
         outs = self.decode(tgt, padded_src, tgt_mask, padding_mask_src)
         return self.generator(outs)
@@ -340,15 +345,18 @@ class TransformerModel(nn.Module):
 
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000, no_pos_enc=False, linear_pos_enc=False):
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000, no_pos_enc=False, linear_pos_enc=False, concat_pos_enc=False,pe_extra_dims=64):
         super().__init__()
+        self.concat_pos_enc = concat_pos_enc
+        self.pe_extra_dims = pe_extra_dims
         self.linear_pos_enc = linear_pos_enc
         self.dropout = nn.Dropout(p=dropout)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         position = torch.arange(max_len).unsqueeze(1).to(self.device)
-        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model)).to(self.device)
-        pe = torch.zeros(max_len, 1, d_model).to(self.device)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model)).to(self.device) \
+            if not concat_pos_enc else torch.exp(torch.arange(0, pe_extra_dims, 2) * (-math.log(10000.0) / d_model)).to(self.device)
+        pe = torch.zeros(max_len, 1, d_model).to(self.device) if not concat_pos_enc else torch.zeros(max_len, 1, pe_extra_dims).to(self.device)
         pe[:, 0, 0::2] = torch.sin(position * div_term)
         pe[:, 0, 1::2] = torch.cos(position * div_term)
         self.register_buffer('pe', pe)
@@ -383,7 +391,14 @@ class PositionalEncoding(nn.Module):
                 pe_ = torch.cat([pe_, torch.zeros(1,1,x.shape[-1]).to(self.device)],dim=0)
                 x = self.dropout(x + pe_)
             else:
-                x = self.dropout(x + self.pe[:x.size(0)])
+                if self.concat_pos_enc:
+                    pe_ = self.pe[:x.size(0)]
+                    # print(pe_, pe_.shape,x.shape,pe_.repeat(1,x.size(1),1).shape)
+                    # print(.shape)
+                    # exit(1)
+                    x = torch.cat([x, pe_.repeat(1,x.size(1),1)],dim=-1)
+                else:
+                    x = self.dropout(x + self.pe[:x.size(0)])
         return x
 
 

@@ -23,14 +23,17 @@ from models.transformer_nmt import TransformerModel
 def init_model(ntoken, lbl2ind={}, lg2ind=None, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
                form_sp_reg_data=False, version2_agregation="max", input_drop=False, no_pos_enc=False,
-               linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix="", tune_bert=False,train_only_decoder=False):
+               linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix="", tune_bert=False,train_only_decoder=False,
+               add_bert_pe_from_dec_to_bert_out=False,concat_pos_enc=False,pe_extra_dims=64):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
                              glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
                              version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
                              linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                             tuning_bert=tune_bert, train_only_decoder=train_only_decoder)
+                             tuning_bert=tune_bert, train_only_decoder=train_only_decoder,
+                             add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out,
+                             concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -54,7 +57,7 @@ def padd_add_eos_tkn(lbl_seqs, lbl2ind):
         tokenized_seq = []
         tokenized_seq.extend(l_s)
         tokenized_seq.append(lbl2ind["ES"])
-        tokenized_seq.append(lbl2ind["PD"])
+        # tokenized_seq.append(lbl2ind["PD"])
         tokenized_seq.extend([lbl2ind["PD"]] * (1 + max_len - len(tokenized_seq)))
         label_outpus_tensors.append(torch.tensor(tokenized_seq, device=device))
     return torch.vstack(label_outpus_tensors)
@@ -898,7 +901,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
                         high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False,
                         reinint_swa_decoder=False,anneal_start=-1,anneal_epochs=20,annealed_lr=0.00002,bert_pe_for_decoder=False,
-                        frozen_pe_epochs=-1, no_bert_pe_training=False):
+                        frozen_pe_epochs=-1, no_bert_pe_training=False, add_bert_pe_from_dec_to_bert_out=False,
+                        concat_pos_enc=False, pe_extra_dims=64):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -939,7 +943,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                            glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False,
                            version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
                            linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                                         tune_bert=tune_bert,train_only_decoder=train_only_decoder)
+                                         tune_bert=tune_bert,train_only_decoder=train_only_decoder,
+                                         add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out,
+                                         concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims)
         model = ProtBertClassifier(hparams)
         if remove_bert_layers != 0:
             model.ProtBertBFD.encoder.layer = model.ProtBertBFD.encoder.layer[:-remove_bert_layers]
@@ -953,7 +959,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                            ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
                            glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
                            version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
-                           linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+                           linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                           concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims)
 
     if bert_pe_for_decoder:
         model.classification_head.update_pe(model.ProtBertBFD.embeddings.position_embeddings, frozen_pe_epochs > -1)
@@ -1293,7 +1300,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             best_epoch = e
             best_valid_loss = valid_loss
             best_valid_mcc_and_recall = patiente_metric
-            save_model(swa_model.module if use_swa and swa_start <= e else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, optimizer=optimizer if use_swa else None)
+            # save_model(swa_model.module if use_swa and swa_start <= e else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, optimizer=optimizer if use_swa else None)
         elif (e > warmup_epochs and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
                 (e > warmup_epochs and best_valid_mcc_and_recall > patiente_metric and eps == -1 and validate_on_mcc):
             if validate_on_mcc:
@@ -1354,9 +1361,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                              batch_size=bs, shuffle=True,
                                                              num_workers=4, collate_fn=collate_fn)
-    if use_swa:
-        update_bn(dataset_loader, swa_model.to(device))
-        save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
+    # if use_swa:
+    #     update_bn(dataset_loader, swa_model.to(device))
+    #     save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
     model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
