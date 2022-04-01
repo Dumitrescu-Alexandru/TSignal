@@ -1300,7 +1300,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             best_epoch = e
             best_valid_loss = valid_loss
             best_valid_mcc_and_recall = patiente_metric
-            # save_model(swa_model.module if use_swa and swa_start <= e else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, optimizer=optimizer if use_swa else None)
+            save_model(swa_model.module if use_swa and swa_start <= e else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, optimizer=optimizer if use_swa else None)
         elif (e > warmup_epochs and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
                 (e > warmup_epochs and best_valid_mcc_and_recall > patiente_metric and eps == -1 and validate_on_mcc):
             if validate_on_mcc:
@@ -1361,9 +1361,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                              batch_size=bs, shuffle=True,
                                                              num_workers=4, collate_fn=collate_fn)
-    # if use_swa:
-    #     update_bn(dataset_loader, swa_model.to(device))
-    #     save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
+    if use_swa:
+        update_bn(dataset_loader, swa_model.to(device))
+        save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
     model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
