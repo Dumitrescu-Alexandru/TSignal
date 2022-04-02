@@ -360,8 +360,11 @@ class PositionalEncoding(nn.Module):
         pe[:, 0, 0::2] = torch.sin(position * div_term)
         pe[:, 0, 1::2] = torch.cos(position * div_term)
         self.register_buffer('pe', pe)
-        if self.linear_pos_enc:
+        if self.linear_pos_enc and not concat_pos_enc:
             self.pos_enc = torch.nn.Embedding(100, 1024).to(self.device)
+        if self.linear_pos_enc and concat_pos_enc:
+            a = torch.arange(0, pe_extra_dims, 1)
+            self.pos_enc = torch.nn.functional.one_hot(a, num_classes=pe_extra_dims).reshape(pe_extra_dims, 1, pe_extra_dims).to(self.device)
 
     def update_pe(self, pe):
         self.linear_pos_enc = True
@@ -373,6 +376,13 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
+        if self.linear_pos_enc and not no_pos_enc and self.concat_pos_enc:
+            pe_ = self.pos_enc[:x.size(0)]
+            # print(pe_, pe_.shape,x.shape,pe_.repeat(1,x.size(1),1).shape)
+            # print(.shape)
+            # exit(1)
+            x = torch.cat([x, pe_.repeat(1, x.size(1), 1)], dim=-1)
+            return x
         if self.linear_pos_enc and not no_pos_enc:
             pos_enc = self.pos_enc(torch.tensor(list(range(x.shape[0]))).to(self.device))
             pos_enc = pos_enc.repeat(1, x.shape[1]).reshape(x.shape[0], x.shape[1], x.shape[2])

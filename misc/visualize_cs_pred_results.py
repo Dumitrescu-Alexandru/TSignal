@@ -2435,7 +2435,7 @@ def plot_sp6_vs_tnmt_mcc():
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
     runs = [21]#,22,23,24,25]
     # runs = list(range(1,29))
-    runs = [26]
+    runs = [31]
     # runs = [2]
     # runs = [26,27]
     # runs = [1]
@@ -4199,7 +4199,7 @@ def rename():
 
 
 if __name__ == "__main__":
-    # plot_sp6_vs_tnmt_mcc()
+    plot_sp6_vs_tnmt_mcc()
     # plot_comparative_performance_sp1_mdls()
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat13/",
@@ -4257,6 +4257,23 @@ if __name__ == "__main__":
     #                                         remove_test_seqs=False,
     #                                         benchmark=True)
     # exit(1)
+    # 5 layers, ffd 2x (deeper, less wide); 0.8235659065834398... OK?... mcc2 ( 0.857/0.860) mcc1 (0.836/0.835) and
+    # non-w average mcc (sp6/tsignal) 0.817/0.826
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat31/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    #  sine-based extra pos enc, f1 result 0.811 (256 extra dims for pos enc); 0.0001 constant lr. Non-weighted summary 0.7056906719071813 0.7088847209792207 (sp6/tsignal)
+    # worse weighted/non-weighted (ts/sp6) MCC1: 0.836/0.813   (ts/sp6) MCC2: 0.857/0.838
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat30/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat26/",
                                             compare_mdl_plots=False,
