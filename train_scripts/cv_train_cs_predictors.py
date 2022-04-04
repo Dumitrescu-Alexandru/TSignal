@@ -772,7 +772,6 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
                             # in the initial stages, model predicts "only T" for tat/sp1 (+ tat/sp2 too maybe). Account
                             # for this issue
                             if predicted_lbls.replace("ES", "G").rfind("T") < len(predicted_lbls.replace("ES","G")) - 1:
-                                print(predicted_lbls)
                                 if predicted_lbls[predicted_lbls.replace("ES","G").rfind("T")+1] == "L":
                                     predicted_lbls = predicted_lbls.replace("ES","G")
                                     predicted_lbls = predicted_lbls.replace("L", "T")
