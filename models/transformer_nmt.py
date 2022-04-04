@@ -381,7 +381,12 @@ class PositionalEncoding(nn.Module):
             # print(pe_, pe_.shape,x.shape,pe_.repeat(1,x.size(1),1).shape)
             # print(.shape)
             # exit(1)
+
+            # print(pe_[0],pe_[1],x.shape)
             x = torch.cat([x, pe_.repeat(1, x.size(1), 1)], dim=-1)
+            # print(x.shape,x[0,0,1024:],x[1,0,1024:],x[0,1,1024:],x[1,1,1024:])
+            # exit(1)
+
             return x
         if self.linear_pos_enc and not no_pos_enc:
             pos_enc = self.pos_enc(torch.tensor(list(range(x.shape[0]))).to(self.device))

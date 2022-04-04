@@ -118,6 +118,7 @@ def parse_arguments():
     parser.add_argument("--change_swa_decoder_optimizer", default=False, action="store_true", help="change decoder optimizer when starting swa from Adam to SGD")
     parser.add_argument("--reinint_swa_decoder", default=False, action="store_true", help="Use the same (Adam) optimizer when SWA starts, but reinitialize it")
     parser.add_argument("--add_val_data_on_swa", default=False, action="store_true", help="SWA isnt based on early stopping, so the validation data can also be used for training")
+    parser.add_argument("--lipbobox_predictions", default=False, action="store_true", help="Modify predictions to have SSS...(SSS)LLL for Sec/SPase (I)II and TTT...(TTT)LLL for Tat/SPase (I)II")
 
     return parser.parse_args()
 
@@ -254,7 +255,7 @@ if __name__ == "__main__":
                                 anneal_epochs=args.anneal_epochs,annealed_lr=args.annealed_lr, bert_pe_for_decoder=args.bert_pe_for_decoder,
                                 frozen_pe_epochs=args.frozen_pe_epochs,no_bert_pe_training=args.no_bert_pe_training,
                                 add_bert_pe_from_dec_to_bert_out=args.add_bert_pe_from_dec_to_bert_out, concat_pos_enc=args.concat_pos_enc,
-                                pe_extra_dims=args.pe_extra_dims)
+                                pe_extra_dims=args.pe_extra_dims,lipbobox_predictions=args.lipbobox_predictions)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):

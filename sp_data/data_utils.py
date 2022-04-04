@@ -348,37 +348,45 @@ class SPCSpredictionData:
 class CSPredsDataset(Dataset):
     def __init__(self, lbl2inds, partitions, data_folder, glbl_lbl_2ind, train=True, sets=["train", "test"],
                  test_f_name="", form_sp_reg_data=False, tuned_bert_embs_prefix="", extended_sublbls=False, random_folds_prefix="",
-                 train_on_subset=1., pick_seqs=False):
+                 train_on_subset=1., pick_seqs=False,lipbobox_predictions=False ):
         extended_pref = "extended_" if extended_sublbls else ""
         self.life_grp, self.seqs, self.lbls, self.glbl_lbl = [], [], [], []
         self.partitions = partitions
         self.extended_pref = extended_pref
         self.form_sp_reg_data = form_sp_reg_data
-        self.lbl2inds = lbl2inds
+        self.lbl2inds =  {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7, 'BS': 8, 'ES': 9} if lipbobox_predictions else  lbl2inds
         self.glbl_lbl_2ind =glbl_lbl_2ind
         self.data_folder = data_folder
+        self.lipbobox_predictions = lipbobox_predictions
         if partitions is not None:
             # when using partitions, the sp6 data partition files will be used in train/testing
             for p in partitions:
                 for s in sets:
+                    # print("sp6_partitioned_data_sublbls_"+extended_pref+"{}_{}.bin".format(s, p))
+                    # exit(1)
                     d_file = random_folds_prefix + tuned_bert_embs_prefix + "sp6_partitioned_data_sublbls_"+extended_pref+"{}_{}.bin".format(s, p) if form_sp_reg_data else \
                         random_folds_prefix + tuned_bert_embs_prefix + "sp6_partitioned_data_"+extended_pref+"{}_{}.bin".format(s, p)
                     data_dict = pickle.load(open(data_folder + d_file, "rb"))
                     if train_on_subset != 1. and s == 'train':
                         self.extract_subset(data_dict, train_on_subset, lbl2inds, glbl_lbl_2ind)
                     else:
-                        self.seqs.extend(list(data_dict.keys()))
-                        self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
-                        self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
-                        self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
+                        for seq_, vals_ in data_dict.items():
+                            self.seqs.append(seq_)
+                            self.lbls.append(self.transorm_seq(vals_[1], vals_[3])
+                                             if lipbobox_predictions else [lbl2inds[l] for l in vals_[1]])
+                            self.life_grp.append(vals_[2])
+                            self.glbl_lbl.append(vals_[3])
         else:
             # parameter for a specific test
             data_dict = pickle.load(open(data_folder + test_f_name, "rb"))
-            self.seqs.extend(list(data_dict.keys()))
-            self.lbls.extend([[lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
-            self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
-            self.glbl_lbl.extend([glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
+            for seq_, vals_ in data_dict.items():
+                self.seqs.append(seq_)
+                self.lbls.append(self.transorm_seq(vals_[1], vals_[3])
+                                 if lipbobox_predictions else [lbl2inds[l] for l in vals_[1]])
+                self.life_grp.append(vals_[2])
+                self.glbl_lbl.append(vals_[3])
         if pick_seqs:
+            # was used when i had memory leaks on grad computation of input wrt the prediction; probably will be deleted
             required_seqs=10
             ind2lbl = {v:k for k,v in lbl2inds.items()}
             gather_SLT = [0,0,0]
@@ -403,6 +411,20 @@ class CSPredsDataset(Dataset):
                     self.life_grp = new_lg
                     self.glbl_lbl = new_gl
 
+    def transorm_seq(self, lbl_seq, glbl_lbl):
+        if glbl_lbl not in ["LIPO", "TATLIPO"]:
+            return [self.lbl2inds[l] for l in lbl_seq]
+        elif glbl_lbl == "LIPO":
+            new_seq = "S" * (lbl_seq.rfind("L")-2)
+            new_seq += "L"*3
+            new_seq += lbl_seq[lbl_seq.rfind("L")+1:]
+            return [self.lbl2inds[l] for l in new_seq]
+        elif glbl_lbl == "TATLIPO":
+            new_seq = "T" * (lbl_seq.rfind("W") - 2)
+            new_seq += "L" * 3
+            new_seq += lbl_seq[lbl_seq.rfind("W") + 1:]
+            return [self.lbl2inds[l] for l in new_seq]
+
     def __len__(self):
         return len(self.seqs)
 
@@ -416,10 +438,12 @@ class CSPredsDataset(Dataset):
                 d_file = "sp6_partitioned_data_sublbls_" + self.extended_pref + "{}_{}.bin".format(s, p) \
                     if self.form_sp_reg_data else "sp6_partitioned_data_" + self.extended_pref + "{}_{}.bin".format(s, p)
                 data_dict = pickle.load(open(self.data_folder + d_file, "rb"))
-                self.seqs.extend(list(data_dict.keys()))
-                self.lbls.extend([[self.lbl2inds[l] for l in label] for (_, label, _, _) in data_dict.values()])
-                self.life_grp.extend([life_grp for (_, _, life_grp, _) in data_dict.values()])
-                self.glbl_lbl.extend([self.glbl_lbl_2ind[glbl_lbl] for (_, _, _, glbl_lbl) in data_dict.values()])
+                for seq_, vals_ in data_dict.items():
+                    self.seqs.append(seq_)
+                    self.lbls.append(self.transorm_seq(vals_[1], vals_[3])
+                                     if self.lipbobox_predictions else [self.lbl2inds[l] for l in vals_[1]])
+                    self.life_grp.append(vals_[2])
+                    self.glbl_lbl.append(vals_[3])
 
     def extract_subset(self, data_dict, train_on_subset, lbl2inds, glbl_lbl_2ind):
         lg_and_sptyp2_inds = {}

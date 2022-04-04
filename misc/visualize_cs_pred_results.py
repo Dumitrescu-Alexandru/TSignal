@@ -176,6 +176,7 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, retu
     grp2_ind = {"EUKARYA": 0, "NEGATIVE": 1, "POSITIVE": 2, "ARCHAEA": 3}
     lg2sp_letter = {'TAT': 'T', 'LIPO': 'L', 'PILIN': 'P', 'TATLIPO': 'W', 'SP': 'S'}
     ind2sptype = {0:'NO_SP', 1:'SP', 2:'TATLIPO', 3:'LIPO', 4:'TAT', 5:'PILIN'}
+    sptype2ind = {v:k for k,v in ind2sptype.items()}
 
     sp_type_letter = lg2sp_letter[sp_type]
     predictions = [[[], []], [[], []], [[], []], [[], []]]
@@ -185,6 +186,14 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, retu
         zv += 1
         lg, sp_info = l.split("|")
         if sp_info == sp_type or sp_info == "NO_SP":
+            # if sp_info == "LIPO" and s[p.rfind("L")+1] != "C":
+            #     sptype_preds[s] = sptype2ind[sp_info]
+            #     print(s)
+            #     print(p)
+            # elif sp_info == "TATLIPO"  and s[p.rfind("L")+1] != "C":
+            #     sptype_preds[s] = sptype2ind[sp_info]
+            #     print(s)
+            #     print(p)
             p = p.replace("ES", "J")
             len_ = min(len(p), len(t))
             t, p = t[:len_], p[:len_]
@@ -2272,6 +2281,9 @@ def plot_sp6_vs_tnmt():
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
     runs = [21,22,23,24,25]
+    runs = [32,34]
+    runs = [32,34,37,39]
+    runs = [32]
     for run_no in runs:
         print("Computing results for run number {}".format(run_no))
         run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
@@ -2393,12 +2405,12 @@ def plot_sp6_vs_tnmt():
         for j in range(2):
             print(colors[j])
             ax[ind].bar([i + offsets[j] for i in range(lower_lim_plots, 17)], all_f1s[j],  label=names[j],
-                   width=line_w,alpha=0.6, color=colors[j])
+                        width=line_w,alpha=0.6, color=colors[j])
         for i in range(lower_lim_plots, 17):
             print(all_sptypes_all_mean[ind],all_sptypes_all_std[ind])
             print("ind", ind)
 
-            low,high = all_sptypes_all_mean[ind][i - lower_lim_plots] - 2 * all_sptypes_all_std[ind][i - lower_lim_plots],\
+            low,high = all_sptypes_all_mean[ind][i - lower_lim_plots] - 2 * all_sptypes_all_std[ind][i - lower_lim_plots], \
                        all_sptypes_all_mean[ind][i - lower_lim_plots] + 2 *  all_sptypes_all_std[ind][i - lower_lim_plots]
             ax[ind].plot([i+offsets[0],i+offsets[0]],[low,max(high,low+0.001)], color='black')
         box = ax[ind].get_position()
@@ -2436,6 +2448,11 @@ def plot_sp6_vs_tnmt_mcc():
     runs = [21]#,22,23,24,25]
     # runs = list(range(1,29))
     runs = [31]
+    runs = [33]
+    runs = [34]
+    runs = [32,34,37]
+    runs = [39]
+    # runs = [32]
     # runs = [2]
     # runs = [26,27]
     # runs = [1]
@@ -2499,8 +2516,8 @@ def plot_sp6_vs_tnmt_mcc():
 
     print("non-w average sp6:",(np.mean(sp6_mcc1_sp1)+np.mean(sp6_mcc1_sp2) + np.mean(sp6_mcc1_tat) + np.mean(sp6_mcc2_sp1)+np.mean(sp6_mcc2_sp2) + np.mean(sp6_mcc2_tat))/6)
     print("non-w average tsignal:",(np.mean(mean_mcc1_sp1)+np.mean(mean_mcc2_sp1) + np.mean(mean_mcc1_sp2) + np.mean(mean_mcc2_sp2)+np.mean(mean_mcc1_tat) + np.mean(mean_mcc2_tat))/6)
-    print("w average sp6/tsignal:",total_mcc1_sp6,total_mcc1)
-    print("w average sp6/tsignal:",total_mcc2_sp6,total_mcc2)
+    print("mcc1 w average sp6/tsignal:",total_mcc1_sp6,total_mcc1)
+    print("mcc2 w average sp6/tsignal:",total_mcc2_sp6,total_mcc2)
     # print("non-w average tsignal:",(np.mean(mean_mcc1_sp1)+np.mean(mean_mcc2_sp1) + np.mean(mean_mcc1_sp2) + np.mean(mean_mcc2_sp2)+np.mean(mean_mcc1_tat) + np.mean(mean_mcc2_tat))/6)
     exit(1)
     print(total_mcc1,total_mcc1_sp6)
@@ -4200,6 +4217,7 @@ def rename():
 
 if __name__ == "__main__":
     plot_sp6_vs_tnmt_mcc()
+    plot_sp6_vs_tnmt()
     # plot_comparative_performance_sp1_mdls()
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat13/",
@@ -4222,7 +4240,6 @@ if __name__ == "__main__":
     # visualize_inp_gradients()
     #
     # plot_comparative_performance_sp1_mdls()
-    # plot_sp6_vs_tnmt()
     # plot_sp6_vs_tnmt_violin()
 
     # exit(1)
@@ -4257,6 +4274,66 @@ if __name__ == "__main__":
     #                                         remove_test_seqs=False,
     #                                         benchmark=True)
     # exit(1)
+    # 0.81697; repeat pe extra dims 128, annealed
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat39/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat38/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # 0.8119 (128 extra dims 3 laters x4 exp dim)
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat37/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # 128 extra dims, annealed, 5 layers x2 exp dim; 0.812
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat36/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # both larger model (5 layers, ffx 2x) and pe_extra dims; 0.77848
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat35/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # repeat adding 128 dims anneal 20/20 0.8166; mcc2/mcc1 (sp6/tsi) 0.836/0.842 mcc1 0.8578/0.851
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat34/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    #  lucky run again... 5 layers, ffd 2x (deeper, less wide); 0.8161024130466082; non-w F1 0.7056/0.74575
+    # non - w average sp6: 0.8178055555555556
+    # non - waverage tsignal: 0.8265448697886194
+    # mcc1  w  average   sp6 / tsignal: 0.8578189390618148 0.8607205519062273
+    # mcc2  w  average  sp6 / tsignal: 0.8365590800951624 0.8354707070968285
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat33/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # 3 layers, ffd 4x 128 pe extra dims (sp6/tsignal) 0.836 vs 0.848; mcc2 0.857 vs 0.855; non-w average mcc (sp6/tsignal): 0.817/0.835;
+    # non-w f1 scores 0.736/0.705; w f1 0.0.822882594764844
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat32/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     # 5 layers, ffd 2x (deeper, less wide); 0.8235659065834398... OK?... mcc2 ( 0.857/0.860) mcc1 (0.836/0.835) and
     # non-w average mcc (sp6/tsignal) 0.817/0.826
     mdl2results = extract_all_param_results(only_cs_position=False,
