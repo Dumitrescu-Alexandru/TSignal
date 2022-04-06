@@ -131,7 +131,10 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             if not model.classification_head.train_only_decoder:
                 memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
             else:
-                _, _, _, _, memory = model.classification_head.input_encoder(memory_bfd, inp_seqs=[s.replace(" ","") for s in seqs])
+                _, _, padding_mask_src, _, memory = model.classification_head.input_encoder(memory_bfd,
+                                                                                            inp_seqs=[s.replace(" ", "")
+                                                                                                      for s in
+                                                                                                      seqs])
                 memory = torch.nn.utils.rnn.pad_sequence(memory, batch_first=True)
         else:
             memory = model.encode(src)

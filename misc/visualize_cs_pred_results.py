@@ -1662,7 +1662,7 @@ def extract_id2seq_dict(file="train_set.fasta"):
             lg_sptype2count[v + "_" + id2type[k]] += 1
     return id2seq, id2lg, id2type, id2truelbls
 
-def extract_compatible_binaries_predtat(restrict_types=None):
+def extract_compatible_binaries_predtat(restrict_types=None, return_mcc=False):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     glbllbl2_ind = {v: k for k, v in ind2glbl_lbl.items()}
     id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict(file="train_set.fasta")
@@ -1715,12 +1715,13 @@ def extract_compatible_binaries_predtat(restrict_types=None):
             else:
                 seq2aalbls[id2seq[id]] = "O" * len(id2seq[id])
             pred_lbls.append(seq2aalbls[id2seq[id]])
-    mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
-    print("computed here", mcc, mcc2)
-    print("reported in sp6", [0.34,0.736,0.839,0.781],[0.238, 0.209, 0.655])
-    mcc_tat= get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="TAT", sptype_preds=seq2sptype)
-    print(mcc_tat)
-    exit(1)
+    if return_mcc:
+        mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
+        # print("computed here", mcc, mcc2)
+        # print("reported in sp6", [0.34,0.736,0.839,0.781],[0.238, 0.209, 0.655])
+        mcc_tat= get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="TAT", sptype_preds=seq2sptype)
+        # print(mcc_tat)
+        return  mcc, mcc_tat
     # all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
     #     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT",
     #                sptype_preds=seq2sptype)
@@ -1735,7 +1736,7 @@ def extract_compatible_binaries_predtat(restrict_types=None):
     # print([round(i, 2) for i in np.array(all_f1_scores).reshape(-1)])
     return all_recalls, all_precisions, all_f1_scores
 
-def extract_compatible_binaries_lipop(restrict_types=None):
+def extract_compatible_binaries_lipop(restrict_types=None, return_mcc=False):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
     # id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict(file="train_set.fasta")
@@ -1795,18 +1796,22 @@ def extract_compatible_binaries_lipop(restrict_types=None):
     # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_precisions).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_f1_scores).reshape(-1)])
+    if return_mcc:
+        mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+                                             sp_type="SP", sptype_preds=seq2sptype)
+        # print("Computed here LIPOP", mcc, mcc2[1:], len(seqs))
+        # print("Reported in SP6", [0.196, 0.71, 0.879, 0.733], [0.342, 0.484, 0.552])
+        mcc_lipop, mcc2_lipop = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+                                             sp_type="LIPO", sptype_preds=seq2sptype)
+        return mcc, mcc_lipop
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
     # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_precisions).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_f1_scores).reshape(-1)])
-
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
-    mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
-    print("Computed here LIPOP", mcc, mcc2[1:], len(seqs))
-    print("Reported in SP6", [0.196,0.71,0.879,0.733], [0.342,0.484,0.552])
-    exit(1)
+
 
     return all_recalls, all_precisions, all_f1_scores
     tp, fn, fp = 0, 0, 0
@@ -1829,7 +1834,7 @@ def extract_compatible_binaries_lipop(restrict_types=None):
     # pickle.dump(seq2aalbls, open("lipoP_0_1.bin", "wb"))
     # for l in lines:
 
-def extract_compatible_binaries_deepsig(restrict_types=None):
+def extract_compatible_binaries_deepsig(restrict_types=None, return_mcc=False):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
     id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict(file="train_set.fasta")
@@ -1873,21 +1878,26 @@ def extract_compatible_binaries_deepsig(restrict_types=None):
     #         elif id2type[seq2id[s]] == "TATLIPO":
     #             count2+=1
     # exit(1)
-    print(len(seqs), len(set(seqs)))
+    if return_mcc:
+        # print(len(seqs), len(set(seqs)))
+        mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
+        # print("Computed here", mcc, mcc2[1:])
+        # print("Reported in SP6", [0.792,0.735,0.798,0.711], [0.159,0.146,"n.d."])
+        if return_mcc:
+            return  mcc
+        # print(all_recalls, all_precisions)
+        # exit(1)
+
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
-    mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
-    print("Computed here", mcc, mcc2[1:])
-    print("Reported in SP6", [0.792,0.735,0.798,0.711], [0.159,0.146,"n.d."])
-    # print(all_recalls, all_precisions)
-    exit(1)
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
+                   sptype_preds=seq2sptype)
     # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
     # print([round (i, 2) for i in np.array(all_precisions).reshape(-1)])
     # print([round (i, 2) for i in np.array(all_f1_scores).reshape(-1)])
-    return all_recalls, all_precisions, all_f1_scores
     tp, fn, fp = 0, 0, 0
     different_types = 0
     crct =0
+    return all_recalls, all_precisions, all_f1_scores
     # Just some sanity checks here
     # for s, pl, tl, lg in zip(seqs, pred_lbls, true_lbls, life_grp):
     #     if "EUKARYA" in lg and "SP" in lg and "NO_SP" not in lg:
@@ -1905,7 +1915,7 @@ def extract_compatible_binaries_deepsig(restrict_types=None):
     # pickle.dump(seq2aalbls, open("lipoP_0_1.bin", "wb"))
     # for l in lines:
 
-def extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"]):
+def extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"], return_mcc=False):
     ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
     file = "sp1_sp2_fastas/results_phobius.txt"
@@ -1943,13 +1953,16 @@ def extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"]):
                 predicted  = "I" * len(seqs[-1])
                 seq2sptype[id2seq[actual_id]] = glbllbl2_ind['NO_SP']
             pred_lbls.append(predicted)
+
+    if return_mcc:
+        mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
+        # print(len(seqs))
+        # print("Computed here", mcc, mcc2[1:])
+        # print("Reported in SP6", [0.531,0.766,0.716,0.796], [0.766,0.716,0.551])
+        return mcc
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
-    mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
-    print(len(seqs))
-    print("Computed here", mcc, mcc2[1:])
-    print("Reported in SP6", [0.531,0.766,0.716,0.796], [0.766,0.716,0.551])
-    exit(1)
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
+                   sptype_preds=seq2sptype)
     # all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
     #     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
     return all_recalls, all_precisions, all_f1_scores
@@ -2388,7 +2401,7 @@ def plot_sp6_vs_tnmt():
     print(all_sptypes_all_f1s)
 
     names = ["TSignal", "SignalP6", "LipoP", "DeepSig", "Phobius"]
-    colors = ["mediumblue", "saddlebrown", "green", "black", "purple"]
+    colors = ["mediumblue", "saddlebrown", "green", "black", "purple","red"]
     titles = ["", "", "", ""]
     x_positions = []
 
@@ -2440,11 +2453,125 @@ def plot_sp6_vs_tnmt():
     exit(1)
     # plt.show()
 
-def plot_sp6_vs_tnmt_mcc():
+def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,mcc_deepsig,mcc_predTat,mcc_lipop,mcc_phobius):
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
     mpl.rcParams['font.family'] = "Arial"
+    fig, ax = plt.subplots(3, 2,figsize=(8, 6),dpi=350)
+    line_w = 0.1
+    offsets = [-line_w*2.5,-line_w*1.5,-line_w*0.5, line_w*0.5,line_w*1.5,line_w*2.5]
+    colors = ["mediumblue", "saddlebrown", "green", "black", "purple","red"]
+    ylabels = ["Sec/SPase I", "Sec/SPase II", "Tat/SPase I"]
+    model_names = ["TSignal", "SP6", "DeepSig", "Pred-TAT","LipoP", "Phobius"]
+    for ind in range(3):
+        current_sptype_mcc1, current_sptype_mcc2 = mean_results_TSignal[ind]
+        current_sptype_mcc1_std, current_sptype_mcc2_std = std_results_TSignal[ind]
+        current_sptype_mcc1_sp6, current_sptype_mcc2_sp6 = mean_results_SP6[ind]
+        current_sptype_mcc1_deepsig, current_sptype_mcc1_predTat, \
+        current_sptype_mcc1_LipoP, current_sptype_mcc1_Phobius = \
+            mcc_deepsig[ind],mcc_predTat[ind],mcc_lipop[ind],mcc_phobius[ind]
+        mcc1_mean_results = [current_sptype_mcc1,current_sptype_mcc1_sp6,current_sptype_mcc1_deepsig,current_sptype_mcc1_predTat,current_sptype_mcc1_LipoP,current_sptype_mcc1_Phobius]
+        mcc2_mean_results = [current_sptype_mcc2,current_sptype_mcc2_sp6]
+        # print(current_sptype_mcc1,current_sptype_mcc1_sp6,current_sptype_mcc1_deepsig,current_sptype_mcc1_predTat,current_sptype_mcc1_LipoP,current_sptype_mcc1_Phobius)
+        box = ax[ind][0].get_position()
+        ax[ind][0].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1.3, box.height * 0.95])
+        box = ax[ind][1].get_position()
+        ax[ind][1].set_position([box.x0+box.width * 0.35, box.y0 + box.height * 0.35, box.width * 0.8, box.height * 0.95])
+        if ind == 0:
+            ax[ind][0].set_title("MCC1",fontsize=8)
+            ax[ind][1].set_title("MCC2",fontsize=8)
+        ax[ind][0].set_ylabel(ylabels[ind],fontsize=8)
+        if ind != 2:
+            ax[ind][0].set_xticks([1,2,3,4])
+            ax[ind][0].set_xticklabels(["","","",""])
+            ax[ind][1].set_xticks([1,2,3])
+            ax[ind][1].set_xticklabels(["","",""])
+        else:
+            ax[ind][0].set_xticks([1,2,3,4])
+            ax[ind][0].set_xticklabels(["eukarya", "gn-bacteria", "gp-bacteria", "archaea"], fontsize=8)
+            ax[ind][1].set_xticks([1, 2, 3])
+            ax[ind][1].set_xticklabels(["gn-bacteria", "gp-bacteria", "archaea"], fontsize=8)
 
+        ax[ind][0].plot([1.5,1.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        ax[ind][0].plot([2.5,2.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        ax[ind][0].plot([3.5,3.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+
+        ax[ind][1].plot([1.5,1.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        ax[ind][1].plot([2.5,2.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        for j in range(6):
+
+            ax[ind][0].bar([i + offsets[j] for i in range(1 if ind == 0 else 2,5)], mcc1_mean_results[j], width=line_w,alpha=0.6,color=colors[j],label=model_names[j]) #, current_sptype_mcc1_sp6[j - 1],
+            if j ==0:
+                current_sptype_mcc1_std = [max(0.001,current_sptype_mcc1_std_) for current_sptype_mcc1_std_ in current_sptype_mcc1_std]
+                low, high = np.array(mcc1_mean_results[j]) - 2 * np.array(current_sptype_mcc1_std), \
+                            np.array(mcc1_mean_results[j]) + 2 *  np.array(current_sptype_mcc1_std)
+                for index, ind_ in enumerate(range(1 if ind == 0 else 2, 5)):
+                    ax[ind][0].plot([ind_+offsets[j], ind_+offsets[j]], [low[index],high[index]],color='black')
+            if ind == 0:
+                handles, labels = ax[ind][0].get_legend_handles_labels()
+                                                          # current_sptype_mcc1_deepsig[j - 1],
+                                                          # current_sptype_mcc1_predTat[j - 1],
+                                                          # current_sptype_mcc1_LipoP[j - 1],
+                                                          # current_sptype_mcc1_Phobius[j - 1]], width=line_w)
+            # ax[ind][0].bar([j + of_ for of_ in offsets], [current_sptype_mcc1[j-1],current_sptype_mcc1_sp6[j-1],
+            #                                               current_sptype_mcc1_deepsig[j-1],current_sptype_mcc1_predTat[j-1],
+            #                                               current_sptype_mcc1_LipoP[j-1],current_sptype_mcc1_Phobius[j-1]],width=line_w)
+        for j in range(2):
+            print([i + offsets[j] for i in range(1,4)],mcc2_mean_results[j])
+            ax[ind][1].bar([i + offsets[j+2] for i in range(1,4)], mcc2_mean_results[j], width=line_w,alpha=0.6,color=colors[j]) #, current_sptype_mcc1_sp6[j - 1],
+
+            if j ==0:
+                current_sptype_mcc2_std = [max(0.0001,current_sptype_mcc2_std_) for current_sptype_mcc2_std_ in current_sptype_mcc2_std]
+                low, high = np.array(mcc2_mean_results[j]) - 2 * np.array(current_sptype_mcc2_std), \
+                            np.array(mcc2_mean_results[j]) + 2 *  np.array(current_sptype_mcc2_std)
+                for index, ind_ in enumerate(range(1, 4)):
+                    ax[ind][1].plot([ind_+offsets[2], ind_+offsets[2]], [low[index],high[index]],color='black')
+
+        ax[ind][0].set_ylim([0,1.1])
+        ax[ind][1].set_ylim([0,1.1])
+        ax[ind][0].set_yticks([0,0.2,0.4,0.6,0.8,1])
+        ax[ind][0].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=8)
+        ax[ind][1].set_yticks([0,0.2,0.4,0.6,0.8,1])
+        ax[ind][1].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=8)
+        ax[ind][0].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
+        ax[ind][1].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
+        ax[ind][0].set_xlim([0.5,4.5])
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=6, fontsize=8)
+    plt.savefig("some_plot_mcc.pdf")
+
+    #     exit(1)
+    #     for j in range(2):
+    #         print(colors[j])
+    #         ax[ind].bar([i + offsets[j] for i in range(lower_lim_plots, 17)], all_f1s[j],  label=names[j],
+    #                     width=line_w,alpha=0.6, color=colors[j])
+    #     for i in range(lower_lim_plots, 17):
+    #         print(all_sptypes_all_mean[ind],all_sptypes_all_std[ind])
+    #         print("ind", ind)
+    #
+    #         low,high = all_sptypes_all_mean[ind][i - lower_lim_plots] - 2 * all_sptypes_all_std[ind][i - lower_lim_plots], \
+    #                    all_sptypes_all_mean[ind][i - lower_lim_plots] + 2 *  all_sptypes_all_std[ind][i - lower_lim_plots]
+    #         ax[ind].plot([i+offsets[0],i+offsets[0]],[low,max(high,low+0.001)], color='black')
+    #     box = ax[ind].get_position()
+    #     ax[ind].set_xlim(0.5,16.5)
+    #     ax[ind].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1.1, box.height * 0.95])
+    #     ax[ind].set_yticks([0,0.2,0.4,0.6,0.8,1])
+    #     ax[ind].set_ylim([0, 1.1])
+    #     ax[ind].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
+    #     ax[ind].set_xticks(list(range(lower_lim_plots, 17)))
+    #     if ind == 2:
+    #         handles, labels = ax[ind].get_legend_handles_labels()
+    #     ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=8)
+    #     ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=8)
+    #     ax[ind].yaxis.set_label_coords(-0.07, 0.42)
+    #     ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=8)
+    # fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=8)
+    # fig.suppressComposite = False
+    # from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
+    # ax[2].set_xlabel("eukarya                                        gn bacteria                                 gp bacteria                                        archaea\n\n "
+    #                  "tolerance/life group",fontsize=8)
+    # plt.savefig("some_plot.pdf")
+
+def plot_sp6_vs_tnmt_mcc():
     # plt.show()
     all_mdl_2results = []
 
@@ -2463,22 +2590,19 @@ def plot_sp6_vs_tnmt_mcc():
     # no pe extra dims; lipobox training
     runs = [42, 45]
 
-
-
-    runs = [46]
-    runs = [47]
-    runs = [48]
     runs = [32,34,37, 39,40, 47]
 
-    # runs = [42]
-    # runs = [34]
-    # runs = [43]
-    # runs = [42]
 
-    # runs = [32]
-    # runs = [2]
-    # runs = [26,27]
-    # runs = [1]
+    mcc_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"], return_mcc=True)
+    mcc_predTat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP"], return_mcc=True)
+    mcc_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP"], return_mcc=True)
+    mcc_phobius = extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"], return_mcc=True)
+    mcc_deepsig[-1] = 0
+    # "padd" with zeroes the SP types which are not predictable by their respective models
+    mcc_deepsig = [mcc_deepsig, [0]*3, [0]*3]
+    mcc_predTat = [mcc_predTat[0], [0]*3, mcc_predTat[1]]
+    mcc_lipop = [mcc_lipop[0], mcc_lipop[1], [0]*3]
+    mcc_phobius = [mcc_phobius, [0]*3, [0]*3]
     for run_no in runs:
         print("Computing results for run number {}".format(run_no))
         run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
@@ -2520,9 +2644,21 @@ def plot_sp6_vs_tnmt_mcc():
     mean_mcc1_sp2, mean_mcc2_sp2 = np.mean(np.stack(mcc1_sp2),axis=0), np.mean(np.stack(mcc2_sp2), axis=0)
     mean_mcc1_tat, mean_mcc2_tat = np.mean(np.stack(mcc1_tat),axis=0), np.mean(np.stack(mcc2_tat), axis=0)
 
+    std_mcc1_sp1, std_mcc2_sp1 = np.std(np.stack(mcc1_sp1), axis=0), np.std(np.stack(mcc2_sp1), axis=0)
+    std_mcc1_sp2, std_mcc2_sp2 = np.std(np.stack(mcc1_sp2), axis=0), np.std(np.stack(mcc2_sp2), axis=0)
+    std_mcc1_tat, std_mcc2_tat = np.std(np.stack(mcc1_tat), axis=0), np.std(np.stack(mcc2_tat), axis=0)
+
     sp6_mcc1_sp1, sp6_mcc2_sp1 = np.array([0.868, 0.811,0.878,0.737]), np.array([0.649, 0.734, 0.728])
     sp6_mcc1_sp2, sp6_mcc2_sp2 = np.array([0.838, 0.894, 0.871]), np.array([0.841, 0.893, 0.719])
     sp6_mcc1_tat, sp6_mcc2_tat = np.array([0.946, 0.788, 0.802]), np.array([0.934, 0.806,0.807])
+
+    mean_results_TSignal = [[mean_mcc1_sp1, mean_mcc2_sp1], [mean_mcc1_sp2, mean_mcc2_sp2],[mean_mcc1_tat, mean_mcc2_tat]]
+    std_results_TSignal = [[std_mcc1_sp1, std_mcc2_sp1], [std_mcc1_sp2, std_mcc2_sp2], [std_mcc1_tat, std_mcc2_tat]]
+    mean_results_SP6 = [[sp6_mcc1_sp1, sp6_mcc2_sp1], [sp6_mcc1_sp2,sp6_mcc2_sp2],[sp6_mcc1_tat, sp6_mcc2_tat]]
+
+    bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,mcc_deepsig,mcc_predTat,mcc_lipop,mcc_phobius)
+
+
 
     no_of_seqs_sp1 = np.array([2040, 44, 142, 356])
     no_of_seqs_sp2 = np.array([1087, 516, 12])
@@ -2707,9 +2843,9 @@ def plot_comparative_performance_sp1_mdls():
     tnmt_rec = [[0.719,0.76,0.788,0.808],[0.556,0.635,0.667,0.683],[0.6,0.667,0.667,0.667],[0.444,0.528,0.556,0.556]]
     tnmt_prec = [[0.669,0.707,0.732,0.752],[0.745,0.851,0.894,0.915],[0.818,0.909,0.909,0.909],[0.727,0.864,0.909,0.909]]
 
-    # all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"])
+    all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"])
     all_recalls, all_precisions, f1_predtat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP"])
-    # all_recalls, all_precisions, f1_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP"])
+    all_recalls, all_precisions, f1_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP"])
     all_recalls, all_precisions, f1_phobius = extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"])
 
 
@@ -4239,9 +4375,9 @@ def rename():
 
 
 if __name__ == "__main__":
-    # plot_sp6_vs_tnmt()
     plot_sp6_vs_tnmt_mcc()
-    # plot_comparative_performance_sp1_mdls()
+    plot_sp6_vs_tnmt()
+    plot_comparative_performance_sp1_mdls()
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat13/",
     #                                         compare_mdl_plots=False,
