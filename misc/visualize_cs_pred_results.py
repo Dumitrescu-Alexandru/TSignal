@@ -1716,8 +1716,10 @@ def extract_compatible_binaries_predtat(restrict_types=None):
                 seq2aalbls[id2seq[id]] = "O" * len(id2seq[id])
             pred_lbls.append(seq2aalbls[id2seq[id]])
     mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
-    print(mcc, mcc2)
-    print([0.34,0.736,0.839,0.781],[0.238, 0.209, 0.655])
+    print("computed here", mcc, mcc2)
+    print("reported in sp6", [0.34,0.736,0.839,0.781],[0.238, 0.209, 0.655])
+    mcc_tat= get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="TAT", sptype_preds=seq2sptype)
+    print(mcc_tat)
     exit(1)
     # all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
     #     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT",
@@ -2284,6 +2286,9 @@ def plot_sp6_vs_tnmt():
     runs = [32,34]
     runs = [32,34,37,39]
     runs = [32]
+    runs = [32,34,37, 39,40, 47]
+    # runs = [42]
+
     for run_no in runs:
         print("Computing results for run number {}".format(run_no))
         run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
@@ -2449,9 +2454,27 @@ def plot_sp6_vs_tnmt_mcc():
     # runs = list(range(1,29))
     runs = [31]
     runs = [33]
-    runs = [34]
-    runs = [32,34,37]
-    runs = [39]
+    # pe extra dims; no lipobox training
+    runs = [32,34,37, 39,40, 47]
+    # no pe extra dims; no lipobox training
+    runs = [21, 22, 23, 24, 25]
+    # pe extra dims; lipobox training
+    runs = [43, 44]
+    # no pe extra dims; lipobox training
+    runs = [42, 45]
+
+
+
+    runs = [46]
+    runs = [47]
+    runs = [48]
+    runs = [32,34,37, 39,40, 47]
+
+    # runs = [42]
+    # runs = [34]
+    # runs = [43]
+    # runs = [42]
+
     # runs = [32]
     # runs = [2]
     # runs = [26,27]
@@ -2467,7 +2490,7 @@ def plot_sp6_vs_tnmt_mcc():
                                                 compare_mdl_plots=False,
                                                 remove_test_seqs=False,
                                                 benchmark=True,
-                                                prints=False)
+                                                prints=True)
         mdl_ind = 0
         sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
         sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][6]]))
@@ -2685,7 +2708,7 @@ def plot_comparative_performance_sp1_mdls():
     tnmt_prec = [[0.669,0.707,0.732,0.752],[0.745,0.851,0.894,0.915],[0.818,0.909,0.909,0.909],[0.727,0.864,0.909,0.909]]
 
     # all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"])
-    # all_recalls, all_precisions, f1_predtat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP"])
+    all_recalls, all_precisions, f1_predtat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP"])
     # all_recalls, all_precisions, f1_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP"])
     all_recalls, all_precisions, f1_phobius = extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"])
 
@@ -4216,8 +4239,8 @@ def rename():
 
 
 if __name__ == "__main__":
+    # plot_sp6_vs_tnmt()
     plot_sp6_vs_tnmt_mcc()
-    plot_sp6_vs_tnmt()
     # plot_comparative_performance_sp1_mdls()
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat13/",
@@ -4274,6 +4297,73 @@ if __name__ == "__main__":
     #                                         remove_test_seqs=False,
     #                                         benchmark=True)
     # exit(1)
+    #
+    # pe extra dims heads=32 0.819; higher non-w average mcc than anything else maybe
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat48/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # additional pe extra dims 0.818; no lipobox training
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat47/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # lipobox labels extra dims, 32 heads dims 0.8102435301349253
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat46/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # lipoboc labels (repeat) train w/o extra dims 0.81605
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat45/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # lipobox labels (repeat) train, with pe extra dims 0.7999
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat44/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # lipobox labels train, no pe extra dims; 0.819
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat42/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # lipobox labels train, with pe extra dims; 0.8154
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat43/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+
+
+
+    # 64 pe extra dims 0.788 quite bad
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat41/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # 128/anneal etc extra pe f1 0.821 or so
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat40/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     # 0.81697; repeat pe extra dims 128, annealed
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat39/",

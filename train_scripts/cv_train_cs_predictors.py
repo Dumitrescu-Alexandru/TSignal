@@ -1457,18 +1457,18 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert",
                                lipbobox_predictions=False):
-    frozen_epochs = 3
-    tune_bert = True
-    for e in range(10):
-        if tune_bert and frozen_epochs > e:
-            print(e, ": model.eval(); model.classification_head.train()")
-        elif tune_bert and frozen_epochs == e:
-            print(e, "model.unfreeze_encoder(no_bert_pe_training);model.train()")
-        elif frozen_epochs > e:
-            print(e, "model.train()")
-
-        else:
-            print(e, "model.train()")
+    # frozen_epochs = 3
+    # tune_bert = True
+    # for e in range(10):
+    #     if tune_bert and frozen_epochs > e:
+    #         print(e, ": model.eval(); model.classification_head.train()")
+    #     elif tune_bert and frozen_epochs == e:
+    #         print(e, "model.unfreeze_encoder(no_bert_pe_training);model.train()")
+    #     elif frozen_epochs > e:
+    #         print(e, "model.train()")
+    #
+    #     else:
+    #         print(e, "model.train()")
     # model = nn.Sequential(nn.Linear(100,10), nn.Linear(10,5))
     # opt = torch.optim.Adam(model.parameters(), lr=0.1)
     # torch.save(opt.state_dict(), "asd.txt")
@@ -1502,13 +1502,13 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # j = [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
     # print(len(j))
     # exit(1)
-    lr_multiplier_swa = 20
-    model = nn.Linear(100,10)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.00001 * lr_multiplier_swa)
-    c_l = 5
-    # lr_scheduler_swa = torch.optim.lr_scheduler_swa.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
-    lr_scheduler_swa = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
-    swa_scheduler = SWALR(optimizer, swa_lr=0.00002, anneal_epochs=30, anneal_strategy='linear')
+    # lr_multiplier_swa = 20
+    # model = nn.Linear(100,10)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=0.00001 * lr_multiplier_swa)
+    # c_l = 5
+    # # lr_scheduler_swa = torch.optim.lr_scheduler_swa.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
+    # lr_scheduler_swa = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
+    # swa_scheduler = SWALR(optimizer, swa_lr=0.00002, anneal_epochs=30, anneal_strategy='linear')
     # sched = torch.optim.lr_scheduler_swa.SWALR(optimizer, base_lr=0.0001, max_lr=0.01, step_size_up=1, step_size_down=10, mode='triangular')
     # ot_sched.step()
     # ot_sched.step()
@@ -1516,18 +1516,18 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # lr_scheduler_swa = torch.optim.lr_scheduler_swa.StepLR(optimizer, step_size=1, gamma=10)
     # lr_scheduler_swa = torch.optim.lr_scheduler_swa.MultiStepLR(optimizer, )
     # schedd_ = torch.optim.lr_scheduler_swa.CyclicLR(optimizer,)
-    lrs = []
-    for i in range(50):
-        # sched.step(i%5)
-        # lr_scheduler_swa.step(i % (c_l+1))
-        lrs.append([i, optimizer.param_groups[0]['lr']])
-        if i > 10:
-            swa_scheduler.step()
-        # ot_sched.step()
-        # lr_scheduler_swa.step(i%5)
-        # sched.step(i%5)
-    print(lrs)
-    exit(1)
+    # lrs = []
+    # for i in range(50):
+    #     # sched.step(i%5)
+    #     # lr_scheduler_swa.step(i % (c_l+1))
+    #     lrs.append([i, optimizer.param_groups[0]['lr']])
+    #     if i > 10:
+    #         swa_scheduler.step()
+    #     # ot_sched.step()
+    #     # lr_scheduler_swa.step(i%5)
+    #     # sched.step(i%5)
+    # print(lrs)
+    # exit(1)
 
     folder = get_data_folder()
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
