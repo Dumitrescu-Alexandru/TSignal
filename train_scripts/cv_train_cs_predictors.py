@@ -128,6 +128,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             input_ids = torch.tensor(inputs['input_ids'], device=model.device)
             attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
             memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
+            seqs = src
             if not model.classification_head.train_only_decoder:
                 memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
             else:
