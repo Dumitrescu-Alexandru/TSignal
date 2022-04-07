@@ -3855,6 +3855,16 @@ def visualize_inp_gradients():
     tobetestd.extend(swa_IEembs_grads_fold_1)
     tobetestd.extend(swa_IEembs_grads_fold_2)
 
+    swa_sep_pe_0 = pickle.load(open("run_swa_1_2", "rb"))
+    swa_sep_pe_1 = pickle.load(open("run_swa_0_2", "rb"))
+    swa_sep_pe_2 = pickle.load(open("run_swa_0_1", "rb"))
+    tobetestd = swa_sep_pe_0.copy()
+    tobetestd.extend(swa_sep_pe_1)
+    tobetestd.extend(swa_sep_pe_2)
+
+    swa_IEembs_grads_fold_1 = pickle.load(open("swa_trained_full_emb_grds_fold1.bin", "rb"))
+    swa_IEembs_grads_fold_2 = pickle.load(open("swa_trained_full_emb_grds_fold2.bin", "rb"))
+
     # sp_type_preds = {k: ind2glbl_lbl[v] for k,v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
     #                                   "fixed_high_lr_swa_only_decoder_0_1_best_sptype.bin", "rb")).items()}
     # sp_type_preds.update({k: ind2glbl_lbl[v] for k, v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
@@ -4028,8 +4038,8 @@ def visualize_inp_gradients():
     #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
     #         else:
     #             print(hydros[1])
-    #
-    #         # axs[0].plot(range(plt_end-motif_pos-6, end_ind_indiv), n_v[78:end_ind_indiv], color=plt_[0].get_color(), alpha=0.3)
+
+            # axs[0].plot(range(plt_end-motif_pos-6, end_ind_indiv), n_v[78:end_ind_indiv], color=plt_[0].get_color(), alpha=0.3)
     # axs[0].set_xlim(15,30)
     axs[0].plot(range(motif_pos), normalized_Tat_values[:motif_pos], color='#1f77b4', label='Other Tat SP residues')
     axs[0].plot([motif_pos-1, motif_pos-0.5], [normalized_Tat_values[motif_pos-1], inbetween_residues_mean_1], color='#1f77b4')
@@ -4107,8 +4117,8 @@ def visualize_inp_gradients():
     #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8)
     # axs[0].annotate("Other residues", xy=(34, normalized_Tat_values[34]), xytext=(21, 0.001),
     #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#1f77b4')
-    axs[0].annotate("Hydrophobic residue (KD=2.09)", xy=(26, normalized_Tat_values[26]), xytext=(29, 0.025),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#1f77b4')
+    # axs[0].annotate("Hydrophobic residue (KD=2.09)", xy=(26, normalized_Tat_values[26]), xytext=(29, 0.025),
+    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#1f77b4')
     # # axs[0].arrow(-100,0,100,100, width=1)
     # # axs[0].arrow(-100,-100,100,100, width=1)
     # # axs[0].arrow(5,5,100,100, width=1)
@@ -4119,6 +4129,7 @@ def visualize_inp_gradients():
     #             arrowprops=dict(arrowstyle="->"))
     # axs[0].set_ylim(0, 1.1 * max(normalized_Tat_values))
     axs[0].set_ylim(-0.02,0.03)
+    # axs[0].set_ylim(-0.02,0.1)
 
     axs[0].set_xlim(7,40)
     axs[0].set_xlabel("Residue position (relative to RRXFLK motif)", fontsize=8)
@@ -4160,6 +4171,10 @@ def visualize_inp_gradients():
     tobetestd = swa_IEembs_grads_fold_0.copy()
     tobetestd.extend(swa_IEembs_grads_fold_1)
     tobetestd.extend(swa_IEembs_grads_fold_2)
+
+    tobetestd = swa_sep_pe_0.copy()
+    tobetestd.extend(swa_sep_pe_1)
+    tobetestd.extend(swa_sep_pe_2)
 
     normalized_sp1_cs_values_pm_5aas = np.zeros(150)
     normalized_sp1_cs_values_pm_5aas_counts = np.zeros(150)
@@ -4376,6 +4391,8 @@ def rename():
 
 if __name__ == "__main__":
     plot_sp6_vs_tnmt_mcc()
+    visualize_inp_gradients()
+
     plot_sp6_vs_tnmt()
     plot_comparative_performance_sp1_mdls()
     # mdl2results = extract_all_param_results(only_cs_position=False,

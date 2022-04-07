@@ -2,7 +2,7 @@ import pickle
 import os
 import datetime
 from sp_data.data_utils import SPbinaryData
-from train_scripts.cv_train_cs_predictors import train_cs_predictors, test_seqs_w_pretrained_mdl
+from train_scripts.cv_train_cs_predictors import train_cs_predictors, test_seqs_w_pretrained_mdl, train_sp_type_predictor
 from train_scripts.cv_train_binary_sp_model import train_bin_sp_mdl
 import argparse
 import logging
@@ -119,6 +119,8 @@ def parse_arguments():
     parser.add_argument("--reinint_swa_decoder", default=False, action="store_true", help="Use the same (Adam) optimizer when SWA starts, but reinitialize it")
     parser.add_argument("--add_val_data_on_swa", default=False, action="store_true", help="SWA isnt based on early stopping, so the validation data can also be used for training")
     parser.add_argument("--lipbobox_predictions", default=False, action="store_true", help="Modify predictions to have SSS...(SSS)LLL for Sec/SPase (I)II and TTT...(TTT)LLL for Tat/SPase (I)II")
+    parser.add_argument("--train_sp_type_predictor", default=False, action="store_true", help="train a TCR conv architecture to predict the sp type")
+    parser.add_argument("--load_model", default="none", type=str, help="Option to load any bert model (e.g. trained on SP-CS prediction task)")
 
     return parser.parse_args()
 
@@ -220,6 +222,9 @@ if __name__ == "__main__":
     args = parse_arguments()
     if args.test_seqs:
         test_seqs_w_pretrained_mdl(args.test_mdl, args.test_seqs, tune_bert=args.tune_bert, saliency_map_save_fn=args.saliency_map_save_fn,hook_layer=args.hook_layer)
+    elif args.train_sp_type_predictor:
+        args2 = parse_arguments()
+        train_sp_type_predictor(args2)
     elif args.train_cs_predictor:
         args2 = parse_arguments()
         if not os.path.exists("param_groups_by_id_cs.bin"):

@@ -16,9 +16,17 @@ import torch.nn as nn
 import torch.optim as optim
 import torch
 sys.path.append(os.path.abspath(".."))
-from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc
+from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc, get_pred_accs_sp_vs_nosp
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights
 from models.transformer_nmt import TransformerModel
+from models.binary_sp_classifier import BinarySPClassifier, CNN3
+
+def init_sptype_classifier(args, glbl_lbls):
+    model = CNN3(input_size=1024, output_size=len(glbl_lbls))
+    for p in model.parameters():
+        if p.dim() > 1:
+            nn.init.xavier_uniform_(p)
+    return model
 
 def init_model(ntoken, lbl2ind={}, lg2ind=None, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
@@ -919,6 +927,203 @@ def get_lr_scheduler_swa(opt, lr_scheduler_swa=False, lr_sched_warmup=0, use_swa
 
 def euk_importance_avg(cs_mcc):
     return (3 / 4) * cs_mcc[0] + (1 / 4) * np.mean(cs_mcc[1:])
+
+
+def test_mcc_sptype_clasifier(args, model, val_or_test="validate", epoch=-1):
+    partitions = args.train_folds if val_or_test == "validate" else list({0,1,2}-set(args.train_folds))
+    sets = ["test"] if val_or_test == "validate" else ["train", "test"]
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    sp_data = SPCSpredictionData(form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified,
+                                 very_simplified=args.very_simplified,
+                                 extended_sublbls=args.extended_sublbls)
+    random_folds_prefix = "random_folds_" if args.random_folds else ""
+    if len(partitions) == 3:
+        tuned_bert_embs_prefix = "bert_tuned_{}_{}_{}_".format(*partitions) if args.tuned_bert_embs else ""
+    else:
+        tuned_bert_embs_prefix = "bert_tuned_{}_{}_".format(*partitions) if args.tuned_bert_embs else ""
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=args.form_sp_reg_data,
+                                tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=args.extended_sublbls,
+                                random_folds_prefix=random_folds_prefix, train_on_subset=args.train_on_subset,
+                                lipbobox_predictions=args.lipbobox_predictions)
+    dataset_loader = torch.utils.data.DataLoader(sp_dataset,
+                                                 batch_size=args.batch_size, shuffle=True,
+                                                 num_workers=4, collate_fn=collate_fn)
+    pred_lbl_2_glbl_lbl = {0:5, 1:1, 2:0, 3:0, 4:3, 5:0, 6:4, 7:2, 8:0, 9:0, 10:0}
+    ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
+    life_grp, all_seqs, true_lbls, pred_lbls, seq2sptype = [], [], [], [], {}
+    for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} {}:".format(epoch, "validation" if val_or_test=="validate" else "test"), total=len(dataset_loader)):
+        seqs, lbl_seqs, og, glbl_lbls = batch
+        for o, g in zip(og, glbl_lbls):
+            life_grp.append(o+"|"+g)
+        if args.tune_bert:
+            seq_lengths = [len(s) for s in seqs]
+            seqs_ = [" ".join(r_ for r_ in s) for s in seqs]
+            inputs = model.tokenizer.batch_encode_plus(seqs_,
+                                                       add_special_tokens=model.hparams.special_tokens,
+                                                       padding=True,
+                                                       truncation=True,
+                                                       max_length=model.hparams.max_length)
+            inputs['targets'] = lbl_seqs
+            inputs['seq_lengths'] = seq_lengths
+            logits = model(**inputs)
+            predictions = torch.argmax(logits, dim=1)
+            all_seqs.extend(seqs)
+            for s, glbl_pred in zip(seqs, predictions):
+                seq2sptype[s] = pred_lbl_2_glbl_lbl[glbl_pred.item()]
+            for l in lbl_seqs:
+                true_lbls.append("".join([ind2lbl[l_] for l_ in l]))
+                pred_lbls.append("J" * len(lbl_seqs))
+    mcc_sp1, mcc2_sp1 = get_pred_accs_sp_vs_nosp(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
+    mcc_sp2, mcc2_sp2 = get_pred_accs_sp_vs_nosp(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="LIPO", sptype_preds=seq2sptype)
+    mcc_tat, mcc2_tat = get_pred_accs_sp_vs_nosp(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="TAT", sptype_preds=seq2sptype)
+    pickle.dump(seq2sptype, open(args.run_name+"_sp_type_eval.bin" if val_or_test=="validate" else args.run_name+"_sp_type_test.bin","wb"))
+    return np.array(mcc_sp1), np.array(mcc2_sp1), np.array(mcc_sp2), np.array(mcc2_sp2), np.array(mcc_tat), np.array(mcc2_tat)
+
+def train_sp_type_predictor(args):
+    partitions = [0, 1, 2] if args.deployment_model else args.train_folds
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    sp_data = SPCSpredictionData(form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified,
+                                 very_simplified=args.very_simplified,
+                                 extended_sublbls=args.extended_sublbls)
+    train_sets = ['test', 'train'] if args.validate_on_test or args.validate_partition is not None else ['train']
+    if len(partitions) == 3:
+        tuned_bert_embs_prefix = "bert_tuned_{}_{}_{}_".format(*partitions) if args.tuned_bert_embs else ""
+    else:
+        tuned_bert_embs_prefix = "bert_tuned_{}_{}_".format(*partitions) if args.tuned_bert_embs else ""
+    test_partition = list({0,1,2} - set(partitions))
+    random_folds_prefix = "random_folds_" if args.random_folds else ""
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=args.form_sp_reg_data,
+                                tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=args.extended_sublbls,
+                                random_folds_prefix=random_folds_prefix, train_on_subset=args.train_on_subset,
+                                lipbobox_predictions=args.lipbobox_predictions)
+    dataset_loader = torch.utils.data.DataLoader(sp_dataset,
+                                                 batch_size=args.batch_size, shuffle=True,
+                                                 num_workers=4, collate_fn=collate_fn)
+    hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
+    hparams.train_enc_dec_sp6 = True
+    # form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False
+    # the form_sp_reg_data param is used to both denote teh RR/C... usage and usually had a mandatory glbl label
+    # in the SP-cs. The current experiment however tests no-glbl-cs tuning
+    classification_head = init_sptype_classifier(args, sp_data.lbl2ind.items())
+    if args.load_model == "none":
+        model = ProtBertClassifier(hparams)
+        if args.remove_bert_layers != 0:
+            model.ProtBertBFD.encoder.layer = model.ProtBertBFD.encoder.layer[:-args.remove_bert_layers]
+        model.classification_head = classification_head
+        model.to(device)
+        if args.frozen_epochs > 0:
+            model.freeze_encoder()
+    else:
+        print("YOYO")
+        model = load_model(args.load_model, tune_bert=True)
+        model.classification_head = classification_head
+        model.to(device)
+        if args.frozen_epochs > 0:
+            model.freeze_encoder()
+
+    if args.tune_bert:
+        if args.use_swa:
+            classification_head_optimizer = optim.Adam(model.classification_head.parameters(),  lr=args.lr * 10 if args.high_lr
+                                                                else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            optimizer = [classification_head_optimizer, bert_optimizer]
+        else:
+            # BERT model always has this LR, as any higher lr worsens the results
+            parameters = [
+                {"params": model.classification_head.parameters()},
+                {
+                    "params": model.ProtBertBFD.parameters(),
+                    "lr": 0.00001,
+                },
+            ]
+            # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
+            optimizer = optim.Adam(parameters,  lr=args.lr * 10 if args.high_lr else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=args.wd)
+    patience = args.patience
+    best_valid_loss = 5 ** 10
+    best_valid_mcc_and_recall = -1
+    best_epoch = 0
+    bestf1_sp_type = 0
+    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"])
+    loss_fn_tune = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
+    current_sptype_f1 = 0
+    e = -1
+    iter_no = 0
+    ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
+    best_avg_mcc = -1
+    if not args.tune_bert:
+        # quick and dirty implementation, just never tune bert but still compute embs with it
+        args.frozen_epochs = 10000
+    no_of_seqs_sp1 = np.array([2040, 44, 142, 356])
+    no_of_seqs_sp2 = np.array([1087, 516, 12])
+    no_of_seqs_tat = np.array([313, 39, 13])
+    no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
+    while patience != 0:
+        if type(optimizer) == list:
+            print("LR:", optimizer[0].param_groups[0]['lr'], "LR_bert:", optimizer[1].param_groups[0]['lr'])
+        if args.tune_bert and args.frozen_epochs > e:
+            model.eval()
+            model.classification_head.train()
+        elif args.tune_bert and args.frozen_epochs == e:
+            model.unfreeze_encoder(args.no_bert_pe_training)
+            model.train()
+        elif args.frozen_epochs > e:
+            model.train()
+        else:
+            model.train()
+        if args.frozen_pe_epochs == e and args.frozen_pe_epochs != -1:
+            if args.tune_bert:
+                for name, param in model.classification_head.pos_encoder.pos_enc.named_parameters():
+                    param.requires_grad = True
+            else:
+                for name, param in model.pos_encoder.pos_enc.named_parameters():
+                    param.requires_grad = True
+
+
+        e += 1
+        losses = 0
+        losses_glbl = 0
+        for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
+            seqs, lbl_seqs, lg_maybe, glbl_lbls = batch
+            seq_lengths = [len(s) for s in seqs]
+            seqs = [" ".join(r_ for r_ in s) for s in seqs]
+            inputs = model.tokenizer.batch_encode_plus(seqs,
+                                                       add_special_tokens=model.hparams.special_tokens,
+                                                       padding=True,
+                                                       truncation=True,
+                                                       max_length=model.hparams.max_length)
+            inputs['targets'] = lbl_seqs
+            inputs['seq_lengths'] = seq_lengths
+            logits = model(**inputs)
+            loss = loss_fn(logits, torch.tensor([l[0] for l in lbl_seqs]).to(device))
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        mcc_sp1, mcc2_sp1, mcc_sp2, mcc2_sp2, mcc_tat, mcc2_tat = test_mcc_sptype_clasifier(args, model, "validate", epoch=e)
+        avg_mcc = (np.sum(no_of_seqs_sp1 * (mcc_sp1 + mcc2_sp1)) + np.sum(no_of_seqs_sp2 * (mcc_sp2 + mcc2_sp2)) + np.sum(no_of_seqs_tat * (mcc_tat, mcc2_tat)))/(2*no_of_tested_sp_seqs)
+        if avg_mcc > best_avg_mcc:
+            print("On epoch {} saving the model with avg mcc {} compared to previous best {}".format(e,avg_mcc, best_avg_mcc))
+            logging.info("On epoch {} saving the model with avg mcc {} compared to previous best {}".format(e,avg_mcc, best_avg_mcc))
+            best_epoch = e
+            best_avg_mcc = avg_mcc
+            save_model(model, model_name=args.run_name, tune_bert=True)
+            patience=10
+        else:
+            print("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
+            logging.info("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
+            patience -= 1
+    model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
+    if not args.deployment_model:
+        # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
+        mcc_sp1, mcc2_sp1, mcc_sp2, mcc2_sp2, mcc_tat, mcc2_tat = test_mcc_sptype_clasifier(args, model, val_or_test="test", epoch=best_epoch)
+        avg_mcc = (np.sum(no_of_seqs_sp1 * (mcc_sp1 + mcc2_sp1)) + np.sum(no_of_seqs_sp2 * (mcc_sp2 + mcc2_sp2)) + np.sum(no_of_seqs_tat * (mcc_tat, mcc2_tat)))/(2*no_of_tested_sp_seqs)
+        print("On epoch {} saving the model TEST avg mcc {}".format(best_epoch, avg_mcc))
+        print("mcc1/2 for sp1/sp2/tat: ",mcc_sp1, mcc2_sp1, mcc_sp2, mcc2_sp2, mcc_tat, mcc2_tat)
+        logging.info("On epoch {} saving the model with TEST avg mcc {}".format(best_epoch, avg_mcc))
 
 
 def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,

@@ -86,9 +86,10 @@ class CNN3(nn.Module):
 
         self.softmax=nn.LogSoftmax(dim=1)
 
-    def forward(self,x):
+    def forward(self,x, targets=None, inp_seqs=None):
         #print('0. SHAPE x',x.shape)
         # CNN part
+        x = x.permute(0,2,1)
         xc = torch.cat((self.cnn1(x),self.cnn2(x),self.cnn3(x),self.cnn4(x)),dim=1)
         xc = self.bn(xc)
         xc = self.relu(xc)
