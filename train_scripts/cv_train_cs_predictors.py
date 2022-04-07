@@ -1116,6 +1116,8 @@ def train_sp_type_predictor(args):
             print("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
             logging.info("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
             patience -= 1
+        if e == 70:
+            patience = 0
     model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
     if not args.deployment_model:
         # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
