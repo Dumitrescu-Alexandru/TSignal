@@ -930,6 +930,7 @@ def euk_importance_avg(cs_mcc):
 
 
 def test_mcc_sptype_clasifier(args, model, val_or_test="validate", epoch=-1):
+    model.eval()
     partitions = args.train_folds if val_or_test == "validate" else list({0,1,2}-set(args.train_folds))
     sets = ["test"] if val_or_test == "validate" else ["train", "test"]
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -978,6 +979,7 @@ def test_mcc_sptype_clasifier(args, model, val_or_test="validate", epoch=-1):
     mcc_sp2, mcc2_sp2 = get_pred_accs_sp_vs_nosp(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="LIPO", sptype_preds=seq2sptype)
     mcc_tat, mcc2_tat = get_pred_accs_sp_vs_nosp(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="TAT", sptype_preds=seq2sptype)
     pickle.dump(seq2sptype, open(args.run_name+"_sp_type_eval.bin" if val_or_test=="validate" else args.run_name+"_sp_type_test.bin","wb"))
+    model.train()
     return np.array(mcc_sp1), np.array(mcc2_sp1), np.array(mcc_sp2), np.array(mcc2_sp2), np.array(mcc_tat), np.array(mcc2_tat)
 
 def train_sp_type_predictor(args):
