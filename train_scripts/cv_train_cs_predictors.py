@@ -102,6 +102,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     sp_predicted_batch_elements_extracated_cs = []
     sp_pred_inds_CS_spType = []
     padding_mask_src = None
+    all_seq_label_probs = []
     if saliency_map:
         def hook_(self, grad_inp, grad_out):
             retain_grads.append((grad_out[0].cpu()))
@@ -332,6 +333,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     if model.classification_head.train_only_decoder:
                         prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs, tgt_mask.to(device))
                         prob = prob[-1]
+                        all_seq_label_probs.append(prob)
                     else:
                         out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
                         out = out.transpose(0, 1)
@@ -416,7 +418,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     if saliency_map:
         handle.remove()
         return (ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits), retain_grads, sp_pred_inds_CS_spType
-    return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits
+    return ys, torch.stack(all_probs).transpose(0, 1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, all_seq_label_probs
 
 
 def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
@@ -577,9 +579,10 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_b
                                            glbl_lbls=glbl_lbls, tune_bert=tune_bert, beam_width=3)
         all_seq_sp_logits = None, None, None
     else:
-        tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = greedy_decode(model, src, start_symbol=bos_id,
+        tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, all_seq_label_probs = greedy_decode(model, src, start_symbol=bos_id,
                                                                                      lbl2ind=lbl2ind, tgt=tgt, tune_bert=tune_bert,
                                                                                      train_oh=train_oh)
+        return tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, all_seq_label_probs
     return tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits
 
 
@@ -753,7 +756,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
                           form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False, second_model=second_model,
                           test_only_cs=test_only_cs, glbl_lbls=glbl_lbls, tune_bert=tune_bert, train_oh=train_oh)
         else:
-            predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits = \
+            predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, all_seq_label_probs = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
                           form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False,
                           second_model=second_model, tune_bert=tune_bert, train_oh=train_oh)
@@ -761,7 +764,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         true_targets = padd_add_eos_tkn(tgt, lbl2ind)
         # if not use_beams_search:
         #     total_loss += loss_fn(probs.reshape(-1, 10), true_targets.reshape(-1)).item()
-        for s, t, pt, sp_type in zip(src, tgt, predicted_tokens, sp_type_probs):
+        for ind_, (s, t, pt, sp_type) in enumerate(zip(src, tgt, predicted_tokens, sp_type_probs)):
             predicted_lbls = "".join([ind2lbl[i] for i in pt])
             if account_lipos:
                 predicted_lbls, sp_type = clean_sec_sp2_preds(s, predicted_lbls, sp_type, ind2glbl_lbl)
@@ -797,6 +800,10 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
                         sp_type_dict[s] = pred_aa_lbl2glbl_ind[pt[0]]
                         # also replace W with T Tat/TATLIPO <- it will already be accounted in the sptype dict
                         predicted_lbls = predicted_lbls.replace("W", "T")
+                        if ind2glbl_lbl[sp_type_dict[s]] == "LIPO" and s[predicted_lbls.rfind("T")+1]!="C":
+                            pass
+                        elif ind2glbl_lbl[sp_type_dict[s]] == "TATLIPO" and s[predicted_lbls.rfind("T")+1]!="C":
+                            pass
             else:
                 sp_type_dict[s] = torch.argmax(sp_type).item()
             if form_sp_reg_data and not extended_sublbls:
@@ -1065,7 +1072,13 @@ def train_sp_type_predictor(args):
     no_of_seqs_sp2 = np.array([1087, 516, 12])
     no_of_seqs_tat = np.array([313, 39, 13])
     no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
+    swa_start=20
+    swa_eps = 20
     while patience != 0:
+        if args.use_swa and e >= swa_start:
+            swa_model.to("cuda:0")
+            swa_model.update_parameters(model)
+            swa_model.to("cpu")
         if type(optimizer) == list:
             print("LR:", optimizer[0].param_groups[0]['lr'], "LR_bert:", optimizer[1].param_groups[0]['lr'])
         if args.tune_bert and args.frozen_epochs > e:
@@ -1103,9 +1116,18 @@ def train_sp_type_predictor(args):
             inputs['seq_lengths'] = seq_lengths
             logits = model(**inputs)
             loss = loss_fn(logits, torch.tensor([l[0] for l in lbl_seqs]).to(device))
-            optimizer.zero_grad()
+            if args.use_swa:
+                optimizer[0].zero_grad()
+                optimizer[1].zero_grad()
+            else:
+                optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+            if args.use_swa:
+                optimizer[0].step()
+                optimizer[1].step()
+            else:
+                optimizer.step()
+
 
         mcc_sp1, mcc2_sp1, mcc_sp2, mcc2_sp2, mcc_tat, mcc2_tat = test_mcc_sptype_clasifier(args, model, "validate", epoch=e)
         avg_mcc = (np.sum(no_of_seqs_sp1 * (mcc_sp1 + mcc2_sp1)) + np.sum(no_of_seqs_sp2 * (mcc_sp2 + mcc2_sp2)) + np.sum(no_of_seqs_tat * (mcc_tat, mcc2_tat)))/(2*no_of_tested_sp_seqs)
@@ -1122,6 +1144,28 @@ def train_sp_type_predictor(args):
             patience -= 1
         if e == 70:
             patience = 0
+        if args.use_swa and swa_start == e + 1:
+            model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
+            classification_head_optimizer = optim.Adam(model.classification_head.parameters(),  lr=args.lr * 10 if args.high_lr
+                                                                else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            optimizer = [classification_head_optimizer, bert_optimizer]
+            swa_model = AveragedModel(model)
+            swa_model.module.to("cpu")
+            if args.add_val_data_on_swa:
+                sp_dataset.add_test_seqs()
+                dataset_loader = torch.utils.data.DataLoader(sp_dataset,
+                                                             batch_size=args.batch_size, shuffle=True,
+                                                             num_workers=4, collate_fn=collate_fn)
+        if args.use_swa and e  >= swa_start:
+            print("Saving swa model on epoch {}".format(e))
+            logging.info("Saving swa model on epoch {}".format(e))
+            swa_eps -= 1
+            patience = 20
+            save_model(model, model_name=args.run_name, tune_bert=True)
+        if swa_eps <= 0:
+            patience = 0
+
     model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
     if not args.deployment_model:
         # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
@@ -1280,6 +1324,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     warmup_epochs = warmup_epochs if validate_on_mcc else 0
     e = -1
     iter_no = 0
+    patience = 0
     while patience != 0:
         if type(optimizer) == list:
             print("LR:", optimizer[0].param_groups[0]['lr'], "LR_bert:", optimizer[1].param_groups[0]['lr'])
@@ -1608,12 +1653,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                              batch_size=bs, shuffle=True,
                                                              num_workers=4, collate_fn=collate_fn)
-    if use_swa:
-        update_bn(dataset_loader, swa_model.to(device))
-        save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
+    # if use_swa:
+    #     update_bn(dataset_loader, swa_model.to(device))
+    #     save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
 
     other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
-    model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
+    # model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
     if not deployment_model and not validate_partition is not None or (
             validate_partition is not None and other_mdl_name):
         if separate_save_sptype_preds:

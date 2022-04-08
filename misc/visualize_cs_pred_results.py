@@ -76,6 +76,13 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     cnt1, cnt2 = 0, 0
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         lg, sp_info = l.split("|")
+        if ind2glbl_lbl[sptype_preds[s]] == "LIPO" and s[p.rfind("L")+1]!="C":
+            sptype_preds[s] = glbllbl2_ind["NO_SP"]
+            p = "I"*len(p)
+        elif ind2glbl_lbl[sptype_preds[s]] =="TATLIPO" and s[p.rfind("T")+1]!="C":
+            sptype_preds[s] = glbllbl2_ind["NO_SP"]
+            p = "I"*len(p)
+
         # if p == "L" and s[p.rfind("L")+1] != "C":
         #     sp_info = "NO_SP"
         #     p = "I" * len(p)
@@ -185,6 +192,11 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, retu
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         zv += 1
         lg, sp_info = l.split("|")
+        if ind2sptype[sptype_preds[s]] == "LIPO" and s[t.rfind("L")+1] != "C":
+            sptype_preds[s] = sptype2ind["NO_SP"]
+        elif ind2sptype[sptype_preds[s]] == "TATLIPO" and s[t.rfind("L")+1] != "C":
+            sptype_preds[s] = sptype2ind["NO_SP"]
+
         if sp_info == sp_type or sp_info == "NO_SP":
             # if sp_info == "LIPO" and s[p.rfind("L")+1] != "C":
             #     sptype_preds[s] = sptype2ind[sp_info]
@@ -4440,9 +4452,10 @@ def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
 if __name__ == "__main__":
     compute_mcc_sp_only_mdls()
     plot_sp6_vs_tnmt_mcc()
+    exit(1)
+    plot_sp6_vs_tnmt()
     visualize_inp_gradients()
 
-    plot_sp6_vs_tnmt()
     plot_comparative_performance_sp1_mdls()
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat13/",
