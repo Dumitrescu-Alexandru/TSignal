@@ -1146,8 +1146,8 @@ def train_sp_type_predictor(args):
             patience = 0
         if args.use_swa and swa_start == e + 1:
             model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
-            classification_head_optimizer = optim.Adam(model.classification_head.parameters(),  lr=args.lr * 10 if args.high_lr
-                                                                else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            classification_head_optimizer = optim.Adam(model.classification_head.parameters(),  lr=args.lr * args.lr_multiplier_swa,
+                                                       eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
             swa_model = AveragedModel(model)

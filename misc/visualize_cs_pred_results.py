@@ -76,12 +76,12 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     cnt1, cnt2 = 0, 0
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         lg, sp_info = l.split("|")
-        if ind2glbl_lbl[sptype_preds[s]] == "LIPO" and s[p.rfind("L")+1]!="C":
-            sptype_preds[s] = glbllbl2_ind["NO_SP"]
-            p = "I"*len(p)
-        elif ind2glbl_lbl[sptype_preds[s]] =="TATLIPO" and s[p.rfind("T")+1]!="C":
-            sptype_preds[s] = glbllbl2_ind["NO_SP"]
-            p = "I"*len(p)
+        # if ind2glbl_lbl[sptype_preds[s]] == "LIPO" and s[p.rfind("L")+1]!="C":
+        #     sptype_preds[s] = glbllbl2_ind["NO_SP"]
+        #     p = "I"*len(p)
+        # elif ind2glbl_lbl[sptype_preds[s]] =="TATLIPO" and s[p.rfind("T")+1]!="C":
+        #     sptype_preds[s] = glbllbl2_ind["NO_SP"]
+        #     p = "I"*len(p)
 
         # if p == "L" and s[p.rfind("L")+1] != "C":
         #     sp_info = "NO_SP"
@@ -192,20 +192,16 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, retu
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         zv += 1
         lg, sp_info = l.split("|")
-        if ind2sptype[sptype_preds[s]] == "LIPO" and s[t.rfind("L")+1] != "C":
-            sptype_preds[s] = sptype2ind["NO_SP"]
-        elif ind2sptype[sptype_preds[s]] == "TATLIPO" and s[t.rfind("L")+1] != "C":
-            sptype_preds[s] = sptype2ind["NO_SP"]
+        # if ind2sptype[sptype_preds[s]] == "LIPO" and s[t.rfind("L")+1] != "C":
+        #     sptype_preds[s] = sptype2ind["NO_SP"]
+        # elif ind2sptype[sptype_preds[s]] == "TATLIPO" and s[t.rfind("L")+1] != "C":
+        #     sptype_preds[s] = sptype2ind["NO_SP"]
 
         if sp_info == sp_type or sp_info == "NO_SP":
             # if sp_info == "LIPO" and s[p.rfind("L")+1] != "C":
             #     sptype_preds[s] = sptype2ind[sp_info]
-            #     print(s)
-            #     print(p)
             # elif sp_info == "TATLIPO"  and s[p.rfind("L")+1] != "C":
             #     sptype_preds[s] = sptype2ind[sp_info]
-            #     print(s)
-            #     print(p)
             p = p.replace("ES", "J")
             len_ = min(len(p), len(t))
             t, p = t[:len_], p[:len_]
