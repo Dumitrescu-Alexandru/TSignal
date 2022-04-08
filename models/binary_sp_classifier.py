@@ -55,7 +55,7 @@ class BinarySPClassifier(nn.Module):
 
 
 class CNN3(nn.Module):
-    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum'):
+    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum',is_cnn2=False):
         super(CNN3, self).__init__()
 
         #filters=[120,100,80,60] # dimensionality of outputspace
@@ -82,9 +82,10 @@ class CNN3(nn.Module):
         self.bn5 = nn.BatchNorm1d(100)
 
         self.dense_i = nn.Linear(input_size,256)
-        self.dense = nn.Linear(100+256,output_size)
+        self.dense = nn.Linear(100,output_size) if is_cnn2 else nn.Linear(100+256,output_size)
 
         self.softmax=nn.LogSoftmax(dim=1)
+        self.is_cnn2 = is_cnn2
 
     def forward(self,x, targets=None, inp_seqs=None):
         #print('0. SHAPE x',x.shape)
@@ -102,19 +103,22 @@ class CNN3(nn.Module):
         xc = torch.squeeze(xc,dim=2)
 
         # PARALLEL LNN part
-        x = self.pool(x)
-        x = torch.squeeze(x,dim=2)
-        x = self.dense_i(x)
-        x = self.relu(x)
+        if not self.is_cnn2:
+            x = self.pool(x)
+            x = torch.squeeze(x,dim=2)
+            x = self.dense_i(x)
+            x = self.relu(x)
 
 
-        # COMBINED part
-        x = torch.cat((xc,x),dim=1)
-        #print('SHAPE x after cat (xc,x)',x.shape)
+            # COMBINED part
+            x = torch.cat((xc,x),dim=1)
+            #print('SHAPE x after cat (xc,x)',x.shape)
 
-        x = self.drop2(x)
-        x = self.dense(x)
-        #x = self.softmax(x)
-        #return x
+            x = self.drop2(x)
+            #x = self.softmax(x)
+            #return x
+            x = self.dense(x)
+        else:
+            x = self.dense(xc)
 
         return x

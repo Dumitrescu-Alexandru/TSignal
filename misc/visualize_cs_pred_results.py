@@ -2656,7 +2656,6 @@ def plot_sp6_vs_tnmt_mcc():
     std_results_TSignal = [[std_mcc1_sp1, std_mcc2_sp1], [std_mcc1_sp2, std_mcc2_sp2], [std_mcc1_tat, std_mcc2_tat]]
     mean_results_SP6 = [[sp6_mcc1_sp1, sp6_mcc2_sp1], [sp6_mcc1_sp2,sp6_mcc2_sp2],[sp6_mcc1_tat, sp6_mcc2_tat]]
 
-    bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,mcc_deepsig,mcc_predTat,mcc_lipop,mcc_phobius)
 
 
 
@@ -2678,6 +2677,7 @@ def plot_sp6_vs_tnmt_mcc():
     print("mcc1 w average sp6/tsignal:",total_mcc1_sp6,total_mcc1)
     print("mcc2 w average sp6/tsignal:",total_mcc2_sp6,total_mcc2)
     # print("non-w average tsignal:",(np.mean(mean_mcc1_sp1)+np.mean(mean_mcc2_sp1) + np.mean(mean_mcc1_sp2) + np.mean(mean_mcc2_sp2)+np.mean(mean_mcc1_tat) + np.mean(mean_mcc2_tat))/6)
+    bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,mcc_deepsig,mcc_predTat,mcc_lipop,mcc_phobius)
     exit(1)
     print(total_mcc1,total_mcc1_sp6)
     print(total_mcc2,total_mcc2_sp6)
@@ -4389,7 +4389,56 @@ def rename():
         os.rename("tuning_bert_fixed_high_lr_swa_only_repeat2/"+n, "tuning_bert_fixed_high_lr_swa_only_repeat2/"+n.replace("cycle_lr_s","repeat2_fixed_high_lr_"))
 
 
+def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
+    # load_tuned_bert
+    folds = [[0,1],[0,2],[1,2]]
+    res_dict = {}
+    from Bio import SeqIO
+    fasta_sequences = SeqIO.parse(open("../sp_data/sp6_data/train_set.fasta"), 'fasta')
+    seq2id = {}
+    for fasta in fasta_sequences:
+        id, sequence = fasta.id, str(fasta.seq)
+        len_ = len(sequence) // 2
+        sequence = sequence[:len_]
+        seq2id[sequence] = id.split("|")[-1]
+    all_ids = []
+    for fold in folds:
+        test_fold = list({0,1,2}-set(fold))[0]
+        file = folder+mdl_name+"_{}_{}_sp_type_test.bin".format(*fold)
+        red_dict_ = pickle.load(open(file, "rb"))
+        for res in red_dict_.items():
+            if int(seq2id[res[0]]) == int(test_fold):
+                res_dict[res[0]] = res[1]
+    id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict()
+    seq2id = {v: k for k, v in id2seq.items()}
+    unique_bench_seqs = set(id2seq.values())
+    life_grps, seqs, true_lbls,pred_lbls = [], [],[],[]
+    for id_ in id2lg.keys():
+        life_grps.append(id2lg[id_]+"|"+id2type[id_])
+        seqs.append(id2seq[id_])
+        true_lbls.append(id2truelbls[id_])
+        pred_lbls.append("J"*len(id2truelbls[id_]))
+    print(len(seqs))
+    mcc_sp1, mcc2_sp1 = get_pred_accs_sp_vs_nosp(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="SP",sptype_preds=res_dict)
+    mcc_sp2, mcc2_sp2 = get_pred_accs_sp_vs_nosp(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="LIPO",sptype_preds=res_dict)
+    mcc_tat, mcc2_tat = get_pred_accs_sp_vs_nosp(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="TAT",sptype_preds=res_dict)
+    mcc_sp1 = np.array(mcc_sp1)
+    mcc_sp2 = np.array(mcc_sp2)
+    mcc_tat = np.array(mcc_tat)
+    no_of_seqs_sp1 = np.array([2040, 44, 142, 356])
+    no_of_seqs_sp2 = np.array([1087, 516, 12])
+    no_of_seqs_tat = np.array([313, 39, 13])
+    no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
+
+    print(mcc_sp1, mcc_sp2, mcc_tat)
+    print(mcc2_sp1, mcc2_sp2, mcc2_tat)
+
+    print("mcc1:",(np.sum(mcc_sp1*no_of_seqs_sp1) + np.sum(mcc_sp2*no_of_seqs_sp2) + np.sum(mcc_tat * no_of_seqs_tat) )/no_of_tested_sp_seqs)
+    print("mcc2:", (np.sum(mcc2_sp1[1:]*no_of_seqs_sp1[1:]) + np.sum(mcc2_sp2*no_of_seqs_sp2) + np.sum(mcc2_tat * no_of_seqs_tat) )/(no_of_tested_sp_seqs-2040))
+    exit(1)
+
 if __name__ == "__main__":
+    compute_mcc_sp_only_mdls()
     plot_sp6_vs_tnmt_mcc()
     visualize_inp_gradients()
 

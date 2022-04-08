@@ -22,7 +22,7 @@ from models.transformer_nmt import TransformerModel
 from models.binary_sp_classifier import BinarySPClassifier, CNN3
 
 def init_sptype_classifier(args, glbl_lbls):
-    model = CNN3(input_size=1024, output_size=len(glbl_lbls))
+    model = CNN3(input_size=1024, output_size=len(glbl_lbls), is_cnn2=False)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -78,7 +78,7 @@ def generate_square_subsequent_mask(sz):
 
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
                   test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False,
-                  hook_layer="bert"):
+                  hook_layer="bert", sp_type_preds=None):
     # model.ProtBertBFD.requires_grad=True
     # onelasttime
     if saliency_map:
@@ -215,11 +215,13 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
 
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
     ys = []
-
     if not ys:
         for _ in range(len(src)):
             ys.append([])
-    start_ind = 0
+    if sp_type_preds is None:
+        start_ind = 0
+    else:
+        start_ind = 1
     # if below condition, then global labels are computed with a separate model. This also affects the first label pred
     # of the model predicting the sequence label. Because of this, compute the first predictions first, and take care
     # of the glbl label model and sequence-model consistency (e.g. one predicts SP other NO-SP - take care of that)
@@ -931,7 +933,7 @@ def euk_importance_avg(cs_mcc):
 
 def test_mcc_sptype_clasifier(args, model, val_or_test="validate", epoch=-1):
     model.eval()
-    partitions = args.train_folds if val_or_test == "validate" else list({0,1,2}-set(args.train_folds))
+    partitions = args.train_folds if val_or_test == "validate" else list({0,1,2}-set([int(tf) for tf in args.train_folds]))
     sets = ["test"] if val_or_test == "validate" else ["train", "test"]
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData(form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified,
@@ -1000,6 +1002,7 @@ def train_sp_type_predictor(args):
                                 tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=args.extended_sublbls,
                                 random_folds_prefix=random_folds_prefix, train_on_subset=args.train_on_subset,
                                 lipbobox_predictions=args.lipbobox_predictions)
+
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=args.batch_size, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
@@ -1018,7 +1021,6 @@ def train_sp_type_predictor(args):
         if args.frozen_epochs > 0:
             model.freeze_encoder()
     else:
-        print("YOYO")
         model = load_model(args.load_model, tune_bert=True)
         model.classification_head = classification_head
         model.to(device)
@@ -1112,15 +1114,15 @@ def train_sp_type_predictor(args):
             logging.info("On epoch {} saving the model with avg mcc {} compared to previous best {}".format(e,avg_mcc, best_avg_mcc))
             best_epoch = e
             best_avg_mcc = avg_mcc
-            save_model(model, model_name=args.run_name, tune_bert=True)
+            # save_model(model, model_name=args.run_name, tune_bert=True)
             patience=10
         else:
             print("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
             logging.info("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
             patience -= 1
-        if e == 70:
+        if e == 10:
             patience = 0
-    model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
+    # model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
     if not args.deployment_model:
         # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
         mcc_sp1, mcc2_sp1, mcc_sp2, mcc2_sp2, mcc_tat, mcc2_tat = test_mcc_sptype_clasifier(args, model, val_or_test="test", epoch=best_epoch)
@@ -1544,7 +1546,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             best_epoch = e
             best_valid_loss = valid_loss
             best_valid_mcc_and_recall = patiente_metric
-            save_model(swa_model.module if use_swa and swa_start <= e else model, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, optimizer=optimizer if use_swa else None)
+            save_model(swa_model.module if use_swa and swa_start <= e else model, run_name,
+                tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, optimizer=optimizer if use_swa and not reinint_swa_decoder else None)
         elif (e > warmup_epochs and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
                 (e > warmup_epochs and best_valid_mcc_and_recall > patiente_metric and eps == -1 and validate_on_mcc):
             if validate_on_mcc:
@@ -1558,7 +1561,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             patience -= 1
         if use_swa and swa_start == e + 1:
             model, optimizer_state_d = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                               tune_bert=tune_bert, opt=True)
+                               tune_bert=tune_bert, opt=True if not reinint_swa_decoder else False)
             if type(optimizer) == list:
                 classification_head_optimizer = optim.Adam(model.classification_head.parameters(), lr=0.00001 * lr_multiplier_swa,
                                                            eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
