@@ -1114,15 +1114,15 @@ def train_sp_type_predictor(args):
             logging.info("On epoch {} saving the model with avg mcc {} compared to previous best {}".format(e,avg_mcc, best_avg_mcc))
             best_epoch = e
             best_avg_mcc = avg_mcc
-            # save_model(model, model_name=args.run_name, tune_bert=True)
-            patience=10
+            save_model(model, model_name=args.run_name, tune_bert=True)
+            patience=20
         else:
             print("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
             logging.info("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
             patience -= 1
-        if e == 10:
+        if e == 70:
             patience = 0
-    # model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
+    model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
     if not args.deployment_model:
         # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
         mcc_sp1, mcc2_sp1, mcc_sp2, mcc2_sp2, mcc_tat, mcc2_tat = test_mcc_sptype_clasifier(args, model, val_or_test="test", epoch=best_epoch)
