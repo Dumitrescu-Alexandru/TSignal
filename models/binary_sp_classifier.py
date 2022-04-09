@@ -55,9 +55,9 @@ class BinarySPClassifier(nn.Module):
 
 
 class CNN3(nn.Module):
-    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum',is_cnn2=False):
+    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum',is_cnn2=False,deep_mdl=False):
         super(CNN3, self).__init__()
-
+        self.deep_mdl=deep_mdl
         #filters=[120,100,80,60] # dimensionality of outputspace
         n_f = sum(filters)
         #lengths=[5,10,15,20] # original kernel sizes
@@ -80,9 +80,16 @@ class CNN3(nn.Module):
 
         self.cnn5 = nn.Conv1d(n_f,100,kernel_size=lengths[4],padding=(lengths[4]-1)//2)
         self.bn5 = nn.BatchNorm1d(100)
-
         self.dense_i = nn.Linear(input_size,256)
-        self.dense = nn.Linear(100,output_size) if is_cnn2 else nn.Linear(100+256,output_size)
+        if self.deep_mdl:
+            self.dense = nn.Linear(100,100) if is_cnn2 else nn.Linear(100+256,100+256)
+            self.layer_norm = nn.LayerNorm(100+256)
+            self.dense2 = nn.Linear(100+256, output_size)
+        else:
+            self.dense = nn.Linear(100,output_size) if is_cnn2 else nn.Linear(100+256,output_size)
+
+
+
 
         self.softmax=nn.LogSoftmax(dim=1)
         self.is_cnn2 = is_cnn2
@@ -117,7 +124,11 @@ class CNN3(nn.Module):
             x = self.drop2(x)
             #x = self.softmax(x)
             #return x
-            x = self.dense(x)
+            if self.deep_mdl:
+                x = self.relu(self.layer_norm(self.dense(x)))
+                x = self.dense2(x)
+            else:
+                x = self.dense(x)
         else:
             x = self.dense(xc)
 

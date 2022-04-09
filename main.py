@@ -121,6 +121,7 @@ def parse_arguments():
     parser.add_argument("--lipbobox_predictions", default=False, action="store_true", help="Modify predictions to have SSS...(SSS)LLL for Sec/SPase (I)II and TTT...(TTT)LLL for Tat/SPase (I)II")
     parser.add_argument("--train_sp_type_predictor", default=False, action="store_true", help="train a TCR conv architecture to predict the sp type")
     parser.add_argument("--load_model", default="none", type=str, help="Option to load any bert model (e.g. trained on SP-CS prediction task)")
+    parser.add_argument("--deep_mdl", default=False, action="store_true", help="Add another layer before the class head of the sp type model")
 
     return parser.parse_args()
 
