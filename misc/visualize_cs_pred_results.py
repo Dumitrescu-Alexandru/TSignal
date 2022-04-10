@@ -4446,8 +4446,8 @@ def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
-    compute_mcc_sp_only_mdls()
     plot_sp6_vs_tnmt_mcc()
+    compute_mcc_sp_only_mdls()
     exit(1)
     plot_sp6_vs_tnmt()
     visualize_inp_gradients()

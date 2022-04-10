@@ -1039,7 +1039,7 @@ def train_sp_type_predictor(args):
             dense_params = []
             other_params = []
             for n, p in model.classification_head.named_parameters():
-                if "dense" in n:
+                if "dense_i" in n:
                     dense_params.append(p)
                 else:
                     other_params.append(p)
@@ -1087,8 +1087,8 @@ def train_sp_type_predictor(args):
     no_of_seqs_sp2 = np.array([1087, 516, 12])
     no_of_seqs_tat = np.array([313, 39, 13])
     no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
-    swa_start=20
-    swa_eps = 20
+    swa_start = 20
+    swa_eps = 10
     while patience != 0:
         if args.use_swa and e >= swa_start:
             swa_model.to("cuda:0")
@@ -1151,7 +1151,7 @@ def train_sp_type_predictor(args):
             logging.info("On epoch {} saving the model with avg mcc {} compared to previous best {}".format(e,avg_mcc, best_avg_mcc))
             best_epoch = e
             best_avg_mcc = avg_mcc
-            # save_model(model, model_name=args.run_name, tune_bert=True)
+            save_model(model, model_name=args.run_name, tune_bert=True)
             patience=20
         else:
             print("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
@@ -1164,7 +1164,7 @@ def train_sp_type_predictor(args):
             dense_params = []
             other_params = []
             for n, p in model.classification_head.named_parameters():
-                if "dense" in n:
+                if "dense_i" in n:
                     dense_params.append(p)
                 else:
                     other_params.append(p)
@@ -1191,7 +1191,7 @@ def train_sp_type_predictor(args):
             logging.info("Saving swa model on epoch {}".format(e))
             swa_eps -= 1
             patience = 20
-            # save_model(model, model_name=args.run_name, tune_bert=True)
+            save_model(model, model_name=args.run_name, tune_bert=True)
         if swa_eps <= 0:
             patience = 0
 

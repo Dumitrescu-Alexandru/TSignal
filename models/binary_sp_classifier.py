@@ -69,7 +69,7 @@ class ResBlock(nn.Module):
         return self.relu(x + x_)
 
 class CNN3(nn.Module):
-    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum',is_cnn2=False,deep_mdl=False, no_of_blocks=4):
+    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum',is_cnn2=False,deep_mdl=False, no_of_blocks=8):
         super(CNN3, self).__init__()
         self.deep_mdl=deep_mdl
         #filters=[120,100,80,60] # dimensionality of outputspace
