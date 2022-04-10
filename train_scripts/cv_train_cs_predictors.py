@@ -1381,7 +1381,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if anneal_scheduler is not None and anneal_start < e <= swa_start:
             anneal_scheduler.step()
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
-            continue
             if lr_scheduler_swa != "none" and e >= swa_start:
                 scheduler.step(iter_no % cycle_length)
                 if iter_no % (cycle_length+1) == 1:
