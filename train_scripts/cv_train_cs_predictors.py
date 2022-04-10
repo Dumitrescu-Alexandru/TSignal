@@ -1634,8 +1634,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
         if use_swa and swa_start == e + 1:
-            model, optimizer_state_d = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                               tune_bert=tune_bert, opt=True if not reinint_swa_decoder else False)
+            if reinint_swa_decoder:
+                model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                                   tune_bert=tune_bert, opt=True if not reinint_swa_decoder else False)
+            else:
+                model, optimizer_state_d = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                                   tune_bert=tune_bert, opt=True if not reinint_swa_decoder else False)
             if type(optimizer) == list:
                 classification_head_optimizer = optim.Adam(model.classification_head.parameters(), lr=0.00001 * lr_multiplier_swa,
                                                            eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
