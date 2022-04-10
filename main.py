@@ -123,6 +123,7 @@ def parse_arguments():
     parser.add_argument("--load_model", default="none", type=str, help="Option to load any bert model (e.g. trained on SP-CS prediction task)")
     parser.add_argument("--deep_mdl", default=False, action="store_true", help="Add another layer before the class head of the sp type model")
     parser.add_argument("--is_cnn2", default=False, action="store_true", help="Remove the additional linear layer.")
+    parser.add_argument("--no_of_layers_onlysp", default=8, type=int, help="No. of additional layers sp classifier.")
 
     return parser.parse_args()
 

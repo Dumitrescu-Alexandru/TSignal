@@ -4397,8 +4397,8 @@ def rename():
         os.rename("tuning_bert_fixed_high_lr_swa_only_repeat2/"+n, "tuning_bert_fixed_high_lr_swa_only_repeat2/"+n.replace("cycle_lr_s","repeat2_fixed_high_lr_"))
 
 
-def compute_mcc_sp_only_mdls(mdl_name="bert_tuning_deep", folder="./"):
-    # load_tuned_bert; bert_tuning; bert_tuning_deep
+def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
+    # load_tuned_bert; bert_tuning; bert_tuning_deep, bert_tuning_crct_swa
     folds = [[0,1],[0,2],[1,2]]
     res_dict = {}
     from Bio import SeqIO
@@ -4438,8 +4438,14 @@ def compute_mcc_sp_only_mdls(mdl_name="bert_tuning_deep", folder="./"):
     no_of_seqs_tat = np.array([313, 39, 13])
     no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
 
-    print(mcc_sp1, mcc_sp2, mcc_tat)
-    print(mcc2_sp1, mcc2_sp2, mcc2_tat)
+    sp6_mcc1_sp1, sp6_mcc2_sp1 = np.array([0.868, 0.811,0.878,0.737]), np.array([0.649, 0.734, 0.728])
+    sp6_mcc1_sp2, sp6_mcc2_sp2 = np.array([0.838, 0.894, 0.871]), np.array([0.841, 0.893, 0.719])
+    sp6_mcc1_tat, sp6_mcc2_tat = np.array([0.946, 0.788, 0.802]), np.array([0.934, 0.806,0.807])
+
+    print("tsignal", mcc_sp1, mcc_sp2, mcc_tat)
+    print("sp6", sp6_mcc1_sp1, sp6_mcc1_sp2, sp6_mcc1_tat)
+    print("tsignal",mcc2_sp1, mcc2_sp2, mcc2_tat)
+    print("sp6",sp6_mcc2_sp1, sp6_mcc2_sp2, sp6_mcc2_tat)
 
     print("mcc1:",(np.sum(mcc_sp1*no_of_seqs_sp1) + np.sum(mcc_sp2*no_of_seqs_sp2) + np.sum(mcc_tat * no_of_seqs_tat) )/no_of_tested_sp_seqs)
     print("mcc2:", (np.sum(mcc2_sp1[1:]*no_of_seqs_sp1[1:]) + np.sum(mcc2_sp2*no_of_seqs_sp2) + np.sum(mcc2_tat * no_of_seqs_tat) )/(no_of_tested_sp_seqs-2040))

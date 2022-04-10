@@ -21,8 +21,8 @@ from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData
 from models.transformer_nmt import TransformerModel
 from models.binary_sp_classifier import BinarySPClassifier, CNN3
 
-def init_sptype_classifier(args, glbl_lbls,deep_mdl, is_cnn2=False):
-    model = CNN3(input_size=1024, output_size=len(glbl_lbls), is_cnn2=is_cnn2, deep_mdl=deep_mdl)
+def init_sptype_classifier(args, glbl_lbls,deep_mdl, is_cnn2=False, no_of_layers=4):
+    model = CNN3(input_size=1024, output_size=len(glbl_lbls), is_cnn2=is_cnn2, deep_mdl=deep_mdl,no_of_layers=no_of_layers)
     for n, p in model.named_parameters():
         if p.dim() > 1 and "res_layers" not in n:
             nn.init.xavier_uniform_(p)
@@ -1018,7 +1018,8 @@ def train_sp_type_predictor(args):
     # form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False
     # the form_sp_reg_data param is used to both denote teh RR/C... usage and usually had a mandatory glbl label
     # in the SP-cs. The current experiment however tests no-glbl-cs tuning
-    classification_head = init_sptype_classifier(args, sp_data.lbl2ind.items(), deep_mdl=args.deep_mdl, is_cnn2=args.is_cnn2)
+    classification_head = init_sptype_classifier(args, sp_data.lbl2ind.items(), deep_mdl=args.deep_mdl, is_cnn2=args.is_cnn2,
+                                                 no_of_layers=args.no_of_layers_onlysp)
     if args.load_model == "none":
         model = ProtBertClassifier(hparams)
         if args.remove_bert_layers != 0:

@@ -69,7 +69,7 @@ class ResBlock(nn.Module):
         return self.relu(x + x_)
 
 class CNN3(nn.Module):
-    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum',is_cnn2=False,deep_mdl=False, no_of_blocks=8):
+    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum',is_cnn2=False,deep_mdl=False, no_of_layers=4):
         super(CNN3, self).__init__()
         self.deep_mdl=deep_mdl
         #filters=[120,100,80,60] # dimensionality of outputspace
@@ -99,7 +99,7 @@ class CNN3(nn.Module):
         self.dense_i = nn.Linear(input_size,256)
         self.res_layers = []
         if self.deep_mdl:
-            for i in range(no_of_blocks):
+            for i in range(no_of_layers):
                 self.res_layers.append((ResBlock(100 if self.is_cnn2 else 100+256, dos[0])))
             self.res_layers = nn.Sequential(*self.res_layers)
             self.dense = nn.Linear(100,output_size) if is_cnn2 else nn.Linear(100+256,output_size)
