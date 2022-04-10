@@ -4397,8 +4397,8 @@ def rename():
         os.rename("tuning_bert_fixed_high_lr_swa_only_repeat2/"+n, "tuning_bert_fixed_high_lr_swa_only_repeat2/"+n.replace("cycle_lr_s","repeat2_fixed_high_lr_"))
 
 
-def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
-    # load_tuned_bert
+def compute_mcc_sp_only_mdls(mdl_name="load_tuned_bert", folder="./"):
+    # load_tuned_bert; bert_tuning
     folds = [[0,1],[0,2],[1,2]]
     res_dict = {}
     from Bio import SeqIO
