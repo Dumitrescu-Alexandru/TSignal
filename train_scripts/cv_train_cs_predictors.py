@@ -1036,7 +1036,22 @@ def train_sp_type_predictor(args):
 
     if args.tune_bert:
         if args.use_swa:
-            classification_head_optimizer = optim.Adam(model.classification_head.parameters(),  lr=args.lr * 10 if args.high_lr
+            dense_params = []
+            other_params = []
+            for n, p in model.classification_head.named_parameters():
+                if "dense" in n:
+                    dense_params.append(p)
+                else:
+                    other_params.append(p)
+            parameters = [
+                {"params": other_params},
+                {
+                    "params": dense_params,
+                    "lr": 0.0001
+                },
+            ]
+            print(len(dense_params), len(other_params))
+            classification_head_optimizer = optim.Adam(parameters,  lr=args.lr * 10 if args.high_lr
                                                                 else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
@@ -1146,8 +1161,22 @@ def train_sp_type_predictor(args):
             patience = 0
         if args.use_swa and swa_start == e + 1:
             model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
-            classification_head_optimizer = optim.Adam(model.classification_head.parameters(),  lr=args.lr * args.lr_multiplier_swa,
-                                                       eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            dense_params = []
+            other_params = []
+            for n, p in model.classification_head.named_parameters():
+                if "dense" in n:
+                    dense_params.append(p)
+                else:
+                    other_params.append(p)
+            parameters = [
+                {"params": other_params},
+                {
+                    "params": dense_params,
+                    "lr": 0.0001
+                },
+            ]
+            classification_head_optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr
+                                    else args.lr, eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98), )
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
             swa_model = AveragedModel(model)
