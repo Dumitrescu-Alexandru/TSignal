@@ -1151,7 +1151,7 @@ def train_sp_type_predictor(args):
             logging.info("On epoch {} saving the model with avg mcc {} compared to previous best {}".format(e,avg_mcc, best_avg_mcc))
             best_epoch = e
             best_avg_mcc = avg_mcc
-            save_model(model, model_name=args.run_name, tune_bert=True)
+            # save_model(model, model_name=args.run_name, tune_bert=True)
             patience=20
         else:
             print("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
@@ -1191,7 +1191,7 @@ def train_sp_type_predictor(args):
             logging.info("Saving swa model on epoch {}".format(e))
             swa_eps -= 1
             patience = 20
-            save_model(model, model_name=args.run_name, tune_bert=True)
+            # save_model(model, model_name=args.run_name, tune_bert=True)
         if swa_eps <= 0:
             patience = 0
 
@@ -1242,7 +1242,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    swa_start = 60
+    swa_start = 1
     if len(sp_data.lg2ind.keys()) <= 1 or not use_lg_info:
         lg2ind = None
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
@@ -1353,7 +1353,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     warmup_epochs = warmup_epochs if validate_on_mcc else 0
     e = -1
     iter_no = 0
-    patience = 0
     while patience != 0:
         if type(optimizer) == list:
             print("LR:", optimizer[0].param_groups[0]['lr'], "LR_bert:", optimizer[1].param_groups[0]['lr'])
@@ -1382,6 +1381,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if anneal_scheduler is not None and anneal_start < e <= swa_start:
             anneal_scheduler.step()
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
+            continue
             if lr_scheduler_swa != "none" and e >= swa_start:
                 scheduler.step(iter_no % cycle_length)
                 if iter_no % (cycle_length+1) == 1:
