@@ -1144,14 +1144,16 @@ def train_sp_type_predictor(args):
                 optimizer.step()
 
 
-        mcc_sp1, mcc2_sp1, mcc_sp2, mcc2_sp2, mcc_tat, mcc2_tat = test_mcc_sptype_clasifier(args, model, "validate", epoch=e)
+        mcc_sp1, mcc2_sp1, mcc_sp2, mcc2_sp2, mcc_tat, mcc2_tat = test_mcc_sptype_clasifier(args, swa_model.module.to(device)
+                                                            if args.use_swa and e >= swa_start else model, "validate", epoch=e)
         avg_mcc = (np.sum(no_of_seqs_sp1 * (mcc_sp1 + mcc2_sp1)) + np.sum(no_of_seqs_sp2 * (mcc_sp2 + mcc2_sp2)) + np.sum(no_of_seqs_tat * (mcc_tat, mcc2_tat)))/(2*no_of_tested_sp_seqs)
         if avg_mcc > best_avg_mcc:
-            print("On epoch {} saving the model with avg mcc {} compared to previous best {}".format(e,avg_mcc, best_avg_mcc))
-            logging.info("On epoch {} saving the model with avg mcc {} compared to previous best {}".format(e,avg_mcc, best_avg_mcc))
+            print("On epoch {} saving the model with avg mcc {} compared to previous best {} from epoch {}".format(e,avg_mcc, best_avg_mcc, best_epoch))
+            logging.info("On epoch {} saving the model with avg mcc {} compared to previous best {} from epoch {}".format(e,avg_mcc, best_avg_mcc, best_epoch))
             best_epoch = e
             best_avg_mcc = avg_mcc
-            save_model(model, model_name=args.run_name, tune_bert=True)
+            if args.use_swa and e < swa_start or not args.use_swa:
+                save_model(model, model_name=args.run_name, tune_bert=True)
             patience=20
         else:
             print("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
@@ -1191,11 +1193,11 @@ def train_sp_type_predictor(args):
             logging.info("Saving swa model on epoch {}".format(e))
             swa_eps -= 1
             patience = 20
-            save_model(model, model_name=args.run_name, tune_bert=True)
+            save_model(swa_model.module, model_name=args.run_name, tune_bert=True)
         if swa_eps <= 0:
             patience = 0
 
-    model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
+    model = load_model(args.run_name + "_best_eval.pth", tune_bert=True).to(device)
     if not args.deployment_model:
         # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
         mcc_sp1, mcc2_sp1, mcc_sp2, mcc2_sp2, mcc_tat, mcc2_tat = test_mcc_sptype_clasifier(args, model, val_or_test="test", epoch=best_epoch)

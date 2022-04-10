@@ -4397,8 +4397,8 @@ def rename():
         os.rename("tuning_bert_fixed_high_lr_swa_only_repeat2/"+n, "tuning_bert_fixed_high_lr_swa_only_repeat2/"+n.replace("cycle_lr_s","repeat2_fixed_high_lr_"))
 
 
-def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
-    # load_tuned_bert; bert_tuning
+def compute_mcc_sp_only_mdls(mdl_name="bert_tuning_deep", folder="./"):
+    # load_tuned_bert; bert_tuning; bert_tuning_deep
     folds = [[0,1],[0,2],[1,2]]
     res_dict = {}
     from Bio import SeqIO
@@ -4426,7 +4426,7 @@ def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
         seqs.append(id2seq[id_])
         true_lbls.append(id2truelbls[id_])
         pred_lbls.append("J"*len(id2truelbls[id_]))
-    print(len(seqs))
+    print(len(seqs), len(res_dict.items()))
     mcc_sp1, mcc2_sp1 = get_pred_accs_sp_vs_nosp(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="SP",sptype_preds=res_dict)
     mcc_sp2, mcc2_sp2 = get_pred_accs_sp_vs_nosp(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="LIPO",sptype_preds=res_dict)
     mcc_tat, mcc2_tat = get_pred_accs_sp_vs_nosp(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="TAT",sptype_preds=res_dict)
@@ -4446,8 +4446,8 @@ def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
-    plot_sp6_vs_tnmt_mcc()
     compute_mcc_sp_only_mdls()
+    plot_sp6_vs_tnmt_mcc()
     exit(1)
     plot_sp6_vs_tnmt()
     visualize_inp_gradients()
