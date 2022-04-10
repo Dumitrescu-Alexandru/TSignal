@@ -1242,7 +1242,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=bs, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    swa_start = 1
+    swa_start = 60
     if len(sp_data.lg2ind.keys()) <= 1 or not use_lg_info:
         lg2ind = None
     elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
