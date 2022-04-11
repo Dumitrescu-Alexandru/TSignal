@@ -222,7 +222,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     if sptype_preds is None:
         start_ind = 0
     else:
-        for ind, seq_ in enumerate(range(src)):
+        for ind, seq_ in enumerate(src):
             ys[ind].append(sptype_preds[seq_])
         start_ind = 1
     # if below condition, then global labels are computed with a separate model. This also affects the first label pred
@@ -1957,7 +1957,7 @@ def test_w_precomputed_sptypes(args):
                                  extended_sublbls=args.extended_sublbls)
     sp_data.lbl2ind = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7, 'BS': 8,
                        'ES': 9} if args.lipbobox_predictions else sp_data.lbl2ind
-    evaluate(model, sp_data.lbl2ind, run_name=args.run_name + "_best", partitions=test_partition, sets=["train", "test"],
+    evaluate(model, sp_data.lbl2ind, run_name="sptype_tested_"+args.run_name + "_best", partitions=test_partition, sets=["train", "test"],
              form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified, second_model=None,
              very_simplified=args.very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind, tuned_bert_embs_prefix="",
              tune_bert=args.tune_bert, extended_sublbls=args.extended_sublbls, random_folds_prefix="",
