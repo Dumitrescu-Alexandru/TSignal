@@ -78,7 +78,7 @@ def generate_square_subsequent_mask(sz):
 
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
                   test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False,
-                  hook_layer="bert", sptype_preds=None):
+                  hook_layer="bert", sptype_preds=None,glbl_lbl_2ind=None):
     # model.ProtBertBFD.requires_grad=True
     # onelasttime
     if saliency_map:
@@ -188,8 +188,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
                 else:
                     _, _, padding_mask_src, _, memory = model.classification_head.input_encoder(memory_bfd,
-                                                                                 inp_seqs=[s.replace(" ", "") for s in
-                                                                                           seqs])
+                                                                                                inp_seqs=[s.replace(" ", "") for s in
+                                                                                                          seqs])
                     memory = torch.nn.utils.rnn.pad_sequence(memory, batch_first=True)
             else:
                 memory = model.encode(src)
@@ -225,6 +225,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         for ind, seq_ in enumerate(src):
             ys[ind].append(sptype_preds[seq_])
         start_ind = 1
+        print(lbl2ind)
+        exit(1)
     # if below condition, then global labels are computed with a separate model. This also affects the first label pred
     # of the model predicting the sequence label. Because of this, compute the first predictions first, and take care
     # of the glbl label model and sequence-model consistency (e.g. one predicts SP other NO-SP - take care of that)
@@ -564,7 +566,7 @@ def beam_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=Fa
 
 def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_beams_search=False,
               form_sp_reg_data=False, second_model=None, test_only_cs=False, glbl_lbls=None,
-              tune_bert=False, train_oh=False,sptype_preds=None):
+              tune_bert=False, train_oh=False,sptype_preds=None,glbl_lbl_2ind=None):
     model.eval()
     if form_sp_reg_data:
         tgt_tokens, probs, sp_probs, \
@@ -572,7 +574,7 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_b
                                                                        tgt=tgt, form_sp_reg_data=form_sp_reg_data,
                                                                        second_model=second_model, test_only_cs=test_only_cs,
                                                                        glbl_lbls=glbl_lbls, tune_bert=tune_bert, train_oh=train_oh,
-                                                                       sptype_preds=sptype_preds)
+                                                                       sptype_preds=sptype_preds,glbl_lbl_2ind=glbl_lbl_2ind)
         return tgt_tokens, probs, sp_probs, \
                all_sp_probs, all_seq_sp_logits, sp_type_probs
     if use_beams_search:
@@ -580,12 +582,12 @@ def translate(model: torch.nn.Module, src: str, bos_id, lbl2ind, tgt=None, use_b
                                            tgt=tgt, form_sp_reg_data=form_sp_reg_data,
                                            second_model=second_model, test_only_cs=test_only_cs,
                                            glbl_lbls=glbl_lbls, tune_bert=tune_bert, beam_width=3,
-                                                                sptype_preds=sptype_preds)
+                                                                sptype_preds=sptype_preds,glbl_lbl_2ind=glbl_lbl_2ind)
         all_seq_sp_logits = None, None, None
     else:
         tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, all_seq_label_probs = greedy_decode(model, src, start_symbol=bos_id,
                                                                                      lbl2ind=lbl2ind, tgt=tgt, tune_bert=tune_bert,
-                                                                                     train_oh=train_oh,sptype_preds=sptype_preds)
+                                                                                     train_oh=train_oh,sptype_preds=sptype_preds,glbl_lbl_2ind=glbl_lbl_2ind)
         return tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, all_seq_label_probs
     return tgt_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits
 
@@ -722,8 +724,6 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         sptype_preds = None
     if glbl_lbl_2ind is not None:
         ind2glbl_lbl = {v:k for k,v in glbl_lbl_2ind.items()}
-    print(glbl_lbl_2ind)
-    exit(1)
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
     sp_type_dict = {}
@@ -769,12 +769,13 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
                           form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False, second_model=second_model,
                           test_only_cs=test_only_cs, glbl_lbls=glbl_lbls, tune_bert=tune_bert, train_oh=train_oh,
-                          sptype_preds=sptype_preds)
+                          sptype_preds=sptype_preds, glbl_lbl_2ind=glbl_lbl_2ind)
         else:
             predicted_tokens, probs, sp_probs, all_sp_probs, all_seq_sp_logits, all_seq_label_probs = \
                 translate(model, src, lbl2ind['BS'], lbl2ind, tgt=tgt, use_beams_search=use_beams_search,
                           form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False,
-                          second_model=second_model, tune_bert=tune_bert, train_oh=train_oh,sptype_preds=sptype_preds)
+                          second_model=second_model, tune_bert=tune_bert, train_oh=train_oh,sptype_preds=sptype_preds,
+                          glbl_lbl_2ind=glbl_lbl_2ind)
             sp_type_probs = [""] * len(predicted_tokens)
         true_targets = padd_add_eos_tkn(tgt, lbl2ind)
         # if not use_beams_search:
