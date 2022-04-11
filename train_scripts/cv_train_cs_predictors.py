@@ -220,9 +220,10 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         for _ in range(len(src)):
             ys.append([])
     if sptype_preds is None:
-        print(src)
         start_ind = 0
     else:
+        for ind, seq_ in enumerate(range(src)):
+            ys[ind].append(sptype_preds[seq_])
         start_ind = 1
     # if below condition, then global labels are computed with a separate model. This also affects the first label pred
     # of the model predicting the sequence label. Because of this, compute the first predictions first, and take care
@@ -331,9 +332,6 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     prob_2nd_mdl = second_model.generator(out_2nd_mdl[:, -1])
                     all_outs_2nd_mdl.append(out_2nd_mdl[:, -1])
                 if tune_bert:
-                    print(ys)
-                    if i == 2:
-                        exit(1)
                     if model.classification_head.train_only_decoder:
                         prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs, tgt_mask.to(device))
                         prob = prob[-1]
