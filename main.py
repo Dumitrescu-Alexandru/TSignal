@@ -2,7 +2,8 @@ import pickle
 import os
 import datetime
 from sp_data.data_utils import SPbinaryData
-from train_scripts.cv_train_cs_predictors import train_cs_predictors, test_seqs_w_pretrained_mdl, train_sp_type_predictor
+from train_scripts.cv_train_cs_predictors import train_cs_predictors, test_seqs_w_pretrained_mdl, train_sp_type_predictor,\
+    test_w_precomputed_sptypes
 from train_scripts.cv_train_binary_sp_model import train_bin_sp_mdl
 import argparse
 import logging
@@ -124,6 +125,8 @@ def parse_arguments():
     parser.add_argument("--deep_mdl", default=False, action="store_true", help="Add another layer before the class head of the sp type model")
     parser.add_argument("--is_cnn2", default=False, action="store_true", help="Remove the additional linear layer.")
     parser.add_argument("--no_of_layers_onlysp", default=8, type=int, help="No. of additional layers sp classifier.")
+    parser.add_argument("--test_sptype_preds", default="none", type=str, help="File name for sp type predictor dictionary results."
+                                                                              "Use predictions from binary sp type classifier as first label preds for a model.")
 
     return parser.parse_args()
 
@@ -223,6 +226,8 @@ if __name__ == "__main__":
     date_now = str(datetime.datetime.now()).split(".")[0].replace("-", "").replace(":", "").replace(" ", "")
     logging.getLogger('some_logger')
     args = parse_arguments()
+    if args.test_mdl and args.test_sptype_preds:
+        test_w_precomputed_sptypes(args)
     if args.test_seqs:
         test_seqs_w_pretrained_mdl(args.test_mdl, args.test_seqs, tune_bert=args.tune_bert, saliency_map_save_fn=args.saliency_map_save_fn,hook_layer=args.hook_layer)
     elif args.train_sp_type_predictor:
@@ -263,7 +268,7 @@ if __name__ == "__main__":
                                 anneal_epochs=args.anneal_epochs,annealed_lr=args.annealed_lr, bert_pe_for_decoder=args.bert_pe_for_decoder,
                                 frozen_pe_epochs=args.frozen_pe_epochs,no_bert_pe_training=args.no_bert_pe_training,
                                 add_bert_pe_from_dec_to_bert_out=args.add_bert_pe_from_dec_to_bert_out, concat_pos_enc=args.concat_pos_enc,
-                                pe_extra_dims=args.pe_extra_dims,lipbobox_predictions=args.lipbobox_predictions)
+                                pe_extra_dims=args.pe_extra_dims,lipbobox_predictions=args.lipbobox_predictions,test_sptype_preds=args.test_sptype_preds)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
