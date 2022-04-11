@@ -222,11 +222,12 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     if sptype_preds is None:
         start_ind = 0
     else:
+        # sp_type classifier now saves sp types, so I need to conver them back to "start y_1".
+        # this is not perfect as all NO-SP are "I's"
+        glbl_lbl_2_start_letter = {0: 'I', 1: 'S', 2: 'W', 3: 'L', 4: 'T', 5: 'P'}
         for ind, seq_ in enumerate(src):
-            ys[ind].append(sptype_preds[seq_])
+            ys[ind].append(lbl2ind[glbl_lbl_2_start_letter[sptype_preds[seq_]]])
         start_ind = 1
-        print(lbl2ind)
-        exit(1)
     # if below condition, then global labels are computed with a separate model. This also affects the first label pred
     # of the model predicting the sequence label. Because of this, compute the first predictions first, and take care
     # of the glbl label model and sequence-model consistency (e.g. one predicts SP other NO-SP - take care of that)
