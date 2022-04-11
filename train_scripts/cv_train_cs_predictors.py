@@ -722,6 +722,8 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
         sptype_preds = None
     if glbl_lbl_2ind is not None:
         ind2glbl_lbl = {v:k for k,v in glbl_lbl_2ind.items()}
+    print(glbl_lbl_2ind)
+    exit(1)
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     eval_dict = {}
     sp_type_dict = {}
@@ -1962,3 +1964,9 @@ def test_w_precomputed_sptypes(args):
              very_simplified=args.very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind, tuned_bert_embs_prefix="",
              tune_bert=args.tune_bert, extended_sublbls=args.extended_sublbls, random_folds_prefix="",
              train_oh=args.train_oh, lipbobox_predictions=args.lipbobox_predictions, sptype_preds=args.test_sptype_preds)
+    sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
+        get_cs_and_sp_pred_results(filename="sptype_tested_"+args.run_name + "_best_sp_probs.bin", v=False,
+                                   return_class_prec_rec=True)
+    all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
+        np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
+    print(all_recalls, all_precisions)

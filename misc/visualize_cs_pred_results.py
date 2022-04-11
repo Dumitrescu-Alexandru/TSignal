@@ -4452,13 +4452,13 @@ def compute_mcc_sp_only_mdls(mdl_name="bert_tuning_deep", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
-    compute_mcc_sp_only_mdls()
-    plot_sp6_vs_tnmt_mcc()
-    exit(1)
-    plot_sp6_vs_tnmt()
-    visualize_inp_gradients()
-
-    plot_comparative_performance_sp1_mdls()
+    # compute_mcc_sp_only_mdls()
+    # plot_sp6_vs_tnmt_mcc()
+    # exit(1)
+    # plot_sp6_vs_tnmt()
+    # visualize_inp_gradients()
+    #
+    # plot_comparative_performance_sp1_mdls()
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat13/",
     #                                         compare_mdl_plots=False,
@@ -4515,6 +4515,12 @@ if __name__ == "__main__":
     #                                         benchmark=True)
     # exit(1)
     #
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat49/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     # pe extra dims heads=32 0.819; higher non-w average mcc than anything else maybe
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat48/",
