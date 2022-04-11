@@ -1967,7 +1967,7 @@ def test_w_precomputed_sptypes(args):
              tune_bert=args.tune_bert, extended_sublbls=args.extended_sublbls, random_folds_prefix="",
              train_oh=args.train_oh, lipbobox_predictions=args.lipbobox_predictions, sptype_preds=args.test_sptype_preds)
     sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
-        get_cs_and_sp_pred_results(filename="sptype_tested_"+args.run_name + "_best_sp_probs.bin", v=False,
+        get_cs_and_sp_pred_results(filename="sptype_tested_"+args.run_name + "_best.bin", v=False,
                                    return_class_prec_rec=True)
     all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
         np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
