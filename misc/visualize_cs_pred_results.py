@@ -3404,6 +3404,10 @@ def plot_perf_over_data_perc():
 
     ax[1,1].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=8)
     ax[1,1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+    ax[0, 0].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+    ax[0, 1].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+    ax[1, 0].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+    ax[1, 1].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
 
     all_handles, all_labels = [], []
     for ind in range(2):
@@ -3462,7 +3466,8 @@ def extract_performance_over_tolerance():
                                                 result_folder=run_results_folder,
                                                 compare_mdl_plots=False,
                                                 remove_test_seqs=False,
-                                                benchmark=False)
+                                                benchmark=False,
+                                                prints=False)
         mdl_ind = 0
         sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
         sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][6]]))
@@ -3553,6 +3558,11 @@ def extract_performance_over_tolerance():
     ax[1, 1].set_xlabel("tolerance", fontsize=8)
     box = ax[1, 1].get_position()
     ax[1, 1].set_position([box.x0 , box.y0 + box.height * 0.5, box.width, box.height * 0.78])
+
+    ax[0, 0].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+    ax[0, 1].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+    ax[1, 0].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+    ax[1, 1].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
 
     all_handles, all_labels = [], []
     for ind in range(2):
@@ -4502,9 +4512,10 @@ def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
-    visualize_inp_gradients()
-    extract_performance_over_tolerance()
     compute_mcc_sp_only_mdls()
+    plot_perf_over_data_perc()
+    extract_performance_over_tolerance()
+    visualize_inp_gradients()
     plot_sp6_vs_tnmt()
     plot_sp6_vs_tnmt_mcc()
     plot_comparative_performance_sp1_mdls()
@@ -4537,7 +4548,6 @@ if __name__ == "__main__":
     # plot_compare_pos_nopos()
     # extract_performance_over_tolerance()
     # compare_experiment_results()
-    # plot_perf_over_data_perc
     # rename()
     # exit(1)
     # --anneal_epochs 20 --anneal_start 20, train for longer. Still not good, will try without fine-tuning

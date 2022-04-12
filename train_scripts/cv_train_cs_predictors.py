@@ -1202,10 +1202,10 @@ def train_sp_type_predictor(args):
                     "lr": 0.0001
                 },
             ]
-            # classification_head_optimizer = optim.SGD(parameters, lr=args.lr)
+            classification_head_optimizer = optim.SGD(parameters, lr=args.lr)
 
-            classification_head_optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr
-                                    else args.lr, eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98), )
+            # classification_head_optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr
+            #                         else args.lr, eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98), )
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
             swa_model = AveragedModel(model)

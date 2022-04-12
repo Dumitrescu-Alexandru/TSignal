@@ -54,7 +54,7 @@ class BinarySPClassifier(nn.Module):
         return x
 
 class ConvResBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, layers=1):
+    def __init__(self, in_channels, out_channels, kernel_size, layers=2):
         super(ConvResBlock, self).__init__()
         padding = kernel_size // 2
         self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, padding=padding)
