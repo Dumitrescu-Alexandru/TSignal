@@ -25,7 +25,7 @@ def init_sptype_classifier(args, glbl_lbls,deep_mdl, is_cnn2=False, no_of_layers
     model = CNN3(input_size=1024, output_size=len(glbl_lbls), is_cnn2=is_cnn2, deep_mdl=deep_mdl,no_of_layers=no_of_layers, cnn_resnets=no_of_layers_conv_resnets)
     for n, p in model.named_parameters():
         if p.dim() > 1 and 'bias' not in n and 'bn' not in n:
-            nn.init.kaiming_normal_(p, nonlinearity='relu')
+            nn.init.kaiming_normal_(p, nonlinearity='relu', mode='fan_in')
         elif 'bias' in n:
             nn.init.zeros_(p)
         elif 'bn' in n and 'weight' in n:
