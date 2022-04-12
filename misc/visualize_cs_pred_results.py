@@ -2627,6 +2627,7 @@ def plot_sp6_vs_tnmt_mcc():
     runs = [42, 45]
 
     runs = [32,34,37, 39,40, 47]
+    runs = [32]
 
 
     mcc_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"], return_mcc=True)
@@ -4457,7 +4458,7 @@ def rename():
         os.rename("tuning_bert_fixed_high_lr_swa_only_repeat2/"+n, "tuning_bert_fixed_high_lr_swa_only_repeat2/"+n.replace("cycle_lr_s","repeat2_fixed_high_lr_"))
 
 
-def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
+def compute_mcc_sp_only_mdls(mdl_name="bert_tuning_deep", folder="./"):
     # load_tuned_bert; bert_tuning; bert_tuning_deep, bert_tuning_crct_swa
     folds = [[0,1],[0,2],[1,2]]
     res_dict = {}
@@ -4512,12 +4513,12 @@ def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
+    plot_sp6_vs_tnmt_mcc()
     compute_mcc_sp_only_mdls()
     plot_perf_over_data_perc()
     extract_performance_over_tolerance()
     visualize_inp_gradients()
     plot_sp6_vs_tnmt()
-    plot_sp6_vs_tnmt_mcc()
     plot_comparative_performance_sp1_mdls()
     # exit(1)
     #

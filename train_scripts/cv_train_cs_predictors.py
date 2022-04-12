@@ -19,17 +19,21 @@ sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc, get_pred_accs_sp_vs_nosp
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights
 from models.transformer_nmt import TransformerModel
-from models.binary_sp_classifier import BinarySPClassifier, CNN3
+from models.binary_sp_classifier import BinarySPClassifier, CNN3, CNN4
 
 def init_sptype_classifier(args, glbl_lbls,deep_mdl, is_cnn2=False, no_of_layers=4, no_of_layers_conv_resnets=4):
-    model = CNN3(input_size=1024, output_size=len(glbl_lbls), is_cnn2=is_cnn2, deep_mdl=deep_mdl,no_of_layers=no_of_layers, cnn_resnets=no_of_layers_conv_resnets)
+    if args.is_cnn4:
+        model = CNN4(input_size=1024, output_size=len(glbl_lbls), is_cnn2=is_cnn2, deep_mdl=deep_mdl,no_of_layers=no_of_layers, cnn_resnets=no_of_layers_conv_resnets)
+    else:
+        model = CNN3(input_size=1024, output_size=len(glbl_lbls), is_cnn2=is_cnn2, deep_mdl=deep_mdl,no_of_layers=no_of_layers, cnn_resnets=no_of_layers_conv_resnets)
     for n, p in model.named_parameters():
         if p.dim() > 1 and 'bias' not in n and 'bn' not in n:
             nn.init.kaiming_normal_(p, nonlinearity='relu', mode='fan_in')
         elif 'bias' in n:
             nn.init.zeros_(p)
-        elif 'bn' in n and 'weight' in n:
-            nn.init.constant_(p, 1)
+        # elif 'bn' in n and 'weight' in n:
+        #     nn.init.constant_(p, 1)
+        # print(n)
 
     return model
 
@@ -1202,10 +1206,11 @@ def train_sp_type_predictor(args):
                     "lr": 0.0001
                 },
             ]
-            classification_head_optimizer = optim.SGD(parameters, lr=args.lr)
-
-            # classification_head_optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr
-            #                         else args.lr, eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98), )
+            if args.use_sgd_on_swa:
+                classification_head_optimizer = optim.SGD(parameters, lr=args.lr)
+            else:
+                classification_head_optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr
+                                        else args.lr, eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98), )
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
             swa_model = AveragedModel(model)

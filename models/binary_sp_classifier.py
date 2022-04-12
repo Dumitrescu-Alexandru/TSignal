@@ -1,3 +1,4 @@
+import pickle
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
@@ -54,7 +55,7 @@ class BinarySPClassifier(nn.Module):
         return x
 
 class ConvResBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, layers=2):
+    def __init__(self, in_channels, out_channels, kernel_size, layers=1):
         super(ConvResBlock, self).__init__()
         padding = kernel_size // 2
         self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, padding=padding)
@@ -192,3 +193,86 @@ class CNN3(nn.Module):
             x = self.dense(x)
 
         return x
+
+class AAEmbModule(nn.Module):
+    def __init__(self, aa_dict, emb_dim=128):
+        super(AAEmbModule, self).__init__()
+        self.emb = nn.Embedding(len(aa_dict.items()), 128)
+        self.aa_dict = aa_dict
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    def forward(self, seqs):
+        emb_seqs = []
+        for s_ in seqs:
+            input_indices = torch.tensor([self.aa_dict[c] for c in s_]).to(self.device)
+            emb_seqs.append(self.emb(input_indices))
+        return torch.nn.utils.rnn.pad_sequence(emb_seqs)
+
+
+class CNN4(nn.Module):
+    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0,0],pool='avg',is_cnn2=False,deep_mdl=False, no_of_layers=4, cnn_resnets=4,
+                 add_additional_emb=True):
+        super(CNN4, self).__init__()
+        aa_dict = pickle.load(open("sp6_dicts.bin", "rb"))
+        aa_dict = {k:v for k,v in aa_dict[-1].items() if v not in ['ES','PD','BS']}
+        self.add_additional_emb = add_additional_emb
+        input_size = input_size + 128 if add_additional_emb else input_size
+        self.residue_emb = AAEmbModule(aa_dict)
+        pool = 'avg'
+        self.deep_mdl=deep_mdl
+        if pool=='sum':
+            self.pool = nn.AdaptiveMaxPool1d(1)
+        else: # pool=='avg'
+            self.pool = nn.AdaptiveAvgPool1d(1)
+        #filters=[120,100,80,60] # dimensionality of outputspace
+        n_f = sum(filters)
+        #lengths=[5,10,15,20] # original kernel sizes
+        #lengths=[5,9,15,21] # kernel sizes (compatible with pytorch and 'same' padding used in TF)
+        self.dos=dos
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.is_cnn2 = is_cnn2
+        self.relu = nn.ReLU()
+
+        self.output_size=output_size
+        self.cnn_reduce1 = nn.Conv1d(input_size,512,kernel_size=7,padding=3,stride=1)
+        self.reduce_pool_1 = nn.MaxPool1d(3, 2)
+        self.bn1 = nn.BatchNorm1d(512)
+        self.cnn_reduce2 = nn.Conv1d(512,256,kernel_size=7,padding=3, stride=1)
+        self.reduce_pool_2 = nn.MaxPool1d(3, 2)
+        self.bn2 = nn.BatchNorm1d(256)
+
+        res_layers = []
+        if cnn_resnets != 0:
+            for i in range(4):
+                res_layers.append(ConvResBlock(256, 256, kernel_size=5))
+            self.conv_res_layers1 = nn.Sequential(*res_layers)
+        self.cnn_reduce3 = nn.Conv1d(256,256,kernel_size=5,padding=2, stride=1)
+        self.bn3 = nn.BatchNorm1d(256)
+        self.reduce_pool_3 = nn.MaxPool1d(3, 2)
+
+        res_layers = []
+        if cnn_resnets != 0:
+            for i in range(4):
+                res_layers.append(ConvResBlock(256, 256, kernel_size=3))
+            self.conv_res_layers2 = nn.Sequential(*res_layers)
+
+        self.dense = nn.Linear(256,output_size) if is_cnn2 else nn.Linear(256,output_size)
+
+    def forward(self,x, targets=None, inp_seqs=None):
+        #print('0. SHAPE x',x.shape)
+        # CNN part
+        x = x.permute(0,2,1)
+        if self.add_additional_emb:
+            additional_imp = self.residue_emb(inp_seqs)
+            additional_imp = additional_imp.permute(1,2,0)
+            x = torch.cat([additional_imp, x], dim=1)
+        x = self.reduce_pool_1(self.relu(self.bn1(self.cnn_reduce1(x))))
+        x = self.reduce_pool_2(self.relu(self.bn2(self.cnn_reduce2(x))))
+        x = self.conv_res_layers1(x)
+        x = self.reduce_pool_3(self.relu(self.bn3(self.cnn_reduce3(x))))
+        x = self.conv_res_layers2(x)
+        x = self.pool(x)
+        x = torch.squeeze(x,dim=2)
+        return self.dense(x)
+
+

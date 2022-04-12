@@ -129,6 +129,8 @@ def parse_arguments():
     parser.add_argument("--test_sptype_preds", default="none", type=str, help="File name for sp type predictor dictionary results."
                                                                               "Use predictions from binary sp type classifier as first label preds for a model.")
     parser.add_argument("--no_of_layers_conv_resnets", default=4, type=int, help="No. of additional (conv) layers sp classifier.")
+    parser.add_argument("--is_cnn4", default=False, action="store_true", help="Use new cnn4 architecture")
+    parser.add_argument("--use_sgd_on_swa", default=False, action="store_true", help="Use sgd on swa for sp type classifier")
 
     return parser.parse_args()
 
