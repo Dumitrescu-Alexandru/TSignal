@@ -31,6 +31,14 @@ def clean_sec_sp2_preds(seq, preds):
         return preds[:last_l_ind + min_i] + np.abs(min_i) * preds[last_l_ind+1] + preds[last_l_ind+np.abs(min_i):]
 
 
+def reassign_cs(s, p):
+    residues = s[p.rfind("L")-3:p.rfind("L")+3]
+    ind = residues.find("C")
+    if ind != -1:
+        return "L" * (p.rfind("L")-3+ind) + (70-p.rfind("L") +3 -ind) * "O"
+    else:
+        return -1
+
 def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=None):
     def get_acc_for_tolerence(ind, t_lbl, sp_letter):
         true_cs = 0
@@ -58,6 +66,8 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
     sptype2letter = {'TAT': 'T', 'LIPO': 'L', 'PILIN': 'P', 'TATLIPO': 'T', 'SP': 'S'}
     sp_types = ["S", "T", "L", "P"]
+    ind2sptype = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
+    sptype2ind = {v:k for k,v in ind2sptype.items()}
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
     # order of elemnts in below list:
     # (eukaria_correct_tollerence_0, eukaria_correct_tollerence_1, eukaria_correct_tollerence_2, ..3, eukaria_total, eukaria_all_pos_preds)
@@ -78,11 +88,22 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
         lg, sp_info = l.split("|")
         # if ind2glbl_lbl[sptype_preds[s]] == "LIPO" and s[p.rfind("L")+1]!="C":
         #     sptype_preds[s] = glbllbl2_ind["NO_SP"]
+        #     print(glbllbl2_ind["NO_SP"], sptype2ind["NO_SP"], ind2glbl_lbl[sptype_preds[s]])
         #     p = "I"*len(p)
-        # elif ind2glbl_lbl[sptype_preds[s]] =="TATLIPO" and s[p.rfind("T")+1]!="C":
+        # elif ind2glbl_lbl[sptype_preds[s]] =="TATLIPO" and p.rfind("T") < len(s)-4 and s[p.rfind("T")+1]!="C":
         #     sptype_preds[s] = glbllbl2_ind["NO_SP"]
         #     p = "I"*len(p)
-
+        # if ind2sptype[sptype_preds[s]] == "LIPO" and s[p.rfind("L") + 1] != "C":
+        #     if "C" in s[p.rfind("L")-3:p.rfind("L")+3]:
+        #         new_res = reassign_cs(s,p)
+        #         if new_res == -1:
+        #             sptype_preds[s] = glbllbl2_ind["NO_SP"]
+        #             p = "I" * len(p)
+        #         else:
+        #             p = new_res
+        #
+        # elif ind2sptype[sptype_preds[s]] == "TATLIPO" and s[p.rfind("L") + 1] != "C":
+        #     sptype_preds[s] = sptype2ind["NO_SP"]
         # if p == "L" and s[p.rfind("L")+1] != "C":
         #     sp_info = "NO_SP"
         #     p = "I" * len(p)
@@ -192,6 +213,16 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, retu
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         zv += 1
         lg, sp_info = l.split("|")
+        # if ind2sptype[sptype_preds[s]] == "LIPO" and s[p.rfind("L") + 1] != "C":
+        #     if "C" in s[p.rfind("L")-3:p.rfind("L")+3]:
+        #         new_res = reassign_cs(s,p)
+        #         if new_res == -1:
+        #             sptype_preds[s] = sptype2ind["NO_SP"]
+        #             p = "I" * len(p)
+        #         else:
+        #             p = new_res
+        # elif ind2sptype[sptype_preds[s]] == "TATLIPO" and s[p.rfind("L") + 1] != "C":
+        #     sptype_preds[s] = sptype2ind["NO_SP"]
         # if ind2sptype[sptype_preds[s]] == "LIPO" and s[t.rfind("L")+1] != "C":
         #     sptype_preds[s] = sptype2ind["NO_SP"]
         # elif ind2sptype[sptype_preds[s]] == "TATLIPO" and s[t.rfind("L")+1] != "C":
@@ -1697,7 +1728,7 @@ def extract_compatible_binaries_predtat(restrict_types=None, return_mcc=False):
     sp_letter = ""
     life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
     restrict_types = restrict_types if restrict_types is not None else ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
-    restrict_types = ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
+    # restrict_types = ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
     for l in lines:
         id = l.split("|")[0]
         if id in ids and id2type[id] in restrict_types:
@@ -1770,7 +1801,7 @@ def extract_compatible_binaries_lipop(restrict_types=None, return_mcc=False):
     sp_letter = ""
     life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
     restrict_types = restrict_types if restrict_types is not None else ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
-    restrict_types = ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
+    # restrict_types = ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
     for l in lines:
         line = l.replace("#", "")
         id = line.split("_")[0].replace(" ", "")
@@ -1856,7 +1887,7 @@ def extract_compatible_binaries_deepsig(restrict_types=None, return_mcc=False):
     life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
     added_seqs = set()
     # restrict_types = restrict_types if restrict_types is not None else ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
-    restrict_types = ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
+    # restrict_types = ["SP", "TAT", "TATLIPO", "LIPO", "NO_SP"]
     for l in lines:
         id = l.split("|")[0]
         if id in id2seq and id2seq[id] not in added_seqs and id2type[id] in restrict_types:
@@ -2406,7 +2437,7 @@ def plot_sp6_vs_tnmt():
     all_f1s_sp2 = [np.array(all_sptypes_all_mean[1]).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
     all_f1s_tat = [np.array(all_sptypes_all_mean[2]).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
     all_sptypes_all_f1s = [all_f1s_sp1, all_f1s_sp2, all_f1s_tat]
-    print(all_sptypes_all_f1s)
+    print(all_sptypes_all_f1s,all_sptypes_all_std)
 
     names = ["TSignal", "SignalP6", "LipoP", "DeepSig", "Phobius"]
     colors = ["mediumblue", "saddlebrown", "green", "black", "purple","red"]
@@ -2429,12 +2460,9 @@ def plot_sp6_vs_tnmt():
         ax[ind].plot([8.5,8.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
         ax[ind].plot([12.5,12.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
         for j in range(2):
-            print(colors[j])
             ax[ind].bar([i + offsets[j] for i in range(lower_lim_plots, 17)], all_f1s[j],  label=names[j],
                         width=line_w,alpha=0.6, color=colors[j])
         for i in range(lower_lim_plots, 17):
-            print(all_sptypes_all_mean[ind],all_sptypes_all_std[ind])
-            print("ind", ind)
 
             low,high = all_sptypes_all_mean[ind][i - lower_lim_plots] - 2 * all_sptypes_all_std[ind][i - lower_lim_plots], \
                        all_sptypes_all_mean[ind][i - lower_lim_plots] + 2 *  all_sptypes_all_std[ind][i - lower_lim_plots]
@@ -2602,8 +2630,8 @@ def plot_sp6_vs_tnmt_mcc():
 
 
     mcc_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"], return_mcc=True)
-    mcc_predTat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP"], return_mcc=True)
-    mcc_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP"], return_mcc=True)
+    mcc_predTat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP", "TAT"], return_mcc=True)
+    mcc_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP", "LIPO"], return_mcc=True)
     mcc_phobius = extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"], return_mcc=True)
     mcc_deepsig[-1] = 0
     # "padd" with zeroes the SP types which are not predictable by their respective models
@@ -2869,9 +2897,13 @@ def plot_comparative_performance_sp1_mdls():
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
     runs = [1,2,3,4,5]
+    runs = [32,34,37, 39,40, 47]
+
     for run_no in runs:
         print("Computing results for run number {}".format(run_no))
         run_results_folder = "tuning_bert_only_decoder_rf_noswa_run{}/".format(run_no)
+        run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
+
         mdl2results = extract_all_param_results(only_cs_position=False,
                                                 result_folder=run_results_folder,
                                                 compare_mdl_plots=False,
@@ -3421,9 +3453,11 @@ def extract_performance_over_tolerance():
     all_mdl_2results = []
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
+    runs = [32,34,37, 39,40, 47]
 
-    for run_no in range(1,6):
+    for run_no in runs:
         run_results_folder = "tuning_bert_repeat{}_only_decoder/".format(run_no) if run_no != 1 else "tuning_bert_only_decoder/"
+        run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
         mdl2results = extract_all_param_results(only_cs_position=False,
                                                 result_folder=run_results_folder,
                                                 compare_mdl_plots=False,
@@ -4070,7 +4104,7 @@ def visualize_inp_gradients():
     axs[0].set_yticks([0, 0.01,0.02,0.03,0.04,0.05])
     axs[0].set_yticklabels([0, 0.01,0.02,0.03,0.04,0.05], fontsize=8)
     lbls =np.array(list(range(len(normalized_Tat_values)))) - motif_pos
-    lbls = [5, -22, -11, 00 ,11, 22]
+    lbls = [5, -11, -0, 11 ,22, 33]
     axs[0].set_xticklabels([str(n) for n in lbls ],fontsize=8)
     axs[0].set_xlim(-2, 89)
     # axs[0].arrow(0,0,10,0.03, width=0.001)
@@ -4096,19 +4130,31 @@ def visualize_inp_gradients():
         dotdotdot = type(s) == list
         for ind_, s_ in enumerate(s[:60]):
             if dotdotdot:
+                print(start + ind_)
                 if 17 < start+ind_ < 24:
-                    axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]),
+                    axs[0].annotate(".", xy=(13, normalized_Tat_values[13]),
                                     xytext=(start + ind_ + 0.80, 0.0035 * (1 - seq_ind)), fontsize=4,color='#ff7f0e')
-                elif start+ind_ < 39:
-                    axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, 0.0035*(1-seq_ind)), fontsize=4)
+                    axs[0].annotate(".", xy=(13, normalized_Tat_values[13]),
+                                    xytext=(start + ind_ + 0.80, 0.0035 * (1 - seq_ind) - 0.001), fontsize=4,color='#ff7f0e')
+                    axs[0].annotate(".", xy=(13, normalized_Tat_values[13]),
+                                    xytext=(start + ind_ + 0.80, 0.0035 * (1 - seq_ind) - 0.002), fontsize=4,color='#ff7f0e')
+                elif 6<start+ind_ < 39:
+                    # axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, 0.0035*(1-seq_ind)), fontsize=4)
+                    axs[0].annotate(".", xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80 + 0.1, 0.0035*(1-seq_ind) -0.000), fontsize=4)
+                    axs[0].annotate(".", xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80 + 0.1, 0.0035*(1-seq_ind) - 0.001), fontsize=4)
+                    axs[0].annotate(".", xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80 + 0.1, 0.0035*(1-seq_ind) - 0.002), fontsize=4)
             else:
+                if seq_ind == len(seqs) - 1:
+                    y_offset = -0.002
+                else:
+                    y_offset=0
                 if 17 < start+ind_ < 24:
                     axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]),
-                                    xytext=(start + ind_ + 0.80, -0.001 + 0.0035 * (1 - seq_ind)), fontsize=4,color='#ff7f0e')
-                elif start+ind_ < 38:
-                    axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, -0.001+0.0035*(1-seq_ind)), fontsize=4)
+                                    xytext=(start + ind_ + 0.80, -0.001 + 0.0035 * (1 - seq_ind)+y_offset), fontsize=4,color='#ff7f0e')
+                elif 6< start+ind_ < 38:
+                    axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, -0.001+0.0035*(1-seq_ind)+y_offset), fontsize=4)
                 elif start+ind_ == 38:
-                    axs[0].annotate("...", xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, 0.0035*(1-seq_ind)), fontsize=4)
+                    axs[0].annotate("...", xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, 0.0035*(1-seq_ind)+y_offset), fontsize=4)
 
 
     # for ind_ in range(18,18+len(text)):
@@ -4208,9 +4254,9 @@ def visualize_inp_gradients():
                 normalized_sp1_cs_values_pm_5aas_counts[75-cs_pred:75+len(seq)-cs_pred] += 1
     start_ind_sp1, end_ind_sp1 = 0, 0
     for i in range(150):
-        if normalized_sp1_cs_values_pm_5aas_counts[i] not in [0,1,2] and start_ind_sp1==0:
+        if normalized_sp1_cs_values_pm_5aas_counts[i] not in [0] and start_ind_sp1==0:
             start_ind_sp1 = i
-        elif normalized_sp1_cs_values_pm_5aas_counts[i] in [0,1,2] and start_ind_sp1 != 0 and end_ind_sp1 == 0:
+        elif normalized_sp1_cs_values_pm_5aas_counts[i] in [0] and start_ind_sp1 != 0 and end_ind_sp1 == 0:
             end_ind_sp1 = i-1
     # print(start_ind_sp1, end_ind_sp1)
     # exit(1)
@@ -4248,6 +4294,7 @@ def visualize_inp_gradients():
     axs[1].set_position([box.x0 + box.width * 0.1, box.y0+box.height*0.1, box.width * 0.95, box.height * 0.85])
 
     axs[1].set_ylabel('CS (Sec/SPI, Sec/SPII)\nIE+PE scores', fontsize=8)
+    print(start_ind)
     axs[1].xaxis.set_major_locator(MultipleLocator(18))
     axs[1].xaxis.set_major_formatter('{x:.0f}')
     axs[1].xaxis.set_minor_locator(MultipleLocator(1))
@@ -4258,7 +4305,10 @@ def visualize_inp_gradients():
     axs[1].set_xlabel("Residue position (relative to Cys/+1 Sec/SPII)", fontsize=8)
     axs[1].set_xlim(-2, 100)
     axs[1].set_ylim(0,0.031)
-
+    normalized_C_cs_values_pm_5aas = normalized_C_cs_values_pm_5aas[1:]
+    normalized_sp1_cs_values_pm_5aas = normalized_sp1_cs_values_pm_5aas[1:]
+    start_ind += 1
+    start_ind_sp1 +=1
     axs[1].plot(range(75-start_ind), normalized_C_cs_values_pm_5aas[:75-start_ind], color='#1f77b4', label='Other Sec/SPII residues')
     axs[1].plot([75-start_ind-1, 75-start_ind-0.5], [normalized_C_cs_values_pm_5aas[75-start_ind-1], inbetween_cysteine1], color='#1f77b4')#'#1f77b4')
     axs[1].plot([75-start_ind-0.5, 75-start_ind], [inbetween_cysteine1, normalized_C_cs_values_pm_5aas[75-start_ind]], color='#ff7f0e')
@@ -4269,6 +4319,7 @@ def visualize_inp_gradients():
     align_sp1sp2 = start_ind-start_ind_sp1
     start_ind_sp1 = start_ind_sp1 + align_sp1sp2
     print(start_ind_sp1,start_ind,len(normalized_sp1_cs_values_pm_5aas))
+    print(normalized_C_cs_values_pm_5aas, len(normalized_C_cs_values_pm_5aas))
 
     normalized_sp1_cs_values_pm_5aas = normalized_sp1_cs_values_pm_5aas[align_sp1sp2:]
 
@@ -4283,11 +4334,11 @@ def visualize_inp_gradients():
 
     axs[1].annotate("+1 Sec/SPI SP", xy=(75-start_ind_sp1, normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1]), xytext=(34, 0.001),
                 arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#ff7f0e')
-    axs[1].annotate("Sec/SPII", xy=(5, normalized_C_cs_values_pm_5aas[5]), xytext=(1, 0.027),
+    axs[1].annotate("Sec/SPII", xy=(4, normalized_C_cs_values_pm_5aas[4]), xytext=(1, 0.027),
                 arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#1f77b4')
     axs[1].annotate("Cys (+1 Sec/SPII SP)", xy=(75-start_ind, normalized_C_cs_values_pm_5aas[75-start_ind]), xytext=(35, 0.027),
                 arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#ff7f0e')
-    axs[1].annotate("Sec/SPI", xy=(5, normalized_sp1_cs_values_pm_5aas[5]), xytext=(1, 0.001),
+    axs[1].annotate("Sec/SPI", xy=(4, normalized_sp1_cs_values_pm_5aas[4]), xytext=(1, 0.001),
                 arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='red')
     axs[1].set_xlim(0,50)
     plt.show()
@@ -4309,7 +4360,6 @@ def visualize_inp_gradients():
     plt.bar(list(range(end_ind-start_ind)),(normalized_C_cs_values_pm_5aas[start_ind:end_ind]/normalized_C_cs_values_pm_5aas_counts[start_ind:end_ind]))
     plt.xticks([75-start_ind], ["Cysteine (+1 CS)"])
     plt.show()
-    print(normalized_C_cs_values_pm_5aas_counts)
     # normalized_C_cs_values_pm_5aas = []
     # for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
     #     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
@@ -4397,7 +4447,7 @@ def rename():
         os.rename("tuning_bert_fixed_high_lr_swa_only_repeat2/"+n, "tuning_bert_fixed_high_lr_swa_only_repeat2/"+n.replace("cycle_lr_s","repeat2_fixed_high_lr_"))
 
 
-def compute_mcc_sp_only_mdls(mdl_name="bert_tuning_deep", folder="./"):
+def compute_mcc_sp_only_mdls(mdl_name="bert_tuning", folder="./"):
     # load_tuned_bert; bert_tuning; bert_tuning_deep, bert_tuning_crct_swa
     folds = [[0,1],[0,2],[1,2]]
     res_dict = {}
@@ -4452,13 +4502,14 @@ def compute_mcc_sp_only_mdls(mdl_name="bert_tuning_deep", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
-    # compute_mcc_sp_only_mdls()
-    # plot_sp6_vs_tnmt_mcc()
+    visualize_inp_gradients()
+    extract_performance_over_tolerance()
+    compute_mcc_sp_only_mdls()
+    plot_sp6_vs_tnmt()
+    plot_sp6_vs_tnmt_mcc()
+    plot_comparative_performance_sp1_mdls()
     # exit(1)
-    # plot_sp6_vs_tnmt()
-    # visualize_inp_gradients()
     #
-    # plot_comparative_performance_sp1_mdls()
     # mdl2results = extract_all_param_results(only_cs_position=False,
     #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat13/",
     #                                         compare_mdl_plots=False,

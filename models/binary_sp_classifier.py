@@ -53,23 +53,53 @@ class BinarySPClassifier(nn.Module):
         x = self.dense(x)
         return x
 
-class ResBlock(nn.Module):
-    def __init__(self, dim, dos):
-        super(ResBlock, self).__init__()
-        self.linear = nn.Linear(dim, dim)
-        # self.linear2 = nn.Linear(dim, dim)
-        self.drop = nn.Dropout(dos)
-        self.layer_norm = nn.LayerNorm(dim)
-        # self.layer_norm2 = nn.LayerNorm(dim)
+class ConvResBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, layers=1):
+        super(ConvResBlock, self).__init__()
+        padding = kernel_size // 2
+        self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, padding=padding)
+        self.bn1 = nn.BatchNorm1d(out_channels)
+        if layers == 2:
+            self.conv2 = nn.Conv1d(in_channels, out_channels, kernel_size,padding=padding)
+            self.bn2 = nn.BatchNorm1d(out_channels)
+        self.layers = layers
         self.relu = nn.ReLU()
 
     def forward(self, x):
+        if self.layers == 1:
+
+            x_ = self.bn1(self.conv(x))
+            return self.relu(x + x_)
+        else:
+            x_ = self.relu(self.bn1(self.conv(x)))
+            x_ = self.bn2(self.conv2(x_))
+            return self.relu(x + x_)
+
+
+class ResBlock(nn.Module):
+    def __init__(self, dim, dos, no_layers=1):
+        super(ResBlock, self).__init__()
+        self.linear = nn.Linear(dim, dim)
+        if no_layers == 2:
+            self.linear2 = nn.Linear(dim, dim)
+        # self.linear2 = nn.Linear(dim, dim)
+        self.drop = nn.Dropout(dos)
+        self.layer_norm = nn.LayerNorm(dim)
+        if no_layers == 2:
+            self.layer_norm2 = nn.LayerNorm(dim)
+        # self.layer_norm2 = nn.LayerNorm(dim)
+        self.relu = nn.ReLU()
+        self.no_layers = no_layers
+
+    def forward(self, x):
         x_ = self.layer_norm(self.linear(x))
+        if self.no_layers == 2:
+            x_ = self.layer_norm2(self.linear2(self.relu(x_)))
         # x_ = self.layer_norm2(self.linear2(x_))
         return self.relu(x + x_)
 
 class CNN3(nn.Module):
-    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum',is_cnn2=False,deep_mdl=False, no_of_layers=4):
+    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0,0],pool='sum',is_cnn2=False,deep_mdl=False, no_of_layers=4, cnn_resnets=4):
         super(CNN3, self).__init__()
         self.deep_mdl=deep_mdl
         #filters=[120,100,80,60] # dimensionality of outputspace
@@ -98,9 +128,16 @@ class CNN3(nn.Module):
         self.bn5 = nn.BatchNorm1d(100)
         self.dense_i = nn.Linear(input_size,256)
         self.res_layers = []
+        if cnn_resnets != 0:
+            for i in range(cnn_resnets):
+                self.res_layers.append(ConvResBlock(100, 100, kernel_size=5))
+            self.conv_res_layers = nn.Sequential(*self.res_layers)
+        else:
+            self.conv_res_layers = None
+        self.res_layers = []
         if self.deep_mdl:
             for i in range(no_of_layers):
-                self.res_layers.append((ResBlock(100 if self.is_cnn2 else 100+256, dos[0])))
+                self.res_layers.append(ResBlock(100 if self.is_cnn2 else 100+256, dos[0]))
             self.res_layers = nn.Sequential(*self.res_layers)
             self.dense = nn.Linear(100,output_size) if is_cnn2 else nn.Linear(100+256,output_size)
         else:
@@ -122,6 +159,9 @@ class CNN3(nn.Module):
         xc = self.cnn5(xc)
         xc = self.bn5(xc)
         xc = self.relu(xc)
+        if self.conv_res_layers is not None:
+            xc = self.conv_res_layers(xc)
+
         #print('1. SHAPE x after convolutions',xc.shape)
         xc = self.pool(xc)
         xc = torch.squeeze(xc,dim=2)
@@ -147,6 +187,8 @@ class CNN3(nn.Module):
         else:
             if self.deep_mdl:
                 x = self.res_layers(xc)
+            else:
+                x = xc
             x = self.dense(x)
 
         return x

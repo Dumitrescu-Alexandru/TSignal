@@ -21,11 +21,16 @@ from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData
 from models.transformer_nmt import TransformerModel
 from models.binary_sp_classifier import BinarySPClassifier, CNN3
 
-def init_sptype_classifier(args, glbl_lbls,deep_mdl, is_cnn2=False, no_of_layers=4):
-    model = CNN3(input_size=1024, output_size=len(glbl_lbls), is_cnn2=is_cnn2, deep_mdl=deep_mdl,no_of_layers=no_of_layers)
+def init_sptype_classifier(args, glbl_lbls,deep_mdl, is_cnn2=False, no_of_layers=4, no_of_layers_conv_resnets=4):
+    model = CNN3(input_size=1024, output_size=len(glbl_lbls), is_cnn2=is_cnn2, deep_mdl=deep_mdl,no_of_layers=no_of_layers, cnn_resnets=no_of_layers_conv_resnets)
     for n, p in model.named_parameters():
-        if p.dim() > 1 and "res_layers" not in n:
-            nn.init.xavier_uniform_(p)
+        if p.dim() > 1 and 'bias' not in n and 'bn' not in n:
+            nn.init.kaiming_normal_(p, nonlinearity='relu')
+        elif 'bias' in n:
+            nn.init.zeros_(p)
+        elif 'bn' in n and 'weight' in n:
+            nn.init.constant_(p, 1)
+
     return model
 
 def init_model(ntoken, lbl2ind={}, lg2ind=None, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
@@ -338,6 +343,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     if model.classification_head.train_only_decoder:
                         prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs, tgt_mask.to(device))
                         prob = prob[-1]
+                        if i == 0:
+                            print(nn.functional.softmax(prob, dim=1), ind2lbl)
                         all_seq_label_probs.append(prob)
                     else:
                         out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
@@ -1036,7 +1043,7 @@ def train_sp_type_predictor(args):
     # the form_sp_reg_data param is used to both denote teh RR/C... usage and usually had a mandatory glbl label
     # in the SP-cs. The current experiment however tests no-glbl-cs tuning
     classification_head = init_sptype_classifier(args, sp_data.lbl2ind.items(), deep_mdl=args.deep_mdl, is_cnn2=args.is_cnn2,
-                                                 no_of_layers=args.no_of_layers_onlysp)
+                                                 no_of_layers=args.no_of_layers_onlysp, no_of_layers_conv_resnets=args.no_of_layers_conv_resnets)
     if args.load_model == "none":
         model = ProtBertClassifier(hparams)
         if args.remove_bert_layers != 0:
@@ -1068,7 +1075,7 @@ def train_sp_type_predictor(args):
                     "lr": 0.0001
                 },
             ]
-            print(len(dense_params), len(other_params))
+            # print(len(dense_params), len(other_params))
             classification_head_optimizer = optim.Adam(parameters,  lr=args.lr * 10 if args.high_lr
                                                                 else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
@@ -1195,6 +1202,8 @@ def train_sp_type_predictor(args):
                     "lr": 0.0001
                 },
             ]
+            # classification_head_optimizer = optim.SGD(parameters, lr=args.lr)
+
             classification_head_optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr
                                     else args.lr, eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98), )
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
@@ -1214,7 +1223,9 @@ def train_sp_type_predictor(args):
             save_model(swa_model.module, model_name=args.run_name, tune_bert=True)
         if swa_eps <= 0:
             patience = 0
-
+    if args.use_swa:
+        update_bn(dataset_loader, swa_model.to(device), tune_bert=args.tune_bert)
+        save_model(swa_model.module, args.run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=args.tune_bert)
     model = load_model(args.run_name + "_best_eval.pth", tune_bert=True).to(device)
     if not args.deployment_model:
         # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
@@ -1401,7 +1412,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         if anneal_scheduler is not None and anneal_start < e <= swa_start:
             anneal_scheduler.step()
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
-            continue
             if lr_scheduler_swa != "none" and e >= swa_start:
                 scheduler.step(iter_no % cycle_length)
                 if iter_no % (cycle_length+1) == 1:
@@ -1773,7 +1783,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             pos_fp_info.extend(false_positives)
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert",
-                               lipbobox_predictions=False):
+                               lipbobox_predictions=False, compute_saliency=False):
     # frozen_epochs = 3
     # tune_bert = True
     # for e in range(10):
@@ -1849,7 +1859,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     folder = get_data_folder()
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
     # hard-code this for now to check some sequences
-    test_file = "sp6_partitioned_data_train_1.bin"
+    # test_file = "sp6_partitioned_data_train_1.bin"
+    compute_saliency_scores = saliency_map_save_fn
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file, lipbobox_predictions=lipbobox_predictions)
     gather_10 = [0, 0, 0]
@@ -1894,15 +1905,27 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     all_seq_preds_grad_CSgrad = []
     save_index = 0
+    print("IM HERE")
     for ind, batch in enumerate(dataset_loader):
         print("{} number of seqs out of {} tested".format(ind, len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
-        some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
-                                            form_sp_reg_data=False, second_model=None, test_only_cs=False,
-                                                     glbl_lbls=None, tune_bert=tune_bert, saliency_map=True,
-                                                                            hook_layer=hook_layer)
-        all_seq_preds_grad_CSgrad.extend(visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
-    pickle.dump(all_seq_preds_grad_CSgrad,
+        if compute_saliency:
+            some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
+                                                form_sp_reg_data=False, second_model=None, test_only_cs=False,
+                                                         glbl_lbls=None, tune_bert=tune_bert, saliency_map=compute_saliency,
+                                                                                hook_layer=hook_layer)
+            all_seq_preds_grad_CSgrad.extend(
+                visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
+        else:
+            some_output = greedy_decode(model, seqs, sp_data.lbl2ind['BS'],
+                                                 sp_data.lbl2ind, tgt=None,
+                                                 form_sp_reg_data=False,
+                                                 second_model=None, test_only_cs=False,
+                                                 glbl_lbls=None, tune_bert=tune_bert,
+                                                 saliency_map=False,
+                                                 hook_layer=hook_layer)
+    if compute_saliency:
+        pickle.dump(all_seq_preds_grad_CSgrad,
                 open(folder+saliency_map_save_fn, "wb"))
     for seq, pred in zip(seqs, some_output[1]):
         print(seq)
