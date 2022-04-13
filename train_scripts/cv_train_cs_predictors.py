@@ -1122,7 +1122,7 @@ def train_sp_type_predictor(args):
     no_of_seqs_sp2 = np.array([1087, 516, 12])
     no_of_seqs_tat = np.array([313, 39, 13])
     no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
-    swa_start = 40
+    swa_start = args.swa_start
     swa_eps = 10
     while patience != 0:
         if args.use_swa and e >= swa_start:
