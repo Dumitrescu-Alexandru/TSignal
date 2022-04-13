@@ -43,7 +43,8 @@ def init_model(ntoken, lbl2ind={}, lg2ind=None, dropout=0.5, use_glbl_lbls=False
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
                form_sp_reg_data=False, version2_agregation="max", input_drop=False, no_pos_enc=False,
                linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix="", tune_bert=False,train_only_decoder=False,
-               add_bert_pe_from_dec_to_bert_out=False,concat_pos_enc=False,pe_extra_dims=64):
+               add_bert_pe_from_dec_to_bert_out=False,concat_pos_enc=False,pe_extra_dims=64,
+               residue_emb_extra_dims=0):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
@@ -52,7 +53,8 @@ def init_model(ntoken, lbl2ind={}, lg2ind=None, dropout=0.5, use_glbl_lbls=False
                              linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                              tuning_bert=tune_bert, train_only_decoder=train_only_decoder,
                              add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out,
-                             concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims)
+                             concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims,
+                             residue_emb_extra_dims=residue_emb_extra_dims)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -349,8 +351,6 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     if model.classification_head.train_only_decoder:
                         prob = model.classification_head.forward_only_decoder(memory.to(device), ys, seqs, tgt_mask.to(device))
                         prob = prob[-1]
-                        if i == 0:
-                            print(nn.functional.softmax(prob, dim=1), ind2lbl)
                         all_seq_label_probs.append(prob)
                     else:
                         out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
@@ -1270,7 +1270,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False,
                         reinint_swa_decoder=False,anneal_start=-1,anneal_epochs=20,annealed_lr=0.00002,bert_pe_for_decoder=False,
                         frozen_pe_epochs=-1, no_bert_pe_training=False, add_bert_pe_from_dec_to_bert_out=False,
-                        concat_pos_enc=False, pe_extra_dims=64,lipbobox_predictions=False,test_sptype_preds="none"):
+                        concat_pos_enc=False, pe_extra_dims=64,lipbobox_predictions=False,test_sptype_preds="none",
+                        residue_emb_extra_dims=0):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -1315,7 +1316,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                            linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                          tune_bert=tune_bert,train_only_decoder=train_only_decoder,
                                          add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out,
-                                         concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims)
+                                         concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims,
+                                         residue_emb_extra_dims=residue_emb_extra_dims)
         model = ProtBertClassifier(hparams)
         if remove_bert_layers != 0:
             model.ProtBertBFD.encoder.layer = model.ProtBertBFD.encoder.layer[:-remove_bert_layers]
@@ -1362,7 +1364,21 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             # 3. when adding the scheduler, we want to increase (cyclically) the lr only for classification_head parameters; That we
             # cannot do with a scheduler on an optimizer on the full model; therefore we need to use 2 optimizers and
             # attach a schduler only on classification_head_optimizer
-            classification_head_optimizer = optim.Adam(model.classification_head.parameters(),  lr=lr * 10 if high_lr
+            additional_emb = []
+            other_params = []
+            for n, p in model.classification_head.named_parameters():
+                if "extra_embs_dec_input" in n:
+                    additional_emb.append(p)
+                else:
+                    other_params.append(p)
+            parameters = [
+                {"params": other_params},
+                {
+                    "params": additional_emb,
+                    "lr": 0.00001,
+                },
+            ]
+            classification_head_optimizer = optim.Adam(parameters, lr=lr * 10 if high_lr
                                                                 else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
@@ -1805,43 +1821,53 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert",
                                lipbobox_predictions=False, compute_saliency=False):
-    # frozen_epochs = 3
-    # tune_bert = True
-    # for e in range(10):
-    #     if tune_bert and frozen_epochs > e:
-    #         print(e, ": model.eval(); model.classification_head.train()")
-    #     elif tune_bert and frozen_epochs == e:
-    #         print(e, "model.unfreeze_encoder(no_bert_pe_training);model.train()")
-    #     elif frozen_epochs > e:
-    #         print(e, "model.train()")
-    #
-    #     else:
-    #         print(e, "model.train()")
-    # model = nn.Sequential(nn.Linear(100,10), nn.Linear(10,5))
-    # opt = torch.optim.Adam(model.parameters(), lr=0.1)
-    # torch.save(opt.state_dict(), "asd.txt")
-    # model2, model3 = nn.Linear(100, 10), nn.Linear(10, 5)
-    # loaded_opt = torch.load("asd.txt")
-    # print(loaded_opt)
-    # opt1, opt2 = torch.optim.Adam(model2.parameters(), lr=0.1), torch.optim.Adam(model3.parameters(), lr=0.1)
-    # opt1.load_state_dict(loaded_opt)
-    # exit(1)
-    # def a(epoch):
-    #
-    #     swa_start = 70
-    #     swa_lr=0.05
-    #     lr_init=0.1
-    #     t = epoch / swa_start
-    #     lr_ratio = swa_lr / lr_init
-    #     swa_lr = 0.05
-    #     lr_init = 0.1
-    #     if t <= 0.5:
-    #         factor = 1.0
-    #     elif t <= 0.9:
-    #         factor = 1.0 - (1.0 - lr_ratio) * (t - 0.5) / 0.4
-    #     else:
-    #         factor = lr_ratio
-    #     return lr_init * factor
+    model = nn.Sequential(nn.Linear(100,10), nn.Linear(10,5))
+    other_params = []
+    some_other_params = []
+
+    for n, p in model.named_parameters():
+        if "1" in n:
+            other_params.append(p)
+        else:
+            some_other_params.append(p)
+    parameters = [
+        {"params": other_params},
+        {
+            "params": some_other_params,
+            "lr": 0.0001
+        },
+    ]
+    optimizer = torch.optim.Adam(parameters, lr=0.1)
+    anneal_scheduler = SWALR(optimizer, swa_lr=0.0001, anneal_epochs=10, anneal_strategy='linear')
+    for e in range(100):
+        print("LR1:", optimizer.param_groups[0]['lr'])
+        print("LR2:", optimizer.param_groups[1]['lr'])
+
+        anneal_scheduler.step()
+    exit(1)
+    torch.save(opt.state_dict(), "asd.txt")
+    model2, model3 = nn.Linear(100, 10), nn.Linear(10, 5)
+    loaded_opt = torch.load("asd.txt")
+    print(loaded_opt)
+    opt1, opt2 = torch.optim.Adam(model2.parameters(), lr=0.1), torch.optim.Adam(model3.parameters(), lr=0.1)
+    opt1.load_state_dict(loaded_opt)
+    exit(1)
+    def a(epoch):
+
+        swa_start = 70
+        swa_lr=0.05
+        lr_init=0.1
+        t = epoch / swa_start
+        lr_ratio = swa_lr / lr_init
+        swa_lr = 0.05
+        lr_init = 0.1
+        if t <= 0.5:
+            factor = 1.0
+        elif t <= 0.9:
+            factor = 1.0 - (1.0 - lr_ratio) * (t - 0.5) / 0.4
+        else:
+            factor = lr_ratio
+        return lr_init * factor
     #
     # lrs =[]
     # for e in range(150):

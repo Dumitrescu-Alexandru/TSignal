@@ -39,7 +39,8 @@ class TokenEmbedding(nn.Module):
 
 class InputEmbeddingEncoder(nn.Module):
     def __init__(self, partitions=[0, 1, 2], data_folder="sp_data/", lg2ind=None, use_glbl_lbls=False, aa2ind=None,
-                 glbl_lbl_version=1, form_sp_reg_data=False, tuned_bert_embs_prefix="", tuning_bert=False):
+                 glbl_lbl_version=1, form_sp_reg_data=False, tuned_bert_embs_prefix="", tuning_bert=False,
+                 residue_emb_extra_dims=0):
         # only create dictionaries from sequences to embeddings (as sequence embeddings are already computed by a bert
         # model
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -48,6 +49,16 @@ class InputEmbeddingEncoder(nn.Module):
             if not os.path.exists("sp_data/"):
                 self.data_folder = "./"
         super().__init__()
+        self.residue_emb_extra_dims = residue_emb_extra_dims
+        if residue_emb_extra_dims != 0:
+            self.extra_embs_dec_input = nn.Embedding(20, residue_emb_extra_dims)
+            aa_dict = pickle.load(open("sp6_dicts.bin", "rb"))
+            aa_dict = {k: v for k, v in aa_dict[-1].items() if v not in ['ES', 'PD', 'BS']}
+            aa_dict['X'] = 20
+            self.aa2ind_extra = aa_dict
+        else:
+            self.extra_embs_dec_input = None
+
         self.glbl_lbl_version = glbl_lbl_version
         seq2emb = {}
         self.lg2ind = pickle.load(open("sp6_dicts.bin", "rb"))[1]
@@ -105,6 +116,11 @@ class InputEmbeddingEncoder(nn.Module):
                 self.lg_embs(torch.tensor([self.seq2lg[inp_seqs]], device=self.device))
             input_tensor.append(lg_emb)
         # input_tensor.append(eos)
+        # add a padding/no residue if lg is used at the end of the sequence
+        if self.extra_embs_dec_input:
+            inp_extra_emb = inp_seqs if not self.use_lg else inp_seqs + "X"
+            extra_emb_tensor = self.extra_embs_dec_input(torch.tensor([self.aa2ind_extra[r] for r in inp_extra_emb], device=self.device))
+            return torch.cat([torch.cat(input_tensor, dim=0), extra_emb_tensor], dim=1)
         return torch.cat(input_tensor, dim=0)
 
     def oh_forward(self, seqs):
@@ -190,10 +206,11 @@ class TransformerModel(nn.Module):
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
                  version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False,
                  tuned_bert_embs_prefix="", tuning_bert=False,train_only_decoder=False, add_bert_pe_from_dec_to_bert_out=False,
-                 concat_pos_enc=False, pe_extra_dims=64):
+                 concat_pos_enc=False, pe_extra_dims=64,residue_emb_extra_dims=0):
         super().__init__()
         self.bert_pe_for_decoder = False
         self.pe_extra_dims = pe_extra_dims
+        self.residue_emb_extra_dims = residue_emb_extra_dims
         self.concat_pos_enc = concat_pos_enc
         self.add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out
         self.train_only_decoder = train_only_decoder
@@ -206,7 +223,7 @@ class TransformerModel(nn.Module):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.pos_encoder = PositionalEncoding(d_model, dropout=dropout if input_drop else 0, no_pos_enc=no_pos_enc,
                                               linear_pos_enc=linear_pos_enc, concat_pos_enc=concat_pos_enc,pe_extra_dims=pe_extra_dims)
-        self.transformer = Transformer(d_model=d_hid + pe_extra_dims if concat_pos_enc else d_hid,
+        self.transformer = Transformer(d_model=d_hid + pe_extra_dims  + residue_emb_extra_dims if concat_pos_enc else d_hid + residue_emb_extra_dims,
                                        nhead=nhead,
                                        num_encoder_layers=nlayers,
                                        num_decoder_layers=nlayers,
@@ -217,11 +234,12 @@ class TransformerModel(nn.Module):
         self.input_encoder = InputEmbeddingEncoder(partitions=[0, 1, 2], data_folder=data_folder, lg2ind=lg2ind,
                                                    use_glbl_lbls=use_glbl_lbls, aa2ind=aa2ind, glbl_lbl_version=glbl_lbl_version,
                                                    form_sp_reg_data=form_sp_reg_data,
-                                                   tuned_bert_embs_prefix=tuned_bert_embs_prefix, tuning_bert=tuning_bert)
+                                                   tuned_bert_embs_prefix=tuned_bert_embs_prefix, tuning_bert=tuning_bert,
+                                                   residue_emb_extra_dims=residue_emb_extra_dims)
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
-        self.label_encoder = TokenEmbedding(ntoken, d_hid, lbl2ind=lbl2ind)
+        self.label_encoder = TokenEmbedding(ntoken, d_hid + residue_emb_extra_dims, lbl2ind=lbl2ind)
         self.d_model = d_model
-        self.generator = nn.Linear(d_model + pe_extra_dims if concat_pos_enc else d_model, ntoken).to(self.device)
+        self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims if concat_pos_enc else d_model, ntoken).to(self.device)
         self.use_glbl_lbls = use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
         if self.form_sp_reg_data and not use_glbl_lbls:

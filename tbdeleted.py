@@ -21,9 +21,25 @@ for l in lines.readlines():
           mccs2.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
      elif "mcc was worse " in l:
           mccs2.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
-plt.plot(a, label=' folds 1,2 2-layered;')
-plt.plot(mccs,label='folds 1,2 2-layered; using lg')
+mccs3 = []
+lines = open("cnn2_4resnets_1_2.log", "rt")
+for l in lines.readlines():
+     if  " model with avg mcc " in l:
+          mccs3.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
+     elif "mcc was worse " in l:
+          mccs3.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
+mccs4 = []
+lines = open("cnn2_4resnets_tune_bert_1_2.log", "rt")
+for l in lines.readlines():
+     if  " model with avg mcc " in l:
+          mccs4.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
+     elif "mcc was worse " in l:
+          mccs4.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
+# plt.plot(a, label=' folds 1,2 2-layered;')
+# plt.plot(mccs,label='folds 1,2 2-layered; using lg')
 plt.plot(mccs2,label='folds 1,2 4-layered; tuning bert from ep3')
+plt.plot(mccs3,label='folds 1 2 cnn2 4 layered FNNs;')
+plt.plot(mccs4,label='folds 1 2 cnn2 4 layered FNNs; tuning bert')
 plt.grid(axis='y', alpha=0.4, linewidth=0.4, color='black')
 plt.legend()
 
@@ -47,9 +63,25 @@ for l in lines.readlines():
           mccs2.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
      elif "mcc was worse " in l:
           mccs2.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
-plt.plot(a, label=' folds 1,1 2-layered;')
-plt.plot(mccs,label='folds 0,1 2-layered; using lg')
+mccs3 = []
+lines = open("cnn2_4resnets_0_1.log", "rt")
+for l in lines.readlines():
+     if  " model with avg mcc " in l:
+          mccs3.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
+     elif "mcc was worse " in l:
+          mccs3.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
+mccs4 = []
+lines = open("cnn2_4resnets_tune_bert_0_1.log", "rt")
+for l in lines.readlines():
+     if  " model with avg mcc " in l:
+          mccs4.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
+     elif "mcc was worse " in l:
+          mccs4.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
+# plt.plot(a, label=' folds 1,1 2-layered;')
+# plt.plot(mccs,label='folds 0,1 2-layered; using lg')
 plt.plot(mccs2,label='folds 0,1 4-layered; tuning bert from ep3')
+plt.plot(mccs3,label='folds 0 1 cnn2 4 layered FNNs;')
+plt.plot(mccs4,label='folds 0 1 cnn2 4 layered FNNs; tuning bert')
 plt.grid(axis='y', alpha=0.4, linewidth=0.4, color='black')
 plt.legend()
 
@@ -74,9 +106,26 @@ for l in lines.readlines():
           mccs2.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
      elif "mcc was worse " in l:
           mccs2.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
-plt.plot(a, label=' folds 0,2 2-layered;')
-plt.plot(mccs, label=' folds 0,2 2-layered; using lg')
-plt.plot(mccs2,label='folds 0,2 4-layered; tuning bert from ep3')
+mccs3 = []
+lines = open("cnn2_4resnets_0_2.log", "rt")
+for l in lines.readlines():
+     if  " model with avg mcc " in l:
+          mccs3.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
+     elif "mcc was worse " in l:
+          mccs3.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
+mccs4 = []
+lines = open("cnn2_4resnets_tune_bert_0_2.log", "rt")
+for l in lines.readlines():
+     if  " model with avg mcc " in l:
+          mccs4.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
+     elif "mcc was worse " in l:
+          mccs4.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
+# plt.plot(a, label='folds 0,2 2-layered;')
+# plt.plot(mccs, label=' folds 0,2 2-layered; using lg')
+# plt.plot(mccs2,label='folds 0,2 4-layered; tuning bert from ep3')
+plt.plot(mccs3,label='folds 0,2 4-layered FNNs;')
+plt.plot(mccs4,label='folds 0 2 cnn2 4 layered FNNs; tuning bert')
+
 
 plt.grid(axis='y', alpha=0.4, linewidth=0.4, color='black')
 plt.legend()

@@ -132,7 +132,8 @@ def parse_arguments():
     parser.add_argument("--is_cnn4", default=False, action="store_true", help="Use new cnn4 architecture")
     parser.add_argument("--use_sgd_on_swa", default=False, action="store_true", help="Use sgd on swa for sp type classifier")
     parser.add_argument("--swa_start", default=30,type=int, help="Epoch at wich you load best mdl and start swa")
-    parser.add_argument("--og_emb_dim", default=30,type=int, help="Epoch at wich you load best mdl and start swa")
+    parser.add_argument("--og_emb_dim", default=32,type=int, help="Epoch at wich you load best mdl and start swa")
+    parser.add_argument("--residue_emb_extra_dims", default=32,type=int, help="Epoch at wich you load best mdl and start swa")
 
     return parser.parse_args()
 
@@ -276,7 +277,8 @@ if __name__ == "__main__":
                                 anneal_epochs=args.anneal_epochs,annealed_lr=args.annealed_lr, bert_pe_for_decoder=args.bert_pe_for_decoder,
                                 frozen_pe_epochs=args.frozen_pe_epochs,no_bert_pe_training=args.no_bert_pe_training,
                                 add_bert_pe_from_dec_to_bert_out=args.add_bert_pe_from_dec_to_bert_out, concat_pos_enc=args.concat_pos_enc,
-                                pe_extra_dims=args.pe_extra_dims,lipbobox_predictions=args.lipbobox_predictions,test_sptype_preds=args.test_sptype_preds)
+                                pe_extra_dims=args.pe_extra_dims,lipbobox_predictions=args.lipbobox_predictions,test_sptype_preds=args.test_sptype_preds,
+                                residue_emb_extra_dims=args.residue_emb_extra_dims)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
