@@ -6,8 +6,6 @@ a = [0.8074965219240372,0.8865215073007242,0.9091850452264456,0.9088374289196987
 0.9168240691887748,0.9492235753079931,0.9236078362869672,0.9177806951543195,0.9192153045105886,0.9186676528817626,0.9045496656658949,0.9217293379879238,0.9174665921715941,0.933878653054991,
      0.9151773390242604,0.9169528497469548,0.9002444133116327,0.9078267920776469,0.9061190494205726]
 
-plt.plot(a)
-plt.grid(axis='y', alpha=0.4, linewidth=0.4, color='black')
 
 lines = open("bert_tuning_crct_swa_1_2.log", "rt")
 mccs = []
@@ -16,7 +14,19 @@ for l in lines.readlines():
           mccs.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
      elif "mcc was worse " in l:
           mccs.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
-plt.plot(mccs)
+lines = open("bert_tuning_deep_1_2.log", "rt")
+mccs2 = []
+for l in lines.readlines():
+     if  " model with avg mcc " in l:
+          mccs2.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
+     elif "mcc was worse " in l:
+          mccs2.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
+plt.plot(a, label=' folds 1,2 2-layered;')
+plt.plot(mccs,label='folds 1,2 2-layered; using lg')
+plt.plot(mccs2,label='folds 1,2 4-layered; tuning bert from ep3')
+plt.grid(axis='y', alpha=0.4, linewidth=0.4, color='black')
+plt.legend()
+
 plt.show()
 
 
@@ -30,9 +40,18 @@ for l in lines.readlines():
           mccs.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
      elif "mcc was worse " in l:
           mccs.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
-plt.plot(a)
-plt.plot(mccs)
+lines = open("bert_tuning_deep_0_1.log", "rt")
+mccs2 = []
+for l in lines.readlines():
+     if  " model with avg mcc " in l:
+          mccs2.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
+     elif "mcc was worse " in l:
+          mccs2.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
+plt.plot(a, label=' folds 1,1 2-layered;')
+plt.plot(mccs,label='folds 0,1 2-layered; using lg')
+plt.plot(mccs2,label='folds 0,1 4-layered; tuning bert from ep3')
 plt.grid(axis='y', alpha=0.4, linewidth=0.4, color='black')
+plt.legend()
 
 plt.show()
 
@@ -48,8 +67,17 @@ for l in lines.readlines():
           mccs.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
      elif "mcc was worse " in l:
           mccs.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
-plt.plot(a)
-plt.plot(mccs)
-plt.grid(axis='y', alpha=0.4, linewidth=0.4, color='black')
+lines = open("bert_tuning_deep_0_2.log", "rt")
+mccs2 = []
+for l in lines.readlines():
+     if  " model with avg mcc " in l:
+          mccs2.append(float(l.split(" model with avg mcc ")[1].split(" ")[0]))
+     elif "mcc was worse " in l:
+          mccs2.append(float(l.split("mcc was worse ")[1].split(" ")[0]))
+plt.plot(a, label=' folds 0,2 2-layered;')
+plt.plot(mccs, label=' folds 0,2 2-layered; using lg')
+plt.plot(mccs2,label='folds 0,2 4-layered; tuning bert from ep3')
 
+plt.grid(axis='y', alpha=0.4, linewidth=0.4, color='black')
+plt.legend()
 plt.show()

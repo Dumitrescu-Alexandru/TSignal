@@ -111,16 +111,17 @@ class ResBlock(nn.Module):
         return self.relu(x + x_)
 
 class CNN3(nn.Module):
-    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0,0],pool='sum',is_cnn2=False,deep_mdl=False, no_of_layers=4, cnn_resnets=4,
-                 add_additional_emb=True):
+    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum',is_cnn2=False,deep_mdl=False, no_of_layers=4, cnn_resnets=4,
+                 add_additional_emb=True, add_emb_dim=32):
         super(CNN3, self).__init__()
         aa_dict = pickle.load(open("sp6_dicts.bin", "rb"))
         aa_dict = {k:v for k,v in aa_dict[-1].items() if v not in ['ES','PD','BS']}
+        aa_dict['X'] = 20
         self.add_additional_emb = add_additional_emb
         self.deep_mdl=deep_mdl
-        self.residue_emb = EmbModule(aa_dict)
+        self.residue_emb = EmbModule(aa_dict, emb_dim=add_emb_dim)
 
-        input_size = input_size + 128 if add_additional_emb else input_size
+        input_size = input_size + add_emb_dim if add_additional_emb else input_size
         #filters=[120,100,80,60] # dimensionality of outputspace
         n_f = sum(filters)
         #lengths=[5,10,15,20] # original kernel sizes
