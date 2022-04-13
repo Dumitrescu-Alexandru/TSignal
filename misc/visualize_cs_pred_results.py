@@ -4458,7 +4458,7 @@ def rename():
         os.rename("tuning_bert_fixed_high_lr_swa_only_repeat2/"+n, "tuning_bert_fixed_high_lr_swa_only_repeat2/"+n.replace("cycle_lr_s","repeat2_fixed_high_lr_"))
 
 
-def compute_mcc_sp_only_mdls(mdl_name="bert_tuning_deep", folder="./"):
+def compute_mcc_sp_only_mdls(mdl_name="bert_tuning_crct_swa", folder="./"):
     # load_tuned_bert; bert_tuning; bert_tuning_deep, bert_tuning_crct_swa
     folds = [[0,1],[0,2],[1,2]]
     res_dict = {}
@@ -4513,8 +4513,8 @@ def compute_mcc_sp_only_mdls(mdl_name="bert_tuning_deep", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
-    plot_sp6_vs_tnmt_mcc()
     compute_mcc_sp_only_mdls()
+    plot_sp6_vs_tnmt_mcc()
     plot_perf_over_data_perc()
     extract_performance_over_tolerance()
     visualize_inp_gradients()

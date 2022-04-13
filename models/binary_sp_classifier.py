@@ -100,9 +100,16 @@ class ResBlock(nn.Module):
         return self.relu(x + x_)
 
 class CNN3(nn.Module):
-    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0,0],pool='sum',is_cnn2=False,deep_mdl=False, no_of_layers=4, cnn_resnets=4):
+    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0,0],pool='sum',is_cnn2=False,deep_mdl=False, no_of_layers=4, cnn_resnets=4,
+                 add_additional_emb=True):
         super(CNN3, self).__init__()
+        aa_dict = pickle.load(open("sp6_dicts.bin", "rb"))
+        aa_dict = {k:v for k,v in aa_dict[-1].items() if v not in ['ES','PD','BS']}
+        self.add_additional_emb = add_additional_emb
         self.deep_mdl=deep_mdl
+        self.residue_emb = AAEmbModule(aa_dict)
+
+        input_size = input_size + 128 if add_additional_emb else input_size
         #filters=[120,100,80,60] # dimensionality of outputspace
         n_f = sum(filters)
         #lengths=[5,10,15,20] # original kernel sizes
@@ -153,6 +160,10 @@ class CNN3(nn.Module):
         #print('0. SHAPE x',x.shape)
         # CNN part
         x = x.permute(0,2,1)
+        if self.add_additional_emb:
+            additional_imp = self.residue_emb(inp_seqs)
+            additional_imp = additional_imp.permute(1,2,0)
+            x = torch.cat([additional_imp, x], dim=1)
         xc = torch.cat((self.cnn1(x),self.cnn2(x),self.cnn3(x),self.cnn4(x)),dim=1)
         xc = self.bn(xc)
         xc = self.relu(xc)
@@ -243,7 +254,7 @@ class CNN4(nn.Module):
 
         res_layers = []
         if cnn_resnets != 0:
-            for i in range(4):
+            for i in range(2):
                 res_layers.append(ConvResBlock(256, 256, kernel_size=5))
             self.conv_res_layers1 = nn.Sequential(*res_layers)
         self.cnn_reduce3 = nn.Conv1d(256,256,kernel_size=5,padding=2, stride=1)
@@ -252,7 +263,7 @@ class CNN4(nn.Module):
 
         res_layers = []
         if cnn_resnets != 0:
-            for i in range(4):
+            for i in range(2):
                 res_layers.append(ConvResBlock(256, 256, kernel_size=3))
             self.conv_res_layers2 = nn.Sequential(*res_layers)
 

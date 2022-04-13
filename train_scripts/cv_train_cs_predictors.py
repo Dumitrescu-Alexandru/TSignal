@@ -1067,9 +1067,12 @@ def train_sp_type_predictor(args):
         if args.use_swa:
             dense_params = []
             other_params = []
+            additional_emb = []
             for n, p in model.classification_head.named_parameters():
                 if "dense_i" in n:
                     dense_params.append(p)
+                elif "residue_emb" in n:
+                    additional_emb.append(p)
                 else:
                     other_params.append(p)
             parameters = [
@@ -1078,10 +1081,13 @@ def train_sp_type_predictor(args):
                     "params": dense_params,
                     "lr": 0.0001
                 },
+                {"params": additional_emb, "lr":0.00001}
             ]
             # print(len(dense_params), len(other_params))
             classification_head_optimizer = optim.Adam(parameters,  lr=args.lr * 10 if args.high_lr
                                                                 else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            anneal_scheduler = SWALR(classification_head_optimizer, swa_lr=10**(-5), anneal_epochs=1, anneal_strategy='linear')
+
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
         else:
@@ -1116,7 +1122,7 @@ def train_sp_type_predictor(args):
     no_of_seqs_sp2 = np.array([1087, 516, 12])
     no_of_seqs_tat = np.array([313, 39, 13])
     no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
-    swa_start = 20
+    swa_start = 40
     swa_eps = 10
     while patience != 0:
         if args.use_swa and e >= swa_start:
@@ -1194,9 +1200,12 @@ def train_sp_type_predictor(args):
             model = load_model(args.run_name + "_best_eval.pth", tune_bert=True)
             dense_params = []
             other_params = []
+            additional_emb = []
             for n, p in model.classification_head.named_parameters():
                 if "dense_i" in n:
                     dense_params.append(p)
+                elif "residue_emb" in n:
+                    additional_emb.append(p)
                 else:
                     other_params.append(p)
             parameters = [
@@ -1205,6 +1214,7 @@ def train_sp_type_predictor(args):
                     "params": dense_params,
                     "lr": 0.0001
                 },
+                {"params": additional_emb, "lr":0.00001}
             ]
             if args.use_sgd_on_swa:
                 classification_head_optimizer = optim.SGD(parameters, lr=args.lr)
@@ -1220,6 +1230,10 @@ def train_sp_type_predictor(args):
                 dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                              batch_size=args.batch_size, shuffle=True,
                                                              num_workers=4, collate_fn=collate_fn)
+        if patience <= 10:
+            anneal_scheduler.step()
+            print("After 5 epochs without improvement, learning rate dropped to :"
+                  "LR:", optimizer[0].param_groups[0]['lr'], "LR_bert:", optimizer[1].param_groups[0]['lr'])
         if args.use_swa and e  >= swa_start:
             print("Saving swa model on epoch {}".format(e))
             logging.info("Saving swa model on epoch {}".format(e))
