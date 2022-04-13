@@ -1,7 +1,18 @@
+import os
 import pickle
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
+
+
+def get_data_folder():
+    if os.path.exists("/scratch/work/dumitra1"):
+        return "/scratch/work/dumitra1/sp_data/"
+    elif os.path.exists("/home/alex"):
+        return "sp_data/"
+    else:
+        return "/scratch/project2003818/dumitra1/sp_data/"
+
 
 class BinarySPClassifier(nn.Module):
     def __init__(self, input_size, output_size, classarray=False, filters=[120, 100, 80, 60], lengths=[5, 9, 15, 21],
@@ -107,7 +118,7 @@ class CNN3(nn.Module):
         aa_dict = {k:v for k,v in aa_dict[-1].items() if v not in ['ES','PD','BS']}
         self.add_additional_emb = add_additional_emb
         self.deep_mdl=deep_mdl
-        self.residue_emb = AAEmbModule(aa_dict)
+        self.residue_emb = EmbModule(aa_dict)
 
         input_size = input_size + 128 if add_additional_emb else input_size
         #filters=[120,100,80,60] # dimensionality of outputspace
@@ -205,10 +216,16 @@ class CNN3(nn.Module):
 
         return x
 
-class AAEmbModule(nn.Module):
-    def __init__(self, aa_dict, emb_dim=128):
-        super(AAEmbModule, self).__init__()
-        self.emb = nn.Embedding(len(aa_dict.items()), emb_dim)
+class EmbModule(nn.Module):
+    def __init__(self, aa_dict, emb_dim=128, og=False):
+        super(EmbModule, self).__init__()
+        og_dict = {'EUKARYA':0, 'NEGATIVE':1, 'POSITIVE':2, 'ARCHAEA':3}
+        self.og = og
+        if og:
+            self.emb = nn.Embedding(len(og_dict.items()), emb_dim)
+        else:
+            self.emb = nn.Embedding(len(aa_dict.items()), emb_dim)
+
         self.aa_dict = aa_dict
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -216,25 +233,31 @@ class AAEmbModule(nn.Module):
         emb_seqs = []
         max_s_l = max([len(s_) for s_ in seqs])
         for s_ in seqs:
-            s_ = s_ + (max_s_l - len(s_))*"X"
-            input_indices = torch.tensor([self.aa_dict[c] for c in s_]).to(self.device)
-            emb_seqs.append(self.emb(input_indices))
+            if self.og:
+                og_emb = self.emb(self.aa_dict[s_].reshape(-1,1).repeat(1,max_s_l))
+                emb_seqs.append(og_emb)
+            else:
+                s_ = s_ + (max_s_l - len(s_))*"X"
+                input_indices = torch.tensor([self.aa_dict[c] for c in s_]).to(self.device)
+                emb_seqs.append(self.emb(input_indices))
         return torch.nn.utils.rnn.pad_sequence(emb_seqs)
 
 
 class CNN4(nn.Module):
     def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0,0],pool='avg',is_cnn2=False,deep_mdl=False, no_of_layers=4, cnn_resnets=4,
-                 add_additional_emb=True, add_emb_dim=32):
+                 add_additional_emb=True, add_emb_dim=32, og_emb_dim=32):
         super(CNN4, self).__init__()
+        self.form_lg_dict()
         aa_dict = pickle.load(open("sp6_dicts.bin", "rb"))
         aa_dict = {k:v for k,v in aa_dict[-1].items() if k not in ['ES','PD','BS']}
         aa_dict['X']= 20
         self.add_additional_emb = add_additional_emb
-        input_size = input_size + add_emb_dim if add_additional_emb else input_size
-        self.residue_emb = AAEmbModule(aa_dict, emb_dim=add_emb_dim)
+        input_size = input_size + add_emb_dim + og_emb_dim if add_additional_emb else input_size
+        self.residue_emb = EmbModule(aa_dict, emb_dim=add_emb_dim)
+        self.og_emb = EmbModule(aa_dict, emb_dim=og_emb_dim) if og_emb_dim != 0 else None
         pool = 'max'
         self.deep_mdl=deep_mdl
-        if pool=='sum':
+        if pool=='max':
             self.pool = nn.AdaptiveMaxPool1d(1)
         else: # pool=='avg'
             self.pool = nn.AdaptiveAvgPool1d(1)
@@ -280,6 +303,10 @@ class CNN4(nn.Module):
             additional_imp = self.residue_emb(inp_seqs)
             additional_imp = additional_imp.permute(1,2,0)
             x = torch.cat([additional_imp, x], dim=1)
+        if self.og_emb is not None:
+            additional_imp = self.og_emb(inp_seqs)
+            additional_imp = additional_imp.permute(1, 2, 0)
+            x = torch.cat([additional_imp, x], dim=1)
         x = self.reduce_pool_1(self.relu(self.bn1(self.cnn_reduce1(x))))
         x = self.reduce_pool_2(self.relu(self.bn2(self.cnn_reduce2(x))))
         x = self.conv_res_layers1(x)
@@ -288,5 +315,16 @@ class CNN4(nn.Module):
         x = self.pool(x)
         x = torch.squeeze(x,dim=2)
         return self.dense(x)
+
+    def form_lg_dict(self):
+        folder = get_data_folder()
+        seq2og = {}
+        for tr_f in [0,1,2]:
+            for t in ['train','test']:
+                data = pickle.load(open(folder+"sp6_partitioned_data_sublbls_{}_{}.bin".format(t,tr_f),"rb"))
+                current_seq2og = {seq: v[-2] for seq, v in data.items()}
+                seq2og.update(current_seq2og)
+        self.seq2og = seq2og
+
 
 

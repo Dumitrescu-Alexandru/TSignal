@@ -1071,7 +1071,7 @@ def train_sp_type_predictor(args):
             for n, p in model.classification_head.named_parameters():
                 if "dense_i" in n:
                     dense_params.append(p)
-                elif "residue_emb" in n:
+                elif "residue_emb" in n or "og_emb" in n:
                     additional_emb.append(p)
                 else:
                     other_params.append(p)

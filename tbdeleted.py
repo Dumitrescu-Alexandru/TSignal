@@ -1,35 +1,11 @@
-import numpy as np
 import matplotlib.pyplot as plt
-import torch.nn
-from torch.optim.lr_scheduler import ExponentialLR, StepLR
-from torch.optim import Adam
-from ignite.handlers.param_scheduler import create_lr_scheduler_with_warmup
-model = torch.nn.Linear(10, 10)
-opt = Adam(model.parameters(), lr=0.0001)
-torch_lr_scheduler = ExponentialLR(optimizer=opt, gamma=0.98)
-# gamma ^ 10 = 10
-lr1, lr2 = ExponentialLR(opt, gamma =0.98), ExponentialLR(opt, gamma=10 ** (1/10))
-for i in range(20):
-    if i < 10:
-        lr2.step()
-    else:
-        lr1.step()
-    print("LR:", opt.param_groups[0]['lr'],)
-exit(1)
+a = [0.8074965219240372,0.8865215073007242,0.9091850452264456,0.9088374289196987,0.894618684406757,0.9105673610440674,0.9071865072447365,0.9029764980218454,0.9034963665307598,0.9036840683049597,
+0.9054497794747358,0.9023446857138531,0.8998382949547479,0.9022186727543066,0.9169891941418591,0.8986603593483089,0.9030613672072456,0.9092818863431541,0.8823337401694279,0.8932541136879946,
+0.9068168115117631,0.9172719838403369,0.9063772401260725,0.9191942169890764,0.9307160430435614,0.9258975524148231,0.9211883374541404,0.917346986158996,0.8867831203130588,0.9193845920120217,
+0.9072606254109385,0.9020072417625522,0.9103189381292363,0.9065674714097618,0.8910398489237374,0.9195794281449907,0.939356743127283,0.8809910828970057,0.9008591278399948,0.9101360741992974,
+0.9168240691887748,0.9492235753079931,0.9236078362869672,0.9177806951543195,0.9192153045105886,0.9186676528817626,0.9045496656658949,0.9217293379879238,0.9174665921715941,0.933878653054991,
+     0.9151773390242604,0.9169528497469548,0.9002444133116327,0.9078267920776469,0.9061190494205726]
 
-lr_values = [None] * 100
-warmup_sched = StepLR()
-scheduler = create_lr_scheduler_with_warmup(torch_lr_scheduler,
-                                            warmup_start_value=0.00001,
-                                            warmup_end_value=0.0001,
-                                            warmup_duration=10,
-                                            output_simulated_values=lr_values)
-lr_values = np.array(lr_values)
-for i in range(20):
-    scheduler(opt)
-    print("\n\nLR:", opt.param_groups[0]['lr'], "\n\n")
-
-# Plot simulated values
-plt.plot(lr_values[:, 0], lr_values[:, 1], label="learning rate")
+plt.plot(a)
+plt.grid(axis='y', alpha=0.4, linewidth=0.4, color='black')
 plt.show()
-# Attach to the trainer

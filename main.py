@@ -235,6 +235,8 @@ if __name__ == "__main__":
     if args.test_seqs:
         test_seqs_w_pretrained_mdl(args.test_mdl, args.test_seqs, tune_bert=args.tune_bert, saliency_map_save_fn=args.saliency_map_save_fn,hook_layer=args.hook_layer, compute_saliency=args.compute_saliency)
     elif args.train_sp_type_predictor:
+        logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
+
         args2 = parse_arguments()
         train_sp_type_predictor(args2)
     elif args.train_cs_predictor:
