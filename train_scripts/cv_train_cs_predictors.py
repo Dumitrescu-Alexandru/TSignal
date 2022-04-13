@@ -1189,7 +1189,7 @@ def train_sp_type_predictor(args):
             best_avg_mcc = avg_mcc
             if args.use_swa and e < swa_start or not args.use_swa:
                 save_model(model, model_name=args.run_name, tune_bert=True)
-            patience=20
+            patience= args.patience
         else:
             print("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
             logging.info("On epoch {} average mcc was worse {} compared to best {}".format(e,avg_mcc, best_avg_mcc))
@@ -1230,10 +1230,10 @@ def train_sp_type_predictor(args):
                 dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                              batch_size=args.batch_size, shuffle=True,
                                                              num_workers=4, collate_fn=collate_fn)
-        if patience <= 10:
-            anneal_scheduler.step()
-            print("After 5 epochs without improvement, learning rate dropped to :"
-                  "LR:", optimizer[0].param_groups[0]['lr'], "LR_bert:", optimizer[1].param_groups[0]['lr'])
+        # if patience <= 10:
+        #     anneal_scheduler.step()
+        #     print("After 5 epochs without improvement, learning rate dropped to :"
+        #           "LR:", optimizer[0].param_groups[0]['lr'], "LR_bert:", optimizer[1].param_groups[0]['lr'])
         if args.use_swa and e  >= swa_start:
             print("Saving swa model on epoch {}".format(e))
             logging.info("Saving swa model on epoch {}".format(e))
