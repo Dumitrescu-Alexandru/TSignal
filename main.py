@@ -132,6 +132,7 @@ def parse_arguments():
     parser.add_argument("--is_cnn4", default=False, action="store_true", help="Use new cnn4 architecture")
     parser.add_argument("--use_sgd_on_swa", default=False, action="store_true", help="Use sgd on swa for sp type classifier")
     parser.add_argument("--swa_start", default=30,type=int, help="Epoch at wich you load best mdl and start swa")
+    parser.add_argument("--og_emb_dim", default=30,type=int, help="Epoch at wich you load best mdl and start swa")
 
     return parser.parse_args()
 

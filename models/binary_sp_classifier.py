@@ -280,7 +280,7 @@ class CNN4(nn.Module):
 
         res_layers = []
         if cnn_resnets != 0:
-            for i in range(2):
+            for i in range(cnn_resnets):
                 res_layers.append(ConvResBlock(256, 256, kernel_size=5))
             self.conv_res_layers1 = nn.Sequential(*res_layers)
         self.cnn_reduce3 = nn.Conv1d(256,256,kernel_size=5,padding=2, stride=1)
@@ -289,7 +289,7 @@ class CNN4(nn.Module):
 
         res_layers = []
         if cnn_resnets != 0:
-            for i in range(2):
+            for i in range(cnn_resnets):
                 res_layers.append(ConvResBlock(256, 256, kernel_size=3))
             self.conv_res_layers2 = nn.Sequential(*res_layers)
 
