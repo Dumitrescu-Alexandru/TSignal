@@ -1238,7 +1238,7 @@ def train_sp_type_predictor(args):
             print("Saving swa model on epoch {}".format(e))
             logging.info("Saving swa model on epoch {}".format(e))
             swa_eps -= 1
-            patience = 20
+            patience = args.patience
             save_model(swa_model.module, model_name=args.run_name, tune_bert=True)
         if swa_eps <= 0:
             patience = 0

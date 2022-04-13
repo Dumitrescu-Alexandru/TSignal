@@ -208,13 +208,15 @@ class CNN3(nn.Module):
 class AAEmbModule(nn.Module):
     def __init__(self, aa_dict, emb_dim=128):
         super(AAEmbModule, self).__init__()
-        self.emb = nn.Embedding(len(aa_dict.items()), 128)
+        self.emb = nn.Embedding(len(aa_dict.items()), emb_dim)
         self.aa_dict = aa_dict
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     def forward(self, seqs):
         emb_seqs = []
+        max_s_l = max([len(s_) for s_ in seqs])
         for s_ in seqs:
+            s_ = s_ + (max_s_l - len(s_))*"X"
             input_indices = torch.tensor([self.aa_dict[c] for c in s_]).to(self.device)
             emb_seqs.append(self.emb(input_indices))
         return torch.nn.utils.rnn.pad_sequence(emb_seqs)
@@ -222,14 +224,15 @@ class AAEmbModule(nn.Module):
 
 class CNN4(nn.Module):
     def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0,0],pool='avg',is_cnn2=False,deep_mdl=False, no_of_layers=4, cnn_resnets=4,
-                 add_additional_emb=True):
+                 add_additional_emb=True, add_emb_dim=32):
         super(CNN4, self).__init__()
         aa_dict = pickle.load(open("sp6_dicts.bin", "rb"))
-        aa_dict = {k:v for k,v in aa_dict[-1].items() if v not in ['ES','PD','BS']}
+        aa_dict = {k:v for k,v in aa_dict[-1].items() if k not in ['ES','PD','BS']}
+        aa_dict['X']= 20
         self.add_additional_emb = add_additional_emb
-        input_size = input_size + 128 if add_additional_emb else input_size
-        self.residue_emb = AAEmbModule(aa_dict)
-        pool = 'avg'
+        input_size = input_size + add_emb_dim if add_additional_emb else input_size
+        self.residue_emb = AAEmbModule(aa_dict, emb_dim=add_emb_dim)
+        pool = 'max'
         self.deep_mdl=deep_mdl
         if pool=='sum':
             self.pool = nn.AdaptiveMaxPool1d(1)
