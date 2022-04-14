@@ -221,6 +221,7 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, retu
         #             p = "I" * len(p)
         #         else:
         #             p = new_res
+
         # elif ind2sptype[sptype_preds[s]] == "TATLIPO" and s[p.rfind("L") + 1] != "C":
         #     sptype_preds[s] = sptype2ind["NO_SP"]
         # if ind2sptype[sptype_preds[s]] == "LIPO" and s[t.rfind("L")+1] != "C":
@@ -2628,6 +2629,8 @@ def plot_sp6_vs_tnmt_mcc():
 
     runs = [32,34,37, 39,40, 47]
     runs = [32]
+    runs = [51]
+    # runs = [47]
 
 
     mcc_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"], return_mcc=True)
@@ -4458,8 +4461,8 @@ def rename():
         os.rename("tuning_bert_fixed_high_lr_swa_only_repeat2/"+n, "tuning_bert_fixed_high_lr_swa_only_repeat2/"+n.replace("cycle_lr_s","repeat2_fixed_high_lr_"))
 
 
-def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets", folder="./"):
-    # load_tuned_bert; bert_tuning; bert_tuning_deep, bert_tuning_crct_swa; cnn2_4resnets
+def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
+    # load_tuned_bert; bert_tuning; bert_tuning_deep, bert_tuning_crct_swa; cnn2_4resnets;cnn2_4resnets_tune_bert_
     folds = [[0,1],[0,2],[1,2]]
     res_dict = {}
     from Bio import SeqIO
@@ -4513,13 +4516,13 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
-    compute_mcc_sp_only_mdls()
-    plot_sp6_vs_tnmt_mcc()
-    plot_perf_over_data_perc()
-    extract_performance_over_tolerance()
-    visualize_inp_gradients()
-    plot_sp6_vs_tnmt()
-    plot_comparative_performance_sp1_mdls()
+    # plot_sp6_vs_tnmt_mcc()
+    # compute_mcc_sp_only_mdls()
+    # plot_perf_over_data_perc()
+    # extract_performance_over_tolerance()
+    # visualize_inp_gradients()
+    # plot_sp6_vs_tnmt()
+    # plot_comparative_performance_sp1_mdls()
     # exit(1)
     #
     # mdl2results = extract_all_param_results(only_cs_position=False,
@@ -4577,6 +4580,27 @@ if __name__ == "__main__":
     #                                         benchmark=True)
     # exit(1)
     #
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat52/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+
+    # 128 pe extra dims; 32 additional emb dims; anneal_start anneal_eps 20/20
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat51/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+    # 128 pe extra dims; 32 additional emb dims; anneal_start anneal_eps 20/20
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat50/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat49/",
                                             compare_mdl_plots=False,
