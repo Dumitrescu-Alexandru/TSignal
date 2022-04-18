@@ -215,12 +215,15 @@ def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, retu
         lg, sp_info = l.split("|")
         # if ind2sptype[sptype_preds[s]] == "LIPO" and s[p.rfind("L") + 1] != "C":
         #     if "C" in s[p.rfind("L")-3:p.rfind("L")+3]:
-        #         new_res = reassign_cs(s,p)
-        #         if new_res == -1:
-        #             sptype_preds[s] = sptype2ind["NO_SP"]
-        #             p = "I" * len(p)
-        #         else:
-        #             p = new_res
+        #         print(p)
+        #         print(t)
+        #         print(s)
+                # new_res = reassign_cs(s,p)
+                # if new_res == -1:
+                #     sptype_preds[s] = sptype2ind["NO_SP"]
+                #     p = "I" * len(p)
+                # else:
+                #     p = new_res
 
         # elif ind2sptype[sptype_preds[s]] == "TATLIPO" and s[p.rfind("L") + 1] != "C":
         #     sptype_preds[s] = sptype2ind["NO_SP"]
@@ -2628,8 +2631,8 @@ def plot_sp6_vs_tnmt_mcc():
     runs = [42, 45]
 
     runs = [32,34,37, 39,40, 47]
-    runs = [32]
-    runs = [51]
+    # runs = [32]
+    # runs = [51]
     # runs = [47]
 
 
@@ -2711,11 +2714,15 @@ def plot_sp6_vs_tnmt_mcc():
     total_mcc1_sp6 = (sum(sp6_mcc1_sp1 * no_of_seqs_sp1) + sum(sp6_mcc1_sp2 * no_of_seqs_sp2) + sum(sp6_mcc1_tat * no_of_seqs_tat))/no_of_tested_sp_seqs
     total_mcc2 = (sum(mean_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(mean_mcc2_sp2 * no_of_seqs_sp2) + sum(mean_mcc2_tat * no_of_seqs_tat))/(no_of_tested_sp_seqs-2040)
     total_mcc2_sp6 =  (sum(sp6_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(sp6_mcc2_sp2 * no_of_seqs_sp2) + sum(sp6_mcc2_tat * no_of_seqs_tat))/(no_of_tested_sp_seqs-2040)
+    total_mcc1_std = (sum(std_mcc1_sp1 * no_of_seqs_sp1) + sum(std_mcc1_sp2 * no_of_seqs_sp2) + sum(
+        std_mcc1_tat * no_of_seqs_tat)) / (no_of_tested_sp_seqs-2040)
+    total_mcc2_std = (sum(std_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(std_mcc2_sp2 * no_of_seqs_sp2) + sum(
+        std_mcc2_tat * no_of_seqs_tat)) / (no_of_tested_sp_seqs-2040)
 
     print("non-w average sp6:",(np.mean(sp6_mcc1_sp1)+np.mean(sp6_mcc1_sp2) + np.mean(sp6_mcc1_tat) + np.mean(sp6_mcc2_sp1)+np.mean(sp6_mcc2_sp2) + np.mean(sp6_mcc2_tat))/6)
     print("non-w average tsignal:",(np.mean(mean_mcc1_sp1)+np.mean(mean_mcc2_sp1) + np.mean(mean_mcc1_sp2) + np.mean(mean_mcc2_sp2)+np.mean(mean_mcc1_tat) + np.mean(mean_mcc2_tat))/6)
-    print("mcc1 w average sp6/tsignal:",total_mcc1_sp6,total_mcc1)
-    print("mcc2 w average sp6/tsignal:",total_mcc2_sp6,total_mcc2)
+    print("mcc1 w average sp6/tsignal:",total_mcc1_sp6,total_mcc1,"+/-", total_mcc1_std)
+    print("mcc2 w average sp6/tsignal:",total_mcc2_sp6,total_mcc2,"+/-", total_mcc2_std)
     # print("non-w average tsignal:",(np.mean(mean_mcc1_sp1)+np.mean(mean_mcc2_sp1) + np.mean(mean_mcc1_sp2) + np.mean(mean_mcc2_sp2)+np.mean(mean_mcc1_tat) + np.mean(mean_mcc2_tat))/6)
     bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,mcc_deepsig,mcc_predTat,mcc_lipop,mcc_phobius)
     exit(1)
@@ -4580,6 +4587,12 @@ if __name__ == "__main__":
     #                                         benchmark=True)
     # exit(1)
     #
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat53/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat52/",
                                             compare_mdl_plots=False,

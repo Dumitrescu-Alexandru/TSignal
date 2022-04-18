@@ -5,8 +5,8 @@ with open("tbdeteled.txt", "rt") as f:
 aa2blosum = {}
 for l in lines:
      l = l.replace("\n", "")
-     aa2blosum[l[0]] = [int(i) for i in re.sub('\s+',' ',l[2:]).split(" ")]
-print(aa2blosum)
+     aa2blosum[l[0]] = [float(i) * 0.05 for i in re.sub('\s+',' ',l[2:]).split(" ")]
+# mean over all residue representations over the STD(0.0523, dim=0)
 pickle.dump(aa2blosum,open("blusum_m.bin", "wb"))
 exit(1)
 import matplotlib.pyplot as plt

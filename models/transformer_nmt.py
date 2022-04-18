@@ -126,6 +126,10 @@ class InputEmbeddingEncoder(nn.Module):
             if self.use_blosum:
                 inp_extra_emb = inp_seqs if not self.use_lg else inp_seqs + "X"
                 extra_emb_tensor = torch.cat([ torch.tensor([self.extra_embs_dec_input[r] for r in inp_extra_emb], device=self.device,dtype=torch.float32) ])
+                # print("mean inp", torch.mean(torch.cat(input_tensor, dim=0), dim=0))
+                # print("std inp", torch.mean(torch.std(torch.cat(input_tensor, dim=0), dim=0)))
+                # print("mean extra emb", torch.mean(extra_emb_tensor, dim=0))
+                # print("std extra emb", torch.mean(torch.std(extra_emb_tensor, dim=0)))
                 return torch.cat([torch.cat(input_tensor, dim=0), extra_emb_tensor], dim=1)
             else:
                 inp_extra_emb = inp_seqs if not self.use_lg else inp_seqs + "X"
@@ -442,10 +446,13 @@ class PositionalEncoding(nn.Module):
                 x = self.dropout(x + pe_)
             else:
                 if self.concat_pos_enc:
-                    pe_ = self.pe[:x.size(0)]
+                    pe_ = self.pe[:x.size(0)] #* 0.1
                     # print(pe_, pe_.shape,x.shape,pe_.repeat(1,x.size(1),1).shape)
                     # print(.shape)
                     # exit(1)
+                    # variance of the pe is about 10 times higher than BERT embs. Maybe getting all variances in line
+                    # is good (multiply vectors with 0.1)
+                    # print(torch.mean(torch.std(pe_, dim=2)))
                     x = torch.cat([x, pe_.repeat(1,x.size(1),1)],dim=-1)
                 else:
                     x = self.dropout(x + self.pe[:x.size(0)])
