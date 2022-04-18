@@ -61,6 +61,7 @@ class InputEmbeddingEncoder(nn.Module):
                 aa_dict = {k: v for k, v in aa_dict[-1].items() if v not in ['ES', 'PD', 'BS']}
                 aa_dict['X'] = 20
                 self.aa2ind_extra = aa_dict
+                self.extra_emb_layer_norm = nn.LayerNorm(residue_emb_extra_dims)
         else:
             self.extra_embs_dec_input = None
 
@@ -133,7 +134,8 @@ class InputEmbeddingEncoder(nn.Module):
                 return torch.cat([torch.cat(input_tensor, dim=0), extra_emb_tensor], dim=1)
             else:
                 inp_extra_emb = inp_seqs if not self.use_lg else inp_seqs + "X"
-                extra_emb_tensor = self.extra_embs_dec_input(torch.tensor([self.aa2ind_extra[r] for r in inp_extra_emb], device=self.device))
+                extra_emb_tensor = self.extra_emb_layer_norm(self.extra_embs_dec_input(torch.tensor([self.aa2ind_extra[r] for r in inp_extra_emb], device=self.device)))
+                # extra_emb_tensor = self.extra_embs_dec_input(torch.tensor([self.aa2ind_extra[r] for r in inp_extra_emb], device=self.device))
                 return torch.cat([torch.cat(input_tensor, dim=0), extra_emb_tensor], dim=1)
         return torch.cat(input_tensor, dim=0)
 
@@ -222,7 +224,8 @@ class TransformerModel(nn.Module):
                  tuned_bert_embs_prefix="", tuning_bert=False,train_only_decoder=False, add_bert_pe_from_dec_to_bert_out=False,
                  concat_pos_enc=False, pe_extra_dims=64,residue_emb_extra_dims=0, use_blosum=False):
         super().__init__()
-        use_blosum = True
+        # use_blosum = True
+        use_blosum = False
 
         if use_blosum:
             residue_emb_extra_dims = 32

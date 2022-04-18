@@ -1375,7 +1375,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 {"params": other_params},
                 {
                     "params": additional_emb,
-                    "lr": 0.00001,
+                    "lr": lr,
                 },
             ]
             classification_head_optimizer = optim.Adam(parameters, lr=lr * 10 if high_lr
