@@ -1367,7 +1367,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             additional_emb = []
             other_params = []
             for n, p in model.classification_head.named_parameters():
-                if "extra_embs" in n:
+                if "extra_emb" in n:
                     additional_emb.append(p)
                 else:
                     other_params.append(p)
@@ -1712,7 +1712,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 additional_emb =[]
                 other_params = []
                 for n, p in model.classification_head.named_parameters():
-                    if "extra_embs" in n:
+                    if "extra_emb" in n:
                         additional_emb.append(p)
                     else:
                         other_params.append(p)
