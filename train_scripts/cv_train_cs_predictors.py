@@ -1375,7 +1375,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 {"params": other_params},
                 {
                     "params": additional_emb,
-                    "lr": lr,
+                    "lr": lr * 0.1,
                 },
             ]
             classification_head_optimizer = optim.Adam(parameters, lr=lr * 10 if high_lr
@@ -1709,8 +1709,20 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 model, optimizer_state_d = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
                                    tune_bert=tune_bert, opt=True if not reinint_swa_decoder else False)
             if type(optimizer) == list:
-                classification_head_optimizer = optim.Adam(model.classification_head.parameters(), lr=0.00001 * lr_multiplier_swa,
-                                                           eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
+                for n, p in model.classification_head.named_parameters():
+                    if "extra_embs_dec_input" in n:
+                        additional_emb.append(p)
+                    else:
+                        other_params.append(p)
+                parameters = [
+                    {"params": other_params},
+                    {
+                        "params": additional_emb,
+                        "lr": lr * 0.1,
+                    },
+                ]
+                classification_head_optimizer = optim.Adam(parameters,  lr=0.00001 * lr_multiplier_swa, eps=1e-9,
+                                                           weight_decay=wd, betas=(0.9, 0.98), )
                 bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(), lr=0.00001, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
                 if change_swa_decoder_optimizer:
                     classification_head_optimizer = optim.SGD(model.classification_head.parameters(), lr=0.0001)

@@ -87,9 +87,13 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         lg, sp_info = l.split("|")
         # if ind2glbl_lbl[sptype_preds[s]] == "LIPO" and s[p.rfind("L")+1]!="C":
-        #     sptype_preds[s] = glbllbl2_ind["NO_SP"]
-        #     print(glbllbl2_ind["NO_SP"], sptype2ind["NO_SP"], ind2glbl_lbl[sptype_preds[s]])
-        #     p = "I"*len(p)
+        #     print(p)
+        #     print(t)
+        #     print(s)
+        #     print("\n")
+            # sptype_preds[s] = glbllbl2_ind["NO_SP"]
+            # print(glbllbl2_ind["NO_SP"], sptype2ind["NO_SP"], ind2glbl_lbl[sptype_preds[s]])
+            # p = "I"*len(p)
         # elif ind2glbl_lbl[sptype_preds[s]] =="TATLIPO" and p.rfind("T") < len(s)-4 and s[p.rfind("T")+1]!="C":
         #     sptype_preds[s] = glbllbl2_ind["NO_SP"]
         #     p = "I"*len(p)
@@ -4538,7 +4542,7 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
-    plot_sp6_vs_tnmt_mcc()
+    # plot_sp6_vs_tnmt_mcc()
     # compute_mcc_sp_only_mdls()
     # plot_perf_over_data_perc()
     # extract_performance_over_tolerance()
@@ -4603,6 +4607,13 @@ if __name__ == "__main__":
     # exit(1)
     #
     # save here the rest of current run
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat55/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
+
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat54/",
                                             compare_mdl_plots=False,
