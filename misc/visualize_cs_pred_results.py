@@ -2653,6 +2653,8 @@ def plot_sp6_vs_tnmt_mcc():
     # runs = [51]
     # runs = [47]
     runs = [54]
+    runs = [56]
+    runs = [57]
 
 
     mcc_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"], return_mcc=True)
@@ -4542,7 +4544,7 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
-    # plot_sp6_vs_tnmt_mcc()
+    plot_sp6_vs_tnmt_mcc()
     # compute_mcc_sp_only_mdls()
     # plot_perf_over_data_perc()
     # extract_performance_over_tolerance()
@@ -4607,6 +4609,13 @@ if __name__ == "__main__":
     # exit(1)
     #
     # save here the rest of current run
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat56/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat55/",
                                             compare_mdl_plots=False,

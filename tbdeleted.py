@@ -1,3 +1,4 @@
+# PERSONALIZE (PCA); maybe use one-hot
 import pickle
 import re
 with open("tbdeteled.txt", "rt") as f:
