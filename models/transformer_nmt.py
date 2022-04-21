@@ -232,14 +232,25 @@ class TransformerModel(nn.Module):
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
                  version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False,
                  tuned_bert_embs_prefix="", tuning_bert=False,train_only_decoder=False, add_bert_pe_from_dec_to_bert_out=False,
-                 concat_pos_enc=False, pe_extra_dims=64,residue_emb_extra_dims=0, use_blosum=False,use_extra_oh=False):
+                 concat_pos_enc=False, pe_extra_dims=64,residue_emb_extra_dims=0, use_blosum=False,use_extra_oh=False,
+                 add_extra_embs2_generator=False):
         super().__init__()
         # use_blosum = True
         use_blosum = False
-        use_extra_oh = False
-
+        use_extra_oh = True
+        add_extra_embs2_generator = True
+        aa_dict = pickle.load(open("sp6_dicts.bin", "rb"))
+        aa_dict = {k: v for k, v in aa_dict[-1].items() if v not in ['ES', 'PD', 'BS']}
+        aa_dict['X'] = 20
+        self.aa2ind_extra = aa_dict
+        self.use_blosum = use_blosum
+        self.use_extra_oh = use_extra_oh
+        self.add_extra_embs2_generator = add_extra_embs2_generator
         if use_blosum or use_extra_oh:
             residue_emb_extra_dims = 32
+        if add_extra_embs2_generator:
+            self.generator_extra_dims = residue_emb_extra_dims
+            residue_emb_extra_dims = 0
         self.use_extra_oh = use_extra_oh
         self.bert_pe_for_decoder = False
         self.pe_extra_dims = pe_extra_dims
@@ -274,7 +285,10 @@ class TransformerModel(nn.Module):
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
         self.label_encoder = TokenEmbedding(ntoken, d_hid + residue_emb_extra_dims, lbl2ind=lbl2ind)
         self.d_model = d_model
-        self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims if concat_pos_enc else d_model + residue_emb_extra_dims, ntoken).to(self.device)
+        # self.generator = nn.Sequential(nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.generator_extra_dims
+        #                            if concat_pos_enc else d_model + residue_emb_extra_dims + self.generator_extra_dims, 512).to(self.device), nn.LayerNorm(512).to(self.device), nn.ReLU(),nn.Linear(512, ntoken).to(self.device))
+        self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.generator_extra_dims
+                                   if concat_pos_enc else d_model + residue_emb_extra_dims + self.generator_extra_dims, ntoken).to(self.device)
         self.use_glbl_lbls = use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
         if self.form_sp_reg_data and not use_glbl_lbls:
@@ -285,6 +299,9 @@ class TransformerModel(nn.Module):
             self.glbl_generator = CNN3(input_size=1024, output_size=no_glbl_lbls).to(self.device)
             # self.glbl_generator = BinarySPClassifier(input_size=1024, output_size=no_glbl_lbls).to(self.device)
 
+    def make_oh(self, seq):
+        inds = torch.tensor([self.aa2ind_extra[r_] for r_ in seq], device=self.device)
+        return torch.nn.functional.one_hot(inds, num_classes=32)
 
     def update_pe(self, pe, freeze_pe):
         # For now, we only add positional encoding to the decoder (not the encoder also), since the encoder (BERT)
@@ -333,6 +350,30 @@ class TransformerModel(nn.Module):
         padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
         return self.glbl_generator(padded_src_glbl.transpose(2, 1))
 
+    def get_extra_tensor(self, inp_seqs, outs):
+        extra_embs = []
+        if self.use_blosum and self.add_extra_embs2_generator:
+            for i_s in inp_seqs:
+                inp_extra_emb = i_s + "X" * (outs.shape[0] - len(i_s))
+                if outs.shape[0] < len(inp_extra_emb):
+                    # during inference, not all outs are present at once
+                    inp_extra_emb = inp_extra_emb[:outs.shape[0]]
+                extra_emb_tensor = torch.cat([torch.tensor([self.extra_embs_dec_input[r] for r in inp_extra_emb],
+                                                           device=self.device, dtype=torch.float32)])
+                extra_embs.append(extra_emb_tensor )
+        elif self.use_extra_oh and self.add_extra_embs2_generator:
+            for i_s in inp_seqs:
+                inp_extra_emb = i_s + "X" * (outs.shape[0] - len(i_s))
+                if outs.shape[0] < len(inp_extra_emb):
+                    # during inference, not all outs are present at once
+                    inp_extra_emb = inp_extra_emb[:outs.shape[0]]
+                extra_emb_tensor = self.make_oh(inp_extra_emb)
+                extra_embs.append(extra_emb_tensor )
+        extra_embs = torch.stack(extra_embs).permute(1,0,2)
+        # print(torch.stack(extra_embs).shape, outs.shape)
+        # extra_embs = torch.stack(extra_embs).permute(1,2,0)
+        return torch.cat([outs, extra_embs], dim=2)
+
     def forward_only_decoder(self, src, tgt, inp_seqs, tgt_mask=None, padding_mask_src=None):
         if tgt_mask is None:
             src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src, inp_seqs=inp_seqs)
@@ -350,6 +391,7 @@ class TransformerModel(nn.Module):
         padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input, no_pos_enc=no_pos_enc, add_lg_info=self.add_lg_info)
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
         outs = self.decode(tgt, padded_src, tgt_mask, padding_mask_src)
+        outs = self.get_extra_tensor(inp_seqs, outs)
         return self.generator(outs)
 
     def forward(self, src: Tensor, tgt: list, inp_seqs=None) -> Tensor:
