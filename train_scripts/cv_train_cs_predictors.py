@@ -44,7 +44,7 @@ def init_model(ntoken, lbl2ind={}, lg2ind=None, dropout=0.5, use_glbl_lbls=False
                form_sp_reg_data=False, version2_agregation="max", input_drop=False, no_pos_enc=False,
                linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix="", tune_bert=False,train_only_decoder=False,
                add_bert_pe_from_dec_to_bert_out=False,concat_pos_enc=False,pe_extra_dims=64,
-               residue_emb_extra_dims=0):
+               residue_emb_extra_dims=0, add_extra_embs2_generator=False,use_blosum=False, use_extra_oh = False):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
                              lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
@@ -54,7 +54,8 @@ def init_model(ntoken, lbl2ind={}, lg2ind=None, dropout=0.5, use_glbl_lbls=False
                              tuning_bert=tune_bert, train_only_decoder=train_only_decoder,
                              add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out,
                              concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims,
-                             residue_emb_extra_dims=residue_emb_extra_dims)
+                             residue_emb_extra_dims=residue_emb_extra_dims,add_extra_embs2_generator=add_extra_embs2_generator,
+                             use_blosum=use_blosum, use_extra_oh = use_extra_oh)
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -1271,7 +1272,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                         reinint_swa_decoder=False,anneal_start=-1,anneal_epochs=20,annealed_lr=0.00002,bert_pe_for_decoder=False,
                         frozen_pe_epochs=-1, no_bert_pe_training=False, add_bert_pe_from_dec_to_bert_out=False,
                         concat_pos_enc=False, pe_extra_dims=64,lipbobox_predictions=False,test_sptype_preds="none",
-                        residue_emb_extra_dims=0):
+                        residue_emb_extra_dims=0, add_extra_embs2_generator=False,
+                        use_blosum=False, use_extra_oh = False):
     if validate_partition is not None:
         test_partition = {0, 1, 2} - {partitions[0], validate_partition}
     else:
@@ -1317,7 +1319,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                                          tune_bert=tune_bert,train_only_decoder=train_only_decoder,
                                          add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out,
                                          concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims,
-                                         residue_emb_extra_dims=residue_emb_extra_dims)
+                                         residue_emb_extra_dims=residue_emb_extra_dims,add_extra_embs2_generator=add_extra_embs2_generator,
+                                         use_blosum=use_blosum, use_extra_oh = use_extra_oh)
         model = ProtBertClassifier(hparams)
         if remove_bert_layers != 0:
             model.ProtBertBFD.encoder.layer = model.ProtBertBFD.encoder.layer[:-remove_bert_layers]

@@ -133,8 +133,10 @@ def parse_arguments():
     parser.add_argument("--use_sgd_on_swa", default=False, action="store_true", help="Use sgd on swa for sp type classifier")
     parser.add_argument("--swa_start", default=30,type=int, help="Epoch at wich you load best mdl and start swa")
     parser.add_argument("--og_emb_dim", default=32,type=int, help="Epoch at wich you load best mdl and start swa")
-    parser.add_argument("--residue_emb_extra_dims", default=32,type=int, help="Epoch at wich you load best mdl and start swa")
-
+    parser.add_argument("--residue_emb_extra_dims", default=0,type=int, help="Epoch at wich you load best mdl and start swa")
+    parser.add_argument("--add_extra_embs2_generator", default=False,action="store_true")
+    parser.add_argument("--use_blosum", default=False,action="store_true")
+    parser.add_argument("--use_extra_oh", default=False,action="store_true")
     return parser.parse_args()
 
 def modify_param_search_args(args):
@@ -278,7 +280,8 @@ if __name__ == "__main__":
                                 frozen_pe_epochs=args.frozen_pe_epochs,no_bert_pe_training=args.no_bert_pe_training,
                                 add_bert_pe_from_dec_to_bert_out=args.add_bert_pe_from_dec_to_bert_out, concat_pos_enc=args.concat_pos_enc,
                                 pe_extra_dims=args.pe_extra_dims,lipbobox_predictions=args.lipbobox_predictions,test_sptype_preds=args.test_sptype_preds,
-                                residue_emb_extra_dims=args.residue_emb_extra_dims)
+                                residue_emb_extra_dims=args.residue_emb_extra_dims,add_extra_embs2_generator=args.add_extra_embs2_generator,
+                                use_blosum=args.use_blosum, use_extra_oh=args.use_extra_oh)
 
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):

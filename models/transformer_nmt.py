@@ -236,9 +236,6 @@ class TransformerModel(nn.Module):
                  add_extra_embs2_generator=False):
         super().__init__()
         # use_blosum = True
-        use_blosum = False
-        use_extra_oh = True
-        add_extra_embs2_generator = True
         aa_dict = pickle.load(open("sp6_dicts.bin", "rb"))
         aa_dict = {k: v for k, v in aa_dict[-1].items() if v not in ['ES', 'PD', 'BS']}
         aa_dict['X'] = 20
@@ -249,9 +246,8 @@ class TransformerModel(nn.Module):
         if use_blosum or use_extra_oh:
             residue_emb_extra_dims = 32
         if add_extra_embs2_generator:
-            self.generator_extra_dims = residue_emb_extra_dims
+            self.add_extra_embs2_generator = residue_emb_extra_dims
             residue_emb_extra_dims = 0
-        self.use_extra_oh = use_extra_oh
         self.bert_pe_for_decoder = False
         self.pe_extra_dims = pe_extra_dims
         self.residue_emb_extra_dims = residue_emb_extra_dims
@@ -285,10 +281,10 @@ class TransformerModel(nn.Module):
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
         self.label_encoder = TokenEmbedding(ntoken, d_hid + residue_emb_extra_dims, lbl2ind=lbl2ind)
         self.d_model = d_model
-        # self.generator = nn.Sequential(nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.generator_extra_dims
-        #                            if concat_pos_enc else d_model + residue_emb_extra_dims + self.generator_extra_dims, 512).to(self.device), nn.LayerNorm(512).to(self.device), nn.ReLU(),nn.Linear(512, ntoken).to(self.device))
-        self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.generator_extra_dims
-                                   if concat_pos_enc else d_model + residue_emb_extra_dims + self.generator_extra_dims, ntoken).to(self.device)
+        # self.generator = nn.Sequential(nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
+        #                            if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, 512).to(self.device), nn.LayerNorm(512).to(self.device), nn.ReLU(),nn.Linear(512, ntoken).to(self.device))
+        self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
+                                   if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, ntoken).to(self.device)
         self.use_glbl_lbls = use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
         if self.form_sp_reg_data and not use_glbl_lbls:
