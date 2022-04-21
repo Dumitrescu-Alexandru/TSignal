@@ -236,7 +236,7 @@ class TransformerModel(nn.Module):
         super().__init__()
         # use_blosum = True
         use_blosum = False
-        use_extra_oh = True
+        use_extra_oh = False
 
         if use_blosum or use_extra_oh:
             residue_emb_extra_dims = 32
