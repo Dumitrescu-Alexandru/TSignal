@@ -391,7 +391,8 @@ class TransformerModel(nn.Module):
         padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input, no_pos_enc=no_pos_enc, add_lg_info=self.add_lg_info)
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
         outs = self.decode(tgt, padded_src, tgt_mask, padding_mask_src)
-        outs = self.get_extra_tensor(inp_seqs, outs)
+        if self.add_extra_embs2_generator:
+            outs = self.get_extra_tensor(inp_seqs, outs)
         return self.generator(outs)
 
     def forward(self, src: Tensor, tgt: list, inp_seqs=None) -> Tensor:
