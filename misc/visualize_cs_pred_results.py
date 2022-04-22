@@ -86,11 +86,11 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     cnt1, cnt2 = 0, 0
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         lg, sp_info = l.split("|")
-        if ind2glbl_lbl[sptype_preds[s]] == "LIPO" and s[p.rfind("L")+1]!="C":
-            print(p)
-            print(t)
-            print(s)
-            print("\n")
+        # if ind2glbl_lbl[sptype_preds[s]] == "LIPO" and s[p.rfind("L")+1]!="C":
+        #     print(p)
+        #     print(t)
+        #     print(s)
+        #     print("\n")
             # sptype_preds[s] = glbllbl2_ind["NO_SP"]
             # print(glbllbl2_ind["NO_SP"], sptype2ind["NO_SP"], ind2glbl_lbl[sptype_preds[s]])
             # p = "I"*len(p)
