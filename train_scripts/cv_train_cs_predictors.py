@@ -1838,53 +1838,53 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert",
                                lipbobox_predictions=False, compute_saliency=False):
-    model = nn.Sequential(nn.Linear(100,10), nn.Linear(10,5))
-    other_params = []
-    some_other_params = []
-
-    for n, p in model.named_parameters():
-        if "1" in n:
-            other_params.append(p)
-        else:
-            some_other_params.append(p)
-    parameters = [
-        {"params": other_params},
-        {
-            "params": some_other_params,
-            "lr": 0.0001
-        },
-    ]
-    optimizer = torch.optim.Adam(parameters, lr=0.1)
-    anneal_scheduler = SWALR(optimizer, swa_lr=0.0001, anneal_epochs=10, anneal_strategy='linear')
-    for e in range(100):
-        print("LR1:", optimizer.param_groups[0]['lr'])
-        print("LR2:", optimizer.param_groups[1]['lr'])
-
-        anneal_scheduler.step()
-    exit(1)
-    torch.save(opt.state_dict(), "asd.txt")
-    model2, model3 = nn.Linear(100, 10), nn.Linear(10, 5)
-    loaded_opt = torch.load("asd.txt")
-    print(loaded_opt)
-    opt1, opt2 = torch.optim.Adam(model2.parameters(), lr=0.1), torch.optim.Adam(model3.parameters(), lr=0.1)
-    opt1.load_state_dict(loaded_opt)
-    exit(1)
-    def a(epoch):
-
-        swa_start = 70
-        swa_lr=0.05
-        lr_init=0.1
-        t = epoch / swa_start
-        lr_ratio = swa_lr / lr_init
-        swa_lr = 0.05
-        lr_init = 0.1
-        if t <= 0.5:
-            factor = 1.0
-        elif t <= 0.9:
-            factor = 1.0 - (1.0 - lr_ratio) * (t - 0.5) / 0.4
-        else:
-            factor = lr_ratio
-        return lr_init * factor
+    # model = nn.Sequential(nn.Linear(100,10), nn.Linear(10,5))
+    # other_params = []
+    # some_other_params = []
+    #
+    # for n, p in model.named_parameters():
+    #     if "1" in n:
+    #         other_params.append(p)
+    #     else:
+    #         some_other_params.append(p)
+    # parameters = [
+    #     {"params": other_params},
+    #     {
+    #         "params": some_other_params,
+    #         "lr": 0.0001
+    #     },
+    # ]
+    # optimizer = torch.optim.Adam(parameters, lr=0.1)
+    # anneal_scheduler = SWALR(optimizer, swa_lr=0.0001, anneal_epochs=10, anneal_strategy='linear')
+    # for e in range(100):
+    #     print("LR1:", optimizer.param_groups[0]['lr'])
+    #     print("LR2:", optimizer.param_groups[1]['lr'])
+    #
+    #     anneal_scheduler.step()
+    # exit(1)
+    # torch.save(opt.state_dict(), "asd.txt")
+    # model2, model3 = nn.Linear(100, 10), nn.Linear(10, 5)
+    # loaded_opt = torch.load("asd.txt")
+    # print(loaded_opt)
+    # opt1, opt2 = torch.optim.Adam(model2.parameters(), lr=0.1), torch.optim.Adam(model3.parameters(), lr=0.1)
+    # opt1.load_state_dict(loaded_opt)
+    # exit(1)
+    # def a(epoch):
+    #
+    #     swa_start = 70
+    #     swa_lr=0.05
+    #     lr_init=0.1
+    #     t = epoch / swa_start
+    #     lr_ratio = swa_lr / lr_init
+    #     swa_lr = 0.05
+    #     lr_init = 0.1
+    #     if t <= 0.5:
+    #         factor = 1.0
+    #     elif t <= 0.9:
+    #         factor = 1.0 - (1.0 - lr_ratio) * (t - 0.5) / 0.4
+    #     else:
+    #         factor = lr_ratio
+    #     return lr_init * factor
     #
     # lrs =[]
     # for e in range(150):

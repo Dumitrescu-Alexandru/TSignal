@@ -47,7 +47,6 @@ class InputEmbeddingEncoder(nn.Module):
         self.data_folder = get_data_folder()
         self.use_extra_oh = use_extra_oh
         self.use_blosum = use_blosum
-        residue_emb_extra_dims = 32 if use_blosum else residue_emb_extra_dims
         if tuning_bert and self.data_folder == "sp_data/":
             if not os.path.exists("sp_data/"):
                 self.data_folder = "./"
@@ -243,11 +242,17 @@ class TransformerModel(nn.Module):
         self.use_blosum = use_blosum
         self.use_extra_oh = use_extra_oh
         self.add_extra_embs2_generator = add_extra_embs2_generator
-        if use_blosum or use_extra_oh:
+        if use_extra_oh:
             residue_emb_extra_dims = 32
+        elif use_blosum:
+            residue_emb_extra_dims = 16
         if add_extra_embs2_generator:
             self.add_extra_embs2_generator = residue_emb_extra_dims
             residue_emb_extra_dims = 0
+        if use_blosum and add_extra_embs2_generator:
+            self.extra_embs_gen_input = pickle.load(open("blusum_m.bin", "rb"))
+        else:
+            self.extra_embs_gen_input = None
         self.bert_pe_for_decoder = False
         self.pe_extra_dims = pe_extra_dims
         self.residue_emb_extra_dims = residue_emb_extra_dims
@@ -281,10 +286,11 @@ class TransformerModel(nn.Module):
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
         self.label_encoder = TokenEmbedding(ntoken, d_hid + residue_emb_extra_dims, lbl2ind=lbl2ind)
         self.d_model = d_model
-        # self.generator = nn.Sequential(nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
-        #                            if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, 512).to(self.device), nn.LayerNorm(512).to(self.device), nn.ReLU(),nn.Linear(512, ntoken).to(self.device))
-        self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
-                                   if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, ntoken).to(self.device)
+        self.generator = nn.Sequential(nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
+                                   if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, 512).to(self.device),
+                                           nn.LayerNorm(512).to(self.device), nn.ReLU(),nn.Linear(512, ntoken).to(self.device))
+        # self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
+        #                            if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, ntoken).to(self.device)
         self.use_glbl_lbls = use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
         if self.form_sp_reg_data and not use_glbl_lbls:
@@ -352,9 +358,9 @@ class TransformerModel(nn.Module):
             for i_s in inp_seqs:
                 inp_extra_emb = i_s + "X" * (outs.shape[0] - len(i_s))
                 if outs.shape[0] < len(inp_extra_emb):
-                    # during inference, not all outs are present at once
+                    # during inference, not all outs are present at once (so inp_sequence_length > output_sequence_length)
                     inp_extra_emb = inp_extra_emb[:outs.shape[0]]
-                extra_emb_tensor = torch.cat([torch.tensor([self.extra_embs_dec_input[r] for r in inp_extra_emb],
+                extra_emb_tensor = torch.cat([torch.tensor([self.extra_embs_gen_input[r] for r in inp_extra_emb],
                                                            device=self.device, dtype=torch.float32)])
                 extra_embs.append(extra_emb_tensor )
         elif self.use_extra_oh and self.add_extra_embs2_generator:

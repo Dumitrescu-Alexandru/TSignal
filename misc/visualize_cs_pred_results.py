@@ -86,11 +86,11 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     cnt1, cnt2 = 0, 0
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
         lg, sp_info = l.split("|")
-        # if ind2glbl_lbl[sptype_preds[s]] == "LIPO" and s[p.rfind("L")+1]!="C":
-        #     print(p)
-        #     print(t)
-        #     print(s)
-        #     print("\n")
+        if ind2glbl_lbl[sptype_preds[s]] == "LIPO" and s[p.rfind("L")+1]!="C":
+            print(p)
+            print(t)
+            print(s)
+            print("\n")
             # sptype_preds[s] = glbllbl2_ind["NO_SP"]
             # print(glbllbl2_ind["NO_SP"], sptype2ind["NO_SP"], ind2glbl_lbl[sptype_preds[s]])
             # p = "I"*len(p)
@@ -2652,10 +2652,16 @@ def plot_sp6_vs_tnmt_mcc():
     # runs = [32]
     # runs = [51]
     # runs = [47]
-    runs = [54]
-    runs = [56]
-    runs = [57]
-    runs = [58]
+    # runs = [54]
+    # runs = [56]
+    # runs = [57]
+    # runs = [58]
+    # additional oh on generator
+    runs = [59]
+    # runs = [60]
+    # additional oh on generator
+    runs = [61]
+    runs = [62]
 
 
     mcc_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"], return_mcc=True)
@@ -4610,7 +4616,13 @@ if __name__ == "__main__":
     # exit(1)
     #
     # save here the rest of current run
-
+    # extra oh on generator
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat59/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=True)
+    exit(1)
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat56/",
                                             compare_mdl_plots=False,

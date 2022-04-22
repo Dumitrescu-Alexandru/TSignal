@@ -1,6 +1,7 @@
+import pickle
 import numpy as np
 from sklearn.decomposition import PCA as PCA
-alphabet='ARNDCEQGHILKMFPSTWYV-'
+alphabet='ARNDCEQGHILKMFPSTWYVX'
 
 def subsmatFromAA2(identifier, data_file='aaindex2.txt'):
      """Retrieve a substitution matrix from AAindex2-file, scale it between 0 and 1, and add gap"""
@@ -15,7 +16,7 @@ def subsmatFromAA2(identifier, data_file='aaindex2.txt'):
                     cols = split_line[6]
                     break
 
-          subsmat = np.zeros((21, 21), dtype=np.float)
+          subsmat = np.zeros((21, 21), dtype=np.float64)
           i0 = 0
           for line in f:
                i = alphabet.find(rows[i0])
@@ -38,6 +39,7 @@ def get_pcs(subsmat,d):
     pca = PCA(d)
     pca.fit(subsmat)
     pc = pca.components_
+    print(pc.shape)
     return pc
 
 def encode_with_pc(seq_lists, lmaxes, pc):
@@ -54,8 +56,16 @@ def encode_with_pc(seq_lists, lmaxes, pc):
         i_start=i_end
     return X
 a = subsmatFromAA2("MUET020102")
-print(len(a[0]))
+print(len(a), len(a[0]))
+pca_blosum = get_pcs(a, 16)
+pca_blosum = pca_blosum.transpose(1,0)
+blusum_dict = {}
+for ind_,l  in enumerate(alphabet):
+     blusum_dict[l] = pca_blosum[ind_]
 # PERSONALIZE (PCA); maybe use one-hot
+print(blusum_dict)
+pickle.dump(blusum_dict,open("blusum_m.bin", "wb"))
+exit(1)
 import pickle
 import re
 with open("tbdeteled.txt", "rt") as f:
