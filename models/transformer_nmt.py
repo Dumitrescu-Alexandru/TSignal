@@ -286,11 +286,11 @@ class TransformerModel(nn.Module):
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
         self.label_encoder = TokenEmbedding(ntoken, d_hid + residue_emb_extra_dims, lbl2ind=lbl2ind)
         self.d_model = d_model
-        self.generator = nn.Sequential(nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
-                                   if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, 512).to(self.device),
-                                           nn.LayerNorm(512).to(self.device), nn.ReLU(),nn.Linear(512, ntoken).to(self.device))
-        # self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
-        #                            if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, ntoken).to(self.device)
+        # self.generator = nn.Sequential(nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
+        #                            if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, 512).to(self.device),
+        #                                    nn.LayerNorm(512).to(self.device), nn.ReLU(),nn.Linear(512, ntoken).to(self.device))
+        self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
+                                   if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, ntoken).to(self.device)
         self.use_glbl_lbls = use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
         if self.form_sp_reg_data and not use_glbl_lbls:

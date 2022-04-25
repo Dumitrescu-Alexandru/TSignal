@@ -2656,12 +2656,17 @@ def plot_sp6_vs_tnmt_mcc():
     # runs = [56]
     # runs = [57]
     # runs = [58]
-    # additional oh on generator
+    # additional oh on generator (1l gen)
     runs = [59]
     # runs = [60]
-    # additional oh on generator
+    # additional oh on generator (1l gen)
     runs = [61]
     runs = [62]
+    # additional blosum on generator (2l gen)
+    runs = [63]
+    # additional oh on generator (2l gen)
+    runs = [64]
+
 
 
     mcc_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"], return_mcc=True)
