@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch
 sys.path.append(os.path.abspath(".."))
-from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc, get_pred_accs_sp_vs_nosp
+from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc, get_pred_accs_sp_vs_nosp, get_cs_acc
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights
 from models.transformer_nmt import TransformerModel
 from models.binary_sp_classifier import BinarySPClassifier, CNN3, CNN4
@@ -1838,88 +1838,6 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert",
                                lipbobox_predictions=False, compute_saliency=False):
-    # model = nn.Sequential(nn.Linear(100,10), nn.Linear(10,5))
-    # other_params = []
-    # some_other_params = []
-    #
-    # for n, p in model.named_parameters():
-    #     if "1" in n:
-    #         other_params.append(p)
-    #     else:
-    #         some_other_params.append(p)
-    # parameters = [
-    #     {"params": other_params},
-    #     {
-    #         "params": some_other_params,
-    #         "lr": 0.0001
-    #     },
-    # ]
-    # optimizer = torch.optim.Adam(parameters, lr=0.1)
-    # anneal_scheduler = SWALR(optimizer, swa_lr=0.0001, anneal_epochs=10, anneal_strategy='linear')
-    # for e in range(100):
-    #     print("LR1:", optimizer.param_groups[0]['lr'])
-    #     print("LR2:", optimizer.param_groups[1]['lr'])
-    #
-    #     anneal_scheduler.step()
-    # exit(1)
-    # torch.save(opt.state_dict(), "asd.txt")
-    # model2, model3 = nn.Linear(100, 10), nn.Linear(10, 5)
-    # loaded_opt = torch.load("asd.txt")
-    # print(loaded_opt)
-    # opt1, opt2 = torch.optim.Adam(model2.parameters(), lr=0.1), torch.optim.Adam(model3.parameters(), lr=0.1)
-    # opt1.load_state_dict(loaded_opt)
-    # exit(1)
-    # def a(epoch):
-    #
-    #     swa_start = 70
-    #     swa_lr=0.05
-    #     lr_init=0.1
-    #     t = epoch / swa_start
-    #     lr_ratio = swa_lr / lr_init
-    #     swa_lr = 0.05
-    #     lr_init = 0.1
-    #     if t <= 0.5:
-    #         factor = 1.0
-    #     elif t <= 0.9:
-    #         factor = 1.0 - (1.0 - lr_ratio) * (t - 0.5) / 0.4
-    #     else:
-    #         factor = lr_ratio
-    #     return lr_init * factor
-    #
-    # lrs =[]
-    # for e in range(150):
-    #     lrs.append(a(e))
-    # print(lrs)
-    # j = [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
-    # print(len(j))
-    # exit(1)
-    # lr_multiplier_swa = 20
-    # model = nn.Linear(100,10)
-    # optimizer = torch.optim.Adam(model.parameters(), lr=0.00001 * lr_multiplier_swa)
-    # c_l = 5
-    # # lr_scheduler_swa = torch.optim.lr_scheduler_swa.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
-    # lr_scheduler_swa = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/c_l))
-    # swa_scheduler = SWALR(optimizer, swa_lr=0.00002, anneal_epochs=30, anneal_strategy='linear')
-    # sched = torch.optim.lr_scheduler_swa.SWALR(optimizer, base_lr=0.0001, max_lr=0.01, step_size_up=1, step_size_down=10, mode='triangular')
-    # ot_sched.step()
-    # ot_sched.step()
-    # sched = SWALR(optimizer, swa_lr=10e-5, anneal_strategy="linear", anneal_epochs=20)
-    # lr_scheduler_swa = torch.optim.lr_scheduler_swa.StepLR(optimizer, step_size=1, gamma=10)
-    # lr_scheduler_swa = torch.optim.lr_scheduler_swa.MultiStepLR(optimizer, )
-    # schedd_ = torch.optim.lr_scheduler_swa.CyclicLR(optimizer,)
-    # lrs = []
-    # for i in range(50):
-    #     # sched.step(i%5)
-    #     # lr_scheduler_swa.step(i % (c_l+1))
-    #     lrs.append([i, optimizer.param_groups[0]['lr']])
-    #     if i > 10:
-    #         swa_scheduler.step()
-    #     # ot_sched.step()
-    #     # lr_scheduler_swa.step(i%5)
-    #     # sched.step(i%5)
-    # print(lrs)
-    # exit(1)
-
     folder = get_data_folder()
     sp_data = SPCSpredictionData(form_sp_reg_data=False)
     # hard-code this for now to check some sequences
@@ -1950,7 +1868,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                              torch.sum(torch.abs(grads[grad_ind_CS][pred_sp_ind]), dim=-1).detach().cpu().numpy()))
         return seq_preds_grad_CSgrad
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
-
+    ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
+    glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
     hparams.train_enc_dec_sp6 = True
     hparams.use_glbl_lbls = False
     lg2ind = sp_data.lg2ind
@@ -1969,7 +1888,9 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     all_seq_preds_grad_CSgrad = []
     save_index = 0
-    print("IM HERE")
+    all_outs = []
+    all_seqs = []
+    all_lbls = []
     for ind, batch in enumerate(dataset_loader):
         print("{} number of seqs out of {} tested".format(ind, len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
@@ -1980,6 +1901,9 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                                                                 hook_layer=hook_layer)
             all_seq_preds_grad_CSgrad.extend(
                 visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))
+            all_outs.extend(some_output[1])
+            all_seqs.extend(seqs)
+            all_lbls.extend(lbl_seqs)
         else:
             some_output = greedy_decode(model, seqs, sp_data.lbl2ind['BS'],
                                                  sp_data.lbl2ind, tgt=None,
@@ -1988,13 +1912,76 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                                  glbl_lbls=None, tune_bert=tune_bert,
                                                  saliency_map=False,
                                                  hook_layer=hook_layer)
+            all_outs.extend(some_output[1])
+            all_seqs.extend(seqs)
+            all_lbls.extend(lbl_seqs)
+    life_grp = []
+    pred_lbls = []
+    true_lbls = []
+    sptype_preds = {}
     if compute_saliency:
         pickle.dump(all_seq_preds_grad_CSgrad,
                 open(folder+saliency_map_save_fn, "wb"))
-    for seq, pred in zip(seqs, some_output[1]):
+    for seq, pred, lbl in zip(all_seqs, all_outs,all_lbls):
+        true_lbls.append("".join([ind2lbl[i] for i in lbl])[:70])
+        pred_lbls.append("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
         print(seq)
-        print("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
-        print()
+        print(true_lbls[-1])
+        print(pred_lbls[-1])
+        if pred_lbls[-1][0] == "S":
+            sptype_preds[seq] = glbllbl2_ind['SP']
+        elif pred_lbls[-1][0] == "T":
+            sptype_preds[seq] = glbllbl2_ind['TAT']
+        elif pred_lbls[-1][0] == "L":
+            sptype_preds[seq] = glbllbl2_ind['LIPO']
+        life_grp.append('POSITIVE|SP')
+    all_recalls, all_precisions, \
+        total_positives, false_positives, predictions, all_f1_scores = get_cs_acc(life_grp, all_seqs, true_lbls,
+                                                                                   pred_lbls, v=False,
+                                                                                   only_cs_position=False,
+                                                                                   sp_type="SP", sptype_preds=sptype_preds)
+    with open("sp_data/synthetic_gp_bacteria_sps.fasta", "rt") as f:
+        lines = f.readlines()
+    seqid2seq = {}
+    for l in lines:
+        if ">" in l:
+            current_id = l.replace(">","").replace("\n", "")
+        else:
+            seqid2seq[current_id] = l.replace("\n","")
+    with open("sp_data/prediction_results_sp6_synthetic_data.txt", "rt") as f:
+        lines = f.readlines()
+    seq2new_preds = {}
+    for l in lines:
+        if "seq" in l:
+            current_seq = seqid2seq[l.split("\t")[0]]
+            sptype = glbllbl2_ind[l.split("\t")[1]]
+            pred_cs = int(l.split("\t")[-1].split(".")[0].split(" ")[-1].split("-")[0])
+            if sptype == 3:
+                sp6_pred = "L"*pred_cs + (70-pred_cs)*"O"
+            elif sptype == 1:
+                sp6_pred = "S"*pred_cs + (70-pred_cs)*"O"
+            else:
+                sp6_pred = "O" * 70
+
+            seq2new_preds[current_seq] = [sp6_pred, sptype]
+    print(all_f1_scores)
+    # update predictions from sp6
+    pred_lbls = []
+    for ind, seq in enumerate(all_seqs):#, all_outs,all_lbls):
+        # print(seq)
+        sptype_preds[seq] = seq2new_preds[seq][1]
+        pred_lbls.append(seq2new_preds[seq][0])
+        # print(pred_lbls[-1])
+        # print(true_lbls[ind])
+        # print()
+    all_recalls, all_precisions, \
+    total_positives, false_positives, predictions, all_f1_scores = get_cs_acc(life_grp, all_seqs, true_lbls,
+                                                                              pred_lbls, v=False,
+                                                                              only_cs_position=False,
+                                                                              sp_type="SP",
+                                                                              sptype_preds=sptype_preds)
+    print(all_f1_scores)
+
     exit(1)
     # sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
     #     get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False,

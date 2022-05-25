@@ -83,10 +83,19 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
     count, count2 = 0, 0
     count_tol_fn, count_complete_fn, count_otherSPpred = 0, 0, 0
     sp_letter = sptype2letter[sp_type]
-    cnt1, cnt2 = 0, 0
+    cnt1, cnt2, ttl = 0,0,0 # tp, total, fp
+    cnt4, cnt5 = 0, 0
     for l, s, t, p in zip(life_grp, seqs, true_lbls, pred_lbls):
-        lg, sp_info = l.split("|")
         # if ind2glbl_lbl[sptype_preds[s]] == "LIPO" and s[p.rfind("L")+1]!="C":
+        lg, sp_info = l.split("|")
+
+        # I previously re-replace Tatlipo seqs to have lbls W instead of T; correct prediction of type is based on
+        # dictionary sptype_preds anyways
+        t = t.replace("W", "T")
+        if sp_info == "TATLIPO" and ind2glbl_lbl[sptype_preds[s]]== "TATLIPO":
+            print(p)
+            print(t)
+            print(s)
         #     print(p)
         #     print(t)
         #     print(s)
@@ -101,6 +110,12 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
         #     sptype_preds[s] = sptype2ind["NO_SP"]
         #     p = "I" * len(s)
         # elif ind2sptype[sptype_preds[s]] == "LIPO" and s[p.rfind("L") + 1] != "C":
+        #     # if the sp type is also LIPO, print the result
+        #     if sp_info == "LIPO":
+        #         print(p)
+        #         print(t)
+        #         print(s)
+        #         print("\n")
         #     if "C" in s[p.rfind("L")-3:p.rfind("L")+3]:
         #         new_res = reassign_cs(s,p)
         #         if new_res == -1:
@@ -143,6 +158,9 @@ def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=F
             predictions[grp2_ind[lg]] += np.array([0, 0, 0, 0, 0, 0, 1, 1, 1, 1])
     if v:
         print(" count_tol_fn, count_complete_fn, count_otherSPpred", count_tol_fn, count_complete_fn, count_otherSPpred)
+    # prc,rc = cnt1/(cnt1+cnt2), cnt1/ttl
+    # print(2*prc*rc/(prc+rc),cnt1,cnt2,ttl)
+    # exit(1)
     # print(sp_type, "count, count2", count, count2 )
     # print(cnt1, cnt2)
     all_recalls = []
@@ -349,7 +367,7 @@ def plot_all_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_a
         total_counts_per_acc_ = list(total_counts_per_acc[i])
         percs = [acc_to_perc[1] for acc_to_perc in resulted_perc_by_acc[i]]
         bars_width = accs[0] - accs[1]
-        # ax[i//2, i%2].set_title(name[i], fontsize=11)
+        # ax[i//2, i%2].set_title(name[i], fontsize=12.5)
         if i == 0:
             box = ax[i//2, i%2].get_position()
             ax[i//2, i%2].set_position([box.x0, box.y0 + box.height * 0.5, box.width * 1.15, box.height * 0.65])
@@ -360,9 +378,9 @@ def plot_all_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_a
             ax[i//2, i%2].set_xticklabels(["{}/{}".format(str(round(accs[j], 2)), str(total_counts_per_acc_[j])) for j in
                range(len(accs))],fontsize=6, rotation=300)
             ax[i // 2, i % 2].set_xlim([0,1])
-            ax[i // 2, i % 2].set_title("tol {}, ece: {}".format(i, ece[i]), fontsize=8)
+            ax[i // 2, i % 2].set_title("tol {}, ece: {}".format(i, ece[i]), fontsize=12.5)
             # ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[i], 2)), str(total_counts_per_acc[i])) for i in
-            #             range(len(accs)//2 - 2)], fontsize=8)
+            #             range(len(accs)//2 - 2)], fontsize=12.5)
             ax[i//2, i%2].set_yticks([0, 0.5, 1])
             ax[i//2, i%2].set_yticklabels([0, 0.5, 1], fontsize=6)
         else:
@@ -380,17 +398,17 @@ def plot_all_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_a
                range(len(accs))],fontsize=6, rotation=300)
 
             ax[i // 2, i % 2].set_xlim([0,1])
-            ax[i // 2, i % 2].set_title("tol {}, ece: {}".format(i, ece[i]), fontsize=8)
+            ax[i // 2, i % 2].set_title("tol {}, ece: {}".format(i, ece[i]), fontsize=12.5)
             ax[i//2, i%2].set_yticks([0, 0.5, 1])
             ax[i//2, i%2].set_yticklabels([0, 0.5, 1], fontsize=6)
 
         if i > 1:
-            ax[i//2, i%2].set_xlabel("Confidence/No of samples", fontsize=8)
+            ax[i//2, i%2].set_xlabel("Confidence/No of samples", fontsize=12.5)
             ax[i//2, i%2].xaxis.set_label_coords(0.5, -0.6)
 
         if i == 0 or i == 2:
-            ax[i//2, i%2].set_ylabel("Accuracy", fontsize=8)
-    fig.legend(loc='center left', bbox_to_anchor=(0.2, 0.05), fontsize=8, ncol=2)
+            ax[i//2, i%2].set_ylabel("Accuracy", fontsize=12.5)
+    fig.legend(loc='center left', bbox_to_anchor=(0.2, 0.05), fontsize=12.5, ncol=2)
     plt.show()
 
 def plot_reliability_diagrams(resulted_perc_by_acc, name, total_counts_per_acc):
@@ -516,28 +534,39 @@ def get_prob_calibration_and_plot(probabilities_file="", life_grp=None, seqs=Non
             plot_all_reliability_diagrams(all_results, all_titles, all_total_cs_preds, ece=[round(sum(all_cs_ece[j]),3) for j in range(4)])
     return lg_and_tol2_lg
 
-def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_fold=2, dict_=None):
+def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_fold=2, dict_=None, benchmark=True):
     seq2preds = pickle.load(open(filename, "rb")) if dict_ is None else dict_
     tested_seqs = set(seq2preds.keys())
     seq2id = {}
     life_grp, seqs, true_lbls, pred_lbls = [], [], [], []
+    info_dictionary = {}
+    for t in ['train','test']:
+        for tf in [0, 1,2]:
+            file = get_data_folder()+"sp6_partitioned_data_{}_{}.bin".format(t,tf)
+            for seq, data in pickle.load(open(file, "rb")).items():
+                info_dictionary[seq] = ["|".join([data[-2],data[-1]]), data[-3]]
+
     for seq_record in SeqIO.parse(get_data_folder() + "sp6_data/train_set.fasta", "fasta"):
         seq, lbls = seq_record.seq[:len(seq_record.seq) // 2], seq_record.seq[len(seq_record.seq) // 2:]
-        if seq in tested_seqs:
-            life_grp.append("|".join(str(seq_record.id).split("|")[1:-1]))
-            seqs.append(seq)
-            true_lbls.append(lbls)
-            pred_lbls.append(seq2preds[seq])
+        if seq in tested_seqs and str(seq) not in seqs:
+            life_grp.append(info_dictionary[str(seq)][0])
+            seqs.append(str(seq))
+            true_lbls.append(info_dictionary[str(seq)][1])
+            pred_lbls.append(seq2preds[str(seq)])
+            # life_grp.append("|".join(str(seq_record.id).split("|")[1:-1]))
+            # seqs.append(seq)
+            # true_lbls.append(lbls)
+            # pred_lbls.append(seq2preds[seq])
     return life_grp, seqs, true_lbls, pred_lbls
 
 
 def get_data_folder():
     if os.path.exists("sp6_data/"):
         return "./"
-    elif os.path.exists("results"):
-        return "../sp_data/"
     elif os.path.exists("/scratch/work/dumitra1"):
         return "/scratch/work/dumitra1/sp_data/"
+    elif os.path.exists("results"):
+        return "../sp_data/"
     elif os.path.exists("/home/alex"):
         return "sp_data/"
     else:
@@ -654,17 +683,17 @@ def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.
         if i == 0 and metric == "f1"  and len(sp_type_f1[0]) != 0:
             axs[0, 0].plot(sp_type_f1[0], color='black', label="SP type F1", linewidth=0.8)
         axs[0, 0].plot(cs_res_euk[i], label="CS tol={}".format(i), linewidth=0.8)
-        axs[0, 0].set_ylabel(metric, fontsize=8)
+        axs[0, 0].set_ylabel(metric, fontsize=12.5)
         # axs[0, 0].legend()
         axs[0, 0].set_ylim(-0.1, 1.1)
         axs[0,0].set_yticks([0,0.2,0.4,0.6,0.8,1])
-        axs[0,0].set_yticklabels([0,0.2,0.4,0.6,0.8,1], fontsize=8)
+        axs[0,0].set_yticklabels([0,0.2,0.4,0.6,0.8,1], fontsize=12.5)
         axs[0, 0].set_xticks([0, 25, 50, 75])
-        axs[0, 0].set_xticklabels([0, 25, 50, 75], fontsize=8)
-        axs[0, 0].set_title("eukarya", fontsize=8)
+        axs[0, 0].set_xticklabels([0, 25, 50, 75], fontsize=12.5)
+        axs[0, 0].set_title("eukarya", fontsize=12.5)
         if i == 0:
             axs[0, 0].annotate("SWA start", xy=(60, cs_res_euk[0][60]), xytext=(50, 0.001),
-                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=8, color='black')
+                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=12.5, color='black')
 
         axs[0, 1].plot(cs_res_neg[i], linewidth=0.8)
         if i == 0 and metric == "f1" and len(sp_type_f1[0]) != 0:
@@ -673,45 +702,45 @@ def extract_and_plot_prec_recall(results, metric="recall", name="param_search_0.
         axs[0, 1].set_ylim(-0.1, 1.1)
         if i == 0:
             axs[0, 1].annotate("SWA start", xy=(60, cs_res_neg[0][60]), xytext=(50, 0.001),
-                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=8, color='black')
+                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=12.5, color='black')
         axs[0, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-        axs[0, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+        axs[0, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
         axs[0, 1].set_xticks([0, 25, 50, 75])
-        axs[0, 1].set_xticklabels([0, 25, 50, 75], fontsize=8)
-        axs[0, 1].set_title("gn bacteria", fontsize=8)
+        axs[0, 1].set_xticklabels([0, 25, 50, 75], fontsize=12.5)
+        axs[0, 1].set_title("gn bacteria", fontsize=12.5)
 
         axs[1, 0].plot(cs_res_pos[i], linewidth=0.8)
         if i == 0  and metric == "f1"  and len(sp_type_f1[0]) != 0:
             axs[1, 0].plot(sp_type_f1[2], color='black', linewidth=0.8)
         # axs[1, 0].legend()
-        axs[1, 0].set_xlabel("epoch", fontsize=8)
+        axs[1, 0].set_xlabel("epoch", fontsize=12.5)
         axs[1, 0].set_ylim(-0.1, 1.1)
-        axs[1, 0].set_ylabel(metric, fontsize=8)
+        axs[1, 0].set_ylabel(metric, fontsize=12.5)
         if i == 0:
             axs[1, 0].annotate("SWA start", xy=(60, cs_res_pos[0][60]), xytext=(50, 0.001),
-                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=8, color='black')
+                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=12.5, color='black')
         axs[1, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-        axs[1, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+        axs[1, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
         axs[1, 0].set_xticks([0, 25, 50, 75])
-        axs[1, 0].set_xticklabels([0, 25, 50, 75], fontsize=8)
-        axs[1, 0].set_title("gp bacteria", fontsize=8)
+        axs[1, 0].set_xticklabels([0, 25, 50, 75], fontsize=12.5)
+        axs[1, 0].set_title("gp bacteria", fontsize=12.5)
 
         axs[1, 1].plot(cs_res_arc[i], linewidth=0.8)
         if i == 0  and metric == "f1" and len(sp_type_f1[0]) != 0:
             axs[1, 1].plot(sp_type_f1[3], color='black', linewidth=0.8)
         # axs[1, 1].legend()
-        axs[1, 1].set_xlabel("epoch", fontsize=8)
+        axs[1, 1].set_xlabel("epoch", fontsize=12.5)
         axs[1, 1].set_ylim(-0.1, 1.1)
         if i == 0:
             axs[1, 1].annotate("SWA start", xy=(60, cs_res_arc[0][60]), xytext=(50, 0.001),
-                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=8, color='black')
+                            arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=12.5, color='black')
         axs[1, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-        axs[1, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+        axs[1, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
         axs[1, 1].set_xticks([0, 25, 50, 75])
-        axs[1, 1].set_xticklabels([0, 25, 50, 75], fontsize=8)
-        axs[1, 1].set_title("archaea", fontsize=8)
+        axs[1, 1].set_xticklabels([0, 25, 50, 75], fontsize=12.5)
+        axs[1, 1].set_title("archaea", fontsize=12.5)
 
-    fig.legend(loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=5, fontsize=8)
+    fig.legend(loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=5, fontsize=12.5)
 
     # plt.savefig("/home/alex/Desktop/sp6_ds_transformer_nmt_results/{}_{}.png".format(name, metric))
     plt.show()
@@ -892,18 +921,20 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
         else:
             full_dict_results.update(res_dict)
     print(len(full_dict_results.keys()), len(set(full_dict_results.keys())), len(unique_bench_seqs))
-    # count1, count2 = 0,0
-    # for s in full_dict_results.keys():
-    #     if id2lg[seq2id[s]] == "ARCHAEA":
-    #         if id2type[seq2id[s]] == "SP":
-    #             count1+=1
-    #         elif id2type[seq2id[s]] == "NO_SP":
-    #             count2+=1
-    # print(count1, count2)
     # exit(1)
 
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin",
                                                                                    dict_=full_dict_results)
+    count1, count2 = 0,0
+    if benchmark:
+        for s in seqs:
+            if id2lg[seq2id[s]] == "NEGATIVE":
+                if id2type[seq2id[s]] == "TATLIPO":
+                    count1+=1
+                elif id2type[seq2id[s]] == "NO_SP":
+                    count2+=1
+        print(count1, count2)
+
     mccs, mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                            sp_type="SP", sptype_preds=full_sptype_dict)
     # LIPO is SEC/SPII
@@ -912,6 +943,12 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
     # TAT is TAT/SPI
     mccs_tat, mccs2_tat = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                                    sp_type="TAT", sptype_preds=full_sptype_dict)
+    # TATLIPO Tat/SPase II
+    mccs_tatlipo, mccs2_tatlipo = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+                                                   sp_type="TATLIPO", sptype_preds=full_sptype_dict)
+    # PILIN Sec/SPase IV
+    mccs_pilin, mccs2_pilin = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+                                                   sp_type="PILIN", sptype_preds=full_sptype_dict)
     if "param_search_w_nl_nh_0.0_4096_1e-05_4_4" in run:
         v = False
     else:
@@ -922,9 +959,16 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="LIPO", sptype_preds=full_sptype_dict )
     all_recalls_tat, all_precisions_tat, _, _, _, f1_scores_tat = \
         get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TAT", sptype_preds=full_sptype_dict)
+    all_recalls_tatlipo, all_precisions_tatlipo, _, _, _, f1_scores_tatlipo = \
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TATLIPO",
+                   sptype_preds=full_sptype_dict)
+    all_recalls_pilin, all_precisions_pilin, _, _, _, f1_scores_pilin = \
+        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="PILIN",
+                   sptype_preds=full_sptype_dict)
     if return_sptype_f1:
-        return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, \
-               all_precisions_lipo, all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat, get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls)
+        return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, mccs_tatlipo, mccs2_tatlipo, mccs_pilin, mccs2_pilin, all_recalls, all_precisions, all_recalls_lipo, \
+               all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_recalls_tatlipo, all_precisions_tatlipo, all_recalls_pilin, all_precisions_pilin,  avg_epoch, \
+               f1_scores, f1_scores_lipo, f1_scores_tat, f1_scores_pilin, f1_scores_tatlipo, get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls)
     return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, all_recalls, all_precisions, all_recalls_lipo, \
            all_precisions_lipo, all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat
 
@@ -1231,9 +1275,10 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
     # order results by the eukaryote mcc
     eukaryote_mcc = []
     for ind, u_p in enumerate(unique_params):
-        mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, \
-        all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo, \
-        all_recalls_tat, all_precisions_tat, avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat, f1_scores_sptype \
+        mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, mccs_tatlipo, mccs2_tatlipo, mccs_pilin, mccs2_pilin, \
+        all_recalls, all_precisions, all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, \
+        all_recalls_tatlipo, all_precisions_tatlipo, all_recalls_pilin, all_precisions_pilin, \
+        avg_epoch, f1_scores, f1_scores_lipo, f1_scores_tat, f1_scores_tatlipo, f1_scores_pilin, f1_scores_sptype \
             = extract_mean_test_results(run=u_p, result_folder=result_folder,
                                         only_cs_position=only_cs_position,
                                         remove_test_seqs=remove_test_seqs, return_sptype_f1=True, benchmark=benchmark,
@@ -1242,14 +1287,22 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
             TSignalSummary = ((np.mean(np.array(f1_scores)) + np.mean(np.array(f1_scores_lipo)) + np.mean(np.array(f1_scores_tat)))/3)
             print("Non-weighted summary (sp6/Tsignal):", sp6_summarized_non_weighted, TSignalSummary)
         all_recalls_lipo, all_precisions_lipo, \
-        all_recalls_tat, all_precisions_tat, = list(np.reshape(np.array(all_recalls_lipo), -1)), list(
+        all_recalls_tat, all_precisions_tat,\
+        all_recalls_tatlipo, all_precisions_tatlipo,\
+        all_recalls_pilin, all_precisions_pilin= list(np.reshape(np.array(all_recalls_lipo), -1)), list(
             np.reshape(np.array(all_precisions_lipo), -1)), \
                                                list(np.reshape(np.array(all_recalls_tat), -1)), list(
-            np.reshape(np.array(all_precisions_tat), -1))
+            np.reshape(np.array(all_precisions_tat), -1)), \
+                                           list(np.reshape(np.array(all_recalls_tatlipo), -1)), list(
+            np.reshape(np.array(all_precisions_tatlipo), -1)), \
+                               list(np.reshape(np.array(all_recalls_pilin), -1)), list(
+            np.reshape(np.array(all_precisions_pilin), -1))
         mdl2results[ind] = (
-        mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, list(np.reshape(np.array(all_recalls), -1)),
-        list(np.reshape(np.array(all_precisions), -1)), all_recalls_lipo, all_precisions_lipo,
-        all_recalls_tat, all_precisions_tat, f1_scores, f1_scores_lipo, f1_scores_tat, f1_scores_sptype, avg_epoch)
+            mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, mccs_tatlipo, mccs2_tatlipo, mccs_pilin, mccs2_pilin,
+            list(np.reshape(np.array(all_recalls), -1)), list(np.reshape(np.array(all_precisions), -1)), all_recalls_lipo,
+            all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_recalls_tatlipo, all_precisions_tatlipo,
+            all_recalls_pilin, all_precisions_pilin, f1_scores, f1_scores_lipo, f1_scores_tat, f1_scores_tatlipo,
+                f1_scores_pilin, f1_scores_sptype, avg_epoch)
         mdl2summarized_results[ind] = np.sum((np.array(f1_scores).reshape(-1) * np.array(no_of_seqs_sp1)))/no_of_tested_sp_seqs + \
                                       np.sum((np.array(f1_scores_lipo).reshape(-1) * np.array(no_of_seqs_sp2)))/no_of_tested_sp_seqs + \
                                       np.sum((np.array(f1_scores_tat).reshape(-1) * np.array(no_of_seqs_tat)))/no_of_tested_sp_seqs
@@ -1295,62 +1348,101 @@ def extract_all_param_results(result_folder="results_param_s_2/", only_cs_positi
         for mdl_ind in best_to_worst_mdls:
             print("total f1 for {}: {} compared to sp6: {}".format(mdl_ind, mdl2summarized_results[mdl_ind]/4, sp6_summarized/4))
             print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-5])]), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-7])]), " & ",
                   round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
         print("\n\nRecall table SEC/SPI\n\n")
         print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_sp1), " & \\\\ \\hline")
         for mdl_ind in best_to_worst_mdls:
             print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][6]]), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][10]]), " & ",
                   round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
         print("\n\nPrec table SEC/SPI\n\n")
         print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_sp1), " & \\\\ \\hline")
         for mdl_ind in best_to_worst_mdls:
             print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][7]]), "&",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][11]]), "&",
                   round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
         print("\n\nF1 table SEC/SPII \n\n")
         print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_sp2), " & \\\\ \\hline")
         for mdl_ind in best_to_worst_mdls:
             print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-4])]), "&",
+                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-6])]), "&",
                   round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
         print("\n\nRecall table SEC/SPII \n\n")
         print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_sp2), " & \\\\ \\hline")
         for mdl_ind in best_to_worst_mdls:
             print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][8]]), "&",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][12]]), "&",
                   round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
         print("\n\nPrec table SEC/SPII \n\n")
         print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_sp2), " & \\\\ \\hline")
         for mdl_ind in best_to_worst_mdls:
             print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][9]]), "&",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][13]]), "&",
                   round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
         print("\n\nF1 table TAT/SPI \n\n")
         print(" SP6 ", " & " * no_of_params, " & ".join(sp6_f1_tat), " & \\\\ \\hline")
         for mdl_ind in best_to_worst_mdls:
             print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-3])]), "&",
+                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-5])]), "&",
                   round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
         print("\n\nRecall table TAT/SPI \n\n")
         print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_tat), " & \\\\ \\hline")
         for mdl_ind in best_to_worst_mdls:
             print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][10]]), "&",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][14]]), "&",
                   round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
         print("\n\nPrec table TAT/SPI \n\n")
         print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_tat), " & \\\\ \\hline")
         for mdl_ind in best_to_worst_mdls:
             print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
-                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][11]]), "&",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][15]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+
+        print("\n\nF1 table TAT/SPII \n\n")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-4])]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+        print("\n\nRecall table TAT/SPII \n\n")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][16]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+        print("\n\nPrec table TAT/SPII \n\n")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][17]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+        print("\n\nF1 table Sec/SPIV \n\n")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in np.concatenate(mdl2results[mdl_ind][-3])]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+        print("\n\nRecall table Sec/SPIV \n\n")
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_recalls_tat), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][18]]), "&",
+                  round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
+
+        print("\n\nPrec table Sec/SPIV \n\n")
+        print(" SP6 ", " & " * no_of_params, " & ".join(sp6_precs_tat), " & \\\\ \\hline")
+        for mdl_ind in best_to_worst_mdls:
+            print(" & ".join(mdlind2mdlparams[mdl_ind].split("_")), " & ",
+                  " & ".join([str(round(rec, 3)) for rec in mdl2results[mdl_ind][19]]), "&",
                   round(mdl2results[mdl_ind][-1], 3), "\\\\ \\hline")
 
         print("\n\nMCC SEC/SPII TABLE\n\n")
@@ -2281,17 +2373,17 @@ def plot_sp6_vs_tnmt_violin():
     for ind in range(3):
         for ind2 in range(4):
             if ind2 == 0:
-                ax[ind, ind2].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=8)
+                ax[ind, ind2].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=12.5)
                 ax[ind, ind2].yaxis.set_label_coords(-0.6, 0.42)
             if ind !=0 and ind2 == 0:
                 if ind ==2:
-                    ax[ind,ind2].set_xlabel(titles[ind2],fontsize=8)
+                    ax[ind,ind2].set_xlabel(titles[ind2],fontsize=12.5)
                 box = ax[ind, ind2].get_position()
                 ax[ind, ind2].set_position([box.x0+box.width * 0.15, box.y0 + box.height * 0.65, box.width * 0.8, box.height * 0.75])
                 ax[ind, ind2].set_xticks([0, 1])
-                ax[ind, ind2].set_xticklabels([" ", " "], fontsize=8)
+                ax[ind, ind2].set_xticklabels([" ", " "], fontsize=12.5)
                 ax[ind, ind2].set_yticks([0, 1])
-                ax[ind, ind2].set_yticklabels([" ", " "], fontsize=8)
+                ax[ind, ind2].set_yticklabels([" ", " "], fontsize=12.5)
 
                 # ax[ind, ind2].tick_params( axis='y', which='both', bottom=False, top=False, labelbottom=False)
                 # ax[ind, ind2].tick_params( axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -2320,17 +2412,17 @@ def plot_sp6_vs_tnmt_violin():
             ax[ind,ind2].set_xticks([1,2,3,4])
             if ind == 2 and ind2 == 2:
                 handles, labels = ax[ind, ind2].get_legend_handles_labels()
-            ax[ind,ind2].set_xticklabels([0,1,2,3], fontsize=8)
+            ax[ind,ind2].set_xticklabels([0,1,2,3], fontsize=12.5)
             ax[ind,ind2].set_yticks([min_, (min_+max_)/2, max_])
-            ax[ind,ind2].set_yticklabels([round(min_,2), round((min_+max_)/2, 2), round(max_,2)], fontsize=8)
+            ax[ind,ind2].set_yticklabels([round(min_,2), round((min_+max_)/2, 2), round(max_,2)], fontsize=12.5)
             if ind == 2:
-                ax[ind, ind2].set_xlabel(titles[ind2], fontsize=8)
+                ax[ind, ind2].set_xlabel(titles[ind2], fontsize=12.5)
         # if ind == 0:
-        #     ax[ind].set_title("Weighted F1 scores for TSignal/SignalP6: 0.8132/0.7976", fontsize=8, y=1.1)
+        #     ax[ind].set_title("Weighted F1 scores for TSignal/SignalP6: 0.8132/0.7976", fontsize=12.5, y=1.1)
     handles.append(mpatches.Patch(color='#1f77b4'))
     labels.append("TSignal")
-    fig.text(0.5, 0.04, 'Tolerance/Life group', ha='center', fontsize=8)
-    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=8)
+    fig.text(0.5, 0.04, 'Tolerance/Life group', ha='center', fontsize=12.5)
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=12.5)
     fig.suppressComposite = False
     from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
     mini_line = Arrow(569, 100, 0, 100 + 800, color='black', alpha=1)
@@ -2338,13 +2430,56 @@ def plot_sp6_vs_tnmt_violin():
     # dotted_line(910,100, patches=fig.patches)
     # dotted_line(1251,100, patches=fig.patches)
     # ax[2].set_xlabel("eukarya                    gn bacteria             gp bacteria                    archaea\n\n "
-    #                  "tolerance/life group", fontsize=8)
+    #                  "tolerance/life group", fontsize=12.5)
 
     # with plt.rc_context({'image.composite_image': False}):
     #     fig.savefig('t.pdf', dpi=350)
 
     plt.savefig("some_plot.pdf")
     exit(1)
+
+def print_tables(sp1rec, sp1prec, sp2rec,sp2prec,tatrec,tatprec,sp6_sp1rec, sp6_sp1prec, sp6_sp2rec,sp6_sp2prec,sp6_tatrec,sp6_tatprec):
+    def print_vecs_as_tbls(vec1,vec2,vec3):
+        string1, string2 = "", ""
+        for v1, v2, v3 in zip(vec1,vec2, vec3):
+            v1, v2,v3= round(v1,3), round(v2,3), round(v3,3)
+            if v1 > v2:
+                string1 += "& $\mathbf{" + str(v1) + " \pm " + str(v3) + "}$ "
+                string2 += "& $" + str(v2) +"$ "
+            elif v1< v2:
+                string1 += "& $"+str(v1) + " \pm " + str(v3) + "$"
+                string2 += "& $\mathbf{" + str(v2) + "}$ "
+            else:
+                string1 += "& $\mathbf{" + str(v1) + " \pm " + str(v3) + "}$ "
+                string2 += "& $\mathbf{" + str(v2) + "}$ "
+        print("TSignal:", string1)
+        print("SP6:", string2)
+
+    mean_sp1rec, mean_sp1prec, \
+        mean_sp2rec,mean_sp2prec,mean_tatrec,mean_tatprec = np.mean(np.stack(sp1rec), axis=0), np.mean(np.stack(sp1prec), axis=0), \
+                                                            np.mean(np.stack(sp2rec),axis=0), np.mean(np.stack(sp2prec), axis=0), \
+                                                            np.mean(np.stack(tatrec),axis=0), np.mean(np.stack(tatprec),axis=0)
+    std_sp1rec, std_sp1prec, \
+            std_sp2rec,std_sp2prec,std_tatrec,std_tatprec = np.std(np.stack(sp1rec), axis=0), np.std(np.stack(sp1prec), axis=0), \
+                                                                np.std(np.stack(sp2rec),axis=0), np.std(np.stack(sp2prec), axis=0), \
+                                                                np.std(np.stack(tatrec),axis=0), np.std(np.stack(tatprec),axis=0)
+    print("\n")
+    print("Recall sp1")
+    print_vecs_as_tbls(mean_sp1rec, sp6_sp1rec, std_sp1rec)
+    print("Precision sp1")
+    print_vecs_as_tbls(mean_sp1prec, sp6_sp1prec, std_sp1prec)
+
+    print("\n")
+    print("Recall sp2")
+    print_vecs_as_tbls(mean_sp2rec, sp6_sp2rec, std_sp2rec)
+    print("Precision sp2")
+    print_vecs_as_tbls(mean_sp2prec, sp6_sp2prec, std_sp2prec)
+
+    print("\n")
+    print("Recall tat")
+    print_vecs_as_tbls(mean_tatrec, sp6_tatrec, std_tatrec)
+    print("Precision tat")
+    print_vecs_as_tbls(mean_tatprec, sp6_tatprec, std_tatprec)
 
 def plot_sp6_vs_tnmt():
     import matplotlib as mpl
@@ -2360,8 +2495,15 @@ def plot_sp6_vs_tnmt():
     runs = [32,34]
     runs = [32,34,37,39]
     runs = [32]
+    # separate pe
     runs = [32,34,37, 39,40, 47]
+    # separate pe w blosum on generator
+    runs = [65,66]
     # runs = [42]
+    # lipobox training + separate pe + blosum on generator
+    runs = [67]
+    runs = [32,34,37, 39,40, 47]
+    runs = [59,60,61,62,71]
 
     for run_no in runs:
         print("Computing results for run number {}".format(run_no))
@@ -2373,15 +2515,15 @@ def plot_sp6_vs_tnmt():
                                                 benchmark=True,
                                                 prints=True)
         mdl_ind = 0
-        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
-        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][6]]))
-        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][7]]))
-        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-4])]))
-        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][8]]))
-        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][9]]))
-        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-3])]))
-        tat_f1s.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
-        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
+        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
+        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-6])]))
+        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][12]]))
+        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][13]]))
+        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
+        tat_recs.append(np.array([rec for rec in mdl2results[mdl_ind][14]]))
+        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][15]]))
         mcc1_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][0]]))
         mcc2_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][1][1:]]))
         mcc1_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][2]]))
@@ -2455,13 +2597,32 @@ def plot_sp6_vs_tnmt():
 
     all_sptypes_all_mean = [np.mean(arrange_sptype_tol_lg[0],axis=1), np.mean(arrange_sptype_tol_lg[1], axis=1), np.mean(arrange_sptype_tol_lg[2], axis=1)]
     all_sptypes_all_std = [np.std(arrange_sptype_tol_lg[0],axis=1), np.std(arrange_sptype_tol_lg[1], axis=1), np.std(arrange_sptype_tol_lg[2], axis=1)]
+    print("Mean SP1:",all_sptypes_all_mean[0])
+    print("STD SP1:",all_sptypes_all_std[0])
+
+    print("Mean SP2:",all_sptypes_all_mean[1])
+    print("STD SP2:",all_sptypes_all_std[1])
+
+    print("Mean Tat:", all_sptypes_all_mean[2])
+    print("STD Tat:", all_sptypes_all_std[2])
+
+    print(np.mean(np.stack(sp1_recs), axis=0))
+    print(np.mean(np.stack(sp1_precs), axis=0))
+    print_tables(sp1_recs,sp1_precs,sp2_recs,sp2_precs,tat_recs,tat_precs,sp6_recalls_sp1,sp6_precs_sp1, sp6_recalls_sp2, sp6_precs_sp2, sp6_recalls_tat, sp6_precs_tat)
+
+    # print(np.mean(np.stack(tat_recs), axis=0))
+    # print(np.mean(np.stack(tat_precs), axis=0))
+    # print(all_sptypes_all_mean)
+
+    exit(1)
+
     all_f1s_sp1 = [np.array(all_sptypes_all_mean[0]).reshape(-1), np.array([sp6_f1_sp1[i * 4:(i + 1) * 4] for i in range(4)]).reshape(-1)]
     all_f1s_sp2 = [np.array(all_sptypes_all_mean[1]).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
     all_f1s_tat = [np.array(all_sptypes_all_mean[2]).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
     all_sptypes_all_f1s = [all_f1s_sp1, all_f1s_sp2, all_f1s_tat]
     print(all_sptypes_all_f1s,all_sptypes_all_std)
 
-    names = ["TSignal", "SignalP6", "LipoP", "DeepSig", "Phobius"]
+    names = ["TSignal", "SignalP 6.0", "LipoP", "DeepSig", "Phobius"]
     colors = ["mediumblue", "saddlebrown", "green", "black", "purple","red"]
     titles = ["", "", "", ""]
     x_positions = []
@@ -2472,7 +2633,7 @@ def plot_sp6_vs_tnmt():
     fig, ax = plt.subplots(3, 1,figsize=(8, 6),dpi=350)
     line_w = 0.3
     offsets = [-line_w*0.5, line_w*0.5]
-    sptypes=["Sec/SPI", "Sec/SPII", "Tat/SP1"]
+    sptypes=["Sec/SPase I", "Sec/SPase II", "Tat/SPase I"]
     for ind in range(3):
         upper_lim = 17 if ind == 0 else 13
         lower_lim = 0 if ind == 0 else 1
@@ -2491,22 +2652,22 @@ def plot_sp6_vs_tnmt():
             ax[ind].plot([i+offsets[0],i+offsets[0]],[low,max(high,low+0.001)], color='black')
         box = ax[ind].get_position()
         ax[ind].set_xlim(0.5,16.5)
-        ax[ind].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1.1, box.height * 0.95])
+        ax[ind].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1, box.height * 0.95])
         ax[ind].set_yticks([0,0.2,0.4,0.6,0.8,1])
         ax[ind].set_ylim([0, 1.1])
         ax[ind].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
         ax[ind].set_xticks(list(range(lower_lim_plots, 17)))
         if ind == 2:
             handles, labels = ax[ind].get_legend_handles_labels()
-        ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=8)
-        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=8)
+        ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=12.5)
+        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=12.5)
         ax[ind].yaxis.set_label_coords(-0.07, 0.42)
-        ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=8)
-    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=8)
+        ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=12.5)
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.0, 0.05), ncol=2, fontsize=12.5)
     fig.suppressComposite = False
     from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
-    ax[2].set_xlabel("eukarya                                        gn bacteria                                 gp bacteria                                        archaea\n\n "
-                     "tolerance/life group",fontsize=8)
+    ax[2].set_xlabel("eukarya                 gn bacteria                  gp bacteria                 archaea\n\n "
+                     "tolerance/life group",fontsize=12.5)
     plt.savefig("some_plot.pdf")
     exit(1)
     # plt.show()
@@ -2520,7 +2681,7 @@ def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,
     offsets = [-line_w*2.5,-line_w*1.5,-line_w*0.5, line_w*0.5,line_w*1.5,line_w*2.5]
     colors = ["mediumblue", "saddlebrown", "green", "black", "purple","red"]
     ylabels = ["Sec/SPase I", "Sec/SPase II", "Tat/SPase I"]
-    model_names = ["TSignal", "SP6", "DeepSig", "Pred-TAT","LipoP", "Phobius"]
+    model_names = ["TSignal", "SignalP 6.0", "DeepSig", "Pred-TAT","LipoP", "Phobius"]
     for ind in range(3):
         current_sptype_mcc1, current_sptype_mcc2 = mean_results_TSignal[ind]
         current_sptype_mcc1_std, current_sptype_mcc2_std = std_results_TSignal[ind]
@@ -2532,13 +2693,14 @@ def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,
         mcc2_mean_results = [current_sptype_mcc2,current_sptype_mcc2_sp6]
         # print(current_sptype_mcc1,current_sptype_mcc1_sp6,current_sptype_mcc1_deepsig,current_sptype_mcc1_predTat,current_sptype_mcc1_LipoP,current_sptype_mcc1_Phobius)
         box = ax[ind][0].get_position()
-        ax[ind][0].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1.3, box.height * 0.95])
+        ax[ind][0].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1.32, box.height * 0.95])
         box = ax[ind][1].get_position()
-        ax[ind][1].set_position([box.x0+box.width * 0.35, box.y0 + box.height * 0.35, box.width * 0.8, box.height * 0.95])
-        if ind == 0:
-            ax[ind][0].set_title("MCC1",fontsize=8)
-            ax[ind][1].set_title("MCC2",fontsize=8)
-        ax[ind][0].set_ylabel(ylabels[ind],fontsize=8)
+        ax[ind][1].set_position([box.x0+box.width * 0.42, box.y0 + box.height * 0.35, box.width * 0.8, box.height * 0.95])
+        # if ind == 0:
+        #     ax[ind][0].set_title("MCC1",fontsize=12.5)
+        #     ax[ind][1].set_title("MCC2",fontsize=12.5)
+        ax[ind][0].set_ylabel("MCC1\n"+ylabels[ind],fontsize=12.5)
+        ax[ind][1].set_ylabel("MCC2\n"+ylabels[ind],fontsize=12.5)
         if ind != 2:
             ax[ind][0].set_xticks([1,2,3,4])
             ax[ind][0].set_xticklabels(["","","",""])
@@ -2546,9 +2708,9 @@ def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,
             ax[ind][1].set_xticklabels(["","",""])
         else:
             ax[ind][0].set_xticks([1,2,3,4])
-            ax[ind][0].set_xticklabels(["eukarya", "gn-bacteria", "gp-bacteria", "archaea"], fontsize=8)
+            ax[ind][0].set_xticklabels(["eukarya", "gn-bacteria", "gp-bacteria", "archaea"], fontsize=12.5)
             ax[ind][1].set_xticks([1, 2, 3])
-            ax[ind][1].set_xticklabels(["gn-bacteria", "gp-bacteria", "archaea"], fontsize=8)
+            ax[ind][1].set_xticklabels(["gn-bacteria", "gp-bacteria", "archaea"], fontsize=12.5)
 
         ax[ind][0].plot([1.5,1.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
         ax[ind][0].plot([2.5,2.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
@@ -2588,13 +2750,13 @@ def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,
         ax[ind][0].set_ylim([0,1.1])
         ax[ind][1].set_ylim([0,1.1])
         ax[ind][0].set_yticks([0,0.2,0.4,0.6,0.8,1])
-        ax[ind][0].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=8)
+        ax[ind][0].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=12.5)
         ax[ind][1].set_yticks([0,0.2,0.4,0.6,0.8,1])
-        ax[ind][1].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=8)
+        ax[ind][1].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=12.5)
         ax[ind][0].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
         ax[ind][1].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
         ax[ind][0].set_xlim([0.5,4.5])
-    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=6, fontsize=8)
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=5, fontsize=12.5)
     plt.savefig("some_plot_mcc.pdf")
 
     #     exit(1)
@@ -2618,15 +2780,15 @@ def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,
     #     ax[ind].set_xticks(list(range(lower_lim_plots, 17)))
     #     if ind == 2:
     #         handles, labels = ax[ind].get_legend_handles_labels()
-    #     ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=8)
-    #     ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=8)
+    #     ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=12.5)
+    #     ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=12.5)
     #     ax[ind].yaxis.set_label_coords(-0.07, 0.42)
-    #     ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=8)
-    # fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=8)
+    #     ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=12.5)
+    # fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=12.5)
     # fig.suppressComposite = False
     # from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
     # ax[2].set_xlabel("eukarya                                        gn bacteria                                 gp bacteria                                        archaea\n\n "
-    #                  "tolerance/life group",fontsize=8)
+    #                  "tolerance/life group",fontsize=12.5)
     # plt.savefig("some_plot.pdf")
 
 def plot_sp6_vs_tnmt_mcc():
@@ -2658,7 +2820,7 @@ def plot_sp6_vs_tnmt_mcc():
     # runs = [58]
     # additional oh on generator (1l gen)
     runs = [59]
-    # runs = [60]
+    runs = [60]
     # additional oh on generator (1l gen)
     runs = [61]
     runs = [62]
@@ -2666,7 +2828,36 @@ def plot_sp6_vs_tnmt_mcc():
     runs = [63]
     # additional oh on generator (2l gen)
     runs = [64]
+    # additional blosum on generator (1l gen)
+    runs = [65,69]
 
+
+
+    # add additional oh 0.8114533887361024
+    runs = [59,60,61,62,71]
+    # do not add additional oh (separate pe) 0.811137870009116
+    runs = [32,34,37, 39,40, 47]
+    # non separate pe; 0.8084162965367755
+    runs = [21, 22, 23, 24, 25]
+
+    runs = [65]
+
+    # blosum on generator (separate pe)
+    runs = [65,66,69, 70]
+
+    # blosum on generator lipobox training
+    runs = [67,68]
+
+    # no extra pe encoding, oh on the generator
+    runs = [72]
+
+    runs = [65,66]
+
+    runs = [69]
+
+    runs = [32,34,37, 39,40, 47]
+    runs = [59,60,61,62,71]
+    # runs = [73]
 
 
     mcc_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"], return_mcc=True)
@@ -2692,15 +2883,15 @@ def plot_sp6_vs_tnmt_mcc():
                                                 benchmark=True,
                                                 prints=True)
         mdl_ind = 0
-        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
-        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][6]]))
-        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][7]]))
-        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-4])]))
-        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][8]]))
-        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][9]]))
-        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-3])]))
-        tat_f1s.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
-        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
+        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
+        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-6])]))
+        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][12]]))
+        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][13]]))
+        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
+        tat_recs.append(np.array([rec for rec in mdl2results[mdl_ind][14]]))
+        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][15]]))
         mcc1_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][0]]))
         mcc2_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][1][1:]]))
         mcc1_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][2]]))
@@ -2727,6 +2918,34 @@ def plot_sp6_vs_tnmt_mcc():
     sp6_mcc1_sp1, sp6_mcc2_sp1 = np.array([0.868, 0.811,0.878,0.737]), np.array([0.649, 0.734, 0.728])
     sp6_mcc1_sp2, sp6_mcc2_sp2 = np.array([0.838, 0.894, 0.871]), np.array([0.841, 0.893, 0.719])
     sp6_mcc1_tat, sp6_mcc2_tat = np.array([0.946, 0.788, 0.802]), np.array([0.934, 0.806,0.807])
+    # print(mean_mcc1_sp1)
+    # print(std_mcc1_sp1)
+    # print(sp6_mcc1_sp1)
+    print("\n")
+    print(mean_mcc2_sp1)
+    print(std_mcc2_sp1)
+    print(sp6_mcc2_sp1)
+    print("\n")
+
+    print(mean_mcc1_sp2)
+    print(std_mcc1_sp2)
+    print(sp6_mcc1_sp2)
+    print("\n")
+
+    print(mean_mcc2_sp2)
+    print(std_mcc2_sp2)
+    print(sp6_mcc2_sp2)
+    print("\n")
+
+    print(mean_mcc1_tat)
+    print(std_mcc1_tat)
+    print(sp6_mcc1_tat)
+    print("\n")
+
+    print(mean_mcc2_tat)
+    print(std_mcc2_tat)
+    print(sp6_mcc2_tat)
+
 
     mean_results_TSignal = [[mean_mcc1_sp1, mean_mcc2_sp1], [mean_mcc1_sp2, mean_mcc2_sp2],[mean_mcc1_tat, mean_mcc2_tat]]
     std_results_TSignal = [[std_mcc1_sp1, std_mcc2_sp1], [std_mcc1_sp2, std_mcc2_sp2], [std_mcc1_tat, std_mcc2_tat]]
@@ -2858,7 +3077,7 @@ def plot_sp6_vs_tnmt_mcc():
     all_sptypes_all_f1s = [all_f1s_sp1, all_f1s_sp2, all_f1s_tat]
     print(all_sptypes_all_f1s)
 
-    names = ["TSignal", "SignalP6", "LipoP", "DeepSig", "Phobius"]
+    names = ["TSignal", "SignalP 6.0", "LipoP", "DeepSig", "Phobius"]
     colors = ["mediumblue", "saddlebrown", "green", "black", "purple"]
     titles = ["", "", "", ""]
     x_positions = []
@@ -2898,15 +3117,15 @@ def plot_sp6_vs_tnmt_mcc():
         ax[ind].set_xticks(list(range(lower_lim_plots, 17)))
         if ind == 2:
             handles, labels = ax[ind].get_legend_handles_labels()
-        ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=8)
-        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=8)
+        ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=12.5)
+        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=12.5)
         ax[ind].yaxis.set_label_coords(-0.07, 0.42)
-        ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=8)
-    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=8)
+        ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=12.5)
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=12.5)
     fig.suppressComposite = False
     from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
     ax[2].set_xlabel("eukarya                                        gn bacteria                                 gp bacteria                                        archaea\n\n "
-                     "tolerance/life group",fontsize=8)
+                     "tolerance/life group",fontsize=12.5)
     plt.savefig("some_plot.pdf")
     exit(1)
     # plt.show()
@@ -2935,13 +3154,14 @@ def plot_comparative_performance_sp1_mdls():
     # names = ["TSignal", "PredTAT", "LipoP", "DeepSig", "Phobius"]
     names = ["TSignal", "DeepSig", "Phobius", "LipoP", "PredTAT"]
     colors = ["navy", "red", "green", "black", "purple"]
-    titles = ["eukarya", "negative", "positive", "archaea"]
+    titles = ["eukarya", "gn bacteria", "gp bacteria", "archaea"]
     x_positions = []
 
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
     runs = [1,2,3,4,5]
     runs = [32,34,37, 39,40, 47]
+    runs = [59,60,61,62,71]
 
     for run_no in runs:
         print("Computing results for run number {}".format(run_no))
@@ -2956,15 +3176,15 @@ def plot_comparative_performance_sp1_mdls():
                                                 prints=False,
                                                 restrict_types=["SP", "NO_SP"])
         mdl_ind = 0
-        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
-        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][6]]))
-        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][7]]))
-        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-4])]))
-        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][8]]))
-        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][9]]))
-        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-3])]))
-        tat_f1s.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
-        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
+        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
+        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-6])]))
+        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][12]]))
+        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][13]]))
+        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
+        tat_f1s.append(np.array([rec for rec in mdl2results[mdl_ind][14]]))
+        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][15]]))
         mcc1_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][0]]))
         mcc2_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][1][1:]]))
         mcc1_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][2]]))
@@ -3041,30 +3261,30 @@ def plot_comparative_performance_sp1_mdls():
             else:
                 ax[ind].bar([i + offsets[j] for i in range(1,5)], all_f1s[j][ind], color=colors[j], label=names[j], width=line_w, alpha=0.6)
         box = ax[ind].get_position()
-        ax[ind].set_position([box.x0 + box.width * 0.15, box.y0 + box.height * 0.35, box.width * 0.9, box.height])
+        ax[ind].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.35, box.width * 1, box.height*0.85])
         if ind == 3:
-            # ax[ind].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=14)
+            # ax[ind].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=12.5)
             handles, labels = ax[ind].get_legend_handles_labels()
 
         # if ind != 3:
         #     ax[ind].set_xticks([])
         # else:
         ax[ind].set_xticks(list(range(1,5)))
-        ax[ind].set_xticklabels(['{}'.format(i) for i in range(4)], fontsize=8)
+        ax[ind].set_xticklabels(['{}'.format(i) for i in range(4)], fontsize=12.5)
         ax[ind].set_yticks([0, 0.2,0.4,0.6,0.8, 1])
         ax[ind].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
-        ax[ind].set_yticklabels(labels=[0, 0.2,0.4,0.6,0.8, 1],fontsize=8)
+        ax[ind].set_yticklabels(labels=[0, 0.2,0.4,0.6,0.8, 1],fontsize=12.5)
         # plt.yticks(fontsize=10)
         # if ind == 0:
-        #     ax[ind].set_title("F1 score", fontsize=14)
-        ax[ind].set_ylabel(titles[ind] + "\nF1", fontsize=8, rotation=0)
-        ax[ind].yaxis.set_label_coords(-0.1, 0.25)
+        #     ax[ind].set_title("F1 score", fontsize=12.5)
+        ax[ind].set_ylabel("F1 score\n"+titles[ind], fontsize=12.5)
+        ax[ind].yaxis.set_label_coords(-0.08, 0.5)
         ax[ind].set_xlim(0.6, 4.4)
         if ind == 3:
-            ax[ind].set_xlabel("tolerance", fontsize=8)
+            ax[ind].set_xlabel("tolerance", fontsize=12.5)
 
-    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.12, 0.045), ncol=5, fontsize=8)
-    plt.savefig("some_plot.pdf")
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.0, 0.045), ncol=5, fontsize=12.5)
+    plt.savefig("some_plot_cs_bench_other_mdls.pdf")
     exit(1)
 
 def create_random_split_fold_data():
@@ -3293,7 +3513,7 @@ def plot_perf_over_data_perc():
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
     mpl.rcParams['font.family'] = "Arial"
-    fig, ax = plt.subplots(2, 2)
+    fig, ax = plt.subplots(2, 2,figsize=(8, 6))
     # print(ax)
     # print(ax[0])
     # print(ax[0, 0])
@@ -3367,14 +3587,14 @@ def plot_perf_over_data_perc():
         # ax[0,0].set_ylabel("F1 score")
         box = ax[0,0].get_position()
         ax[0,0].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.45, box.width, box.height * 0.75])
-        ax[0,0].set_ylabel("F1 score", fontsize=8)
+        ax[0,0].set_ylabel("F1 score", fontsize=12.5)
         ax[0, 0].yaxis.set_label_coords(-0.2, 0.45)
         ax[0, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
         ax[0, 0].set_xticks([0.25, 0.5, 0.75, 1])
-        ax[0, 0].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=8)
-        ax[0, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+        ax[0, 0].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=12.5)
+        ax[0, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
 
-        # ax[0,0].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=11)
+        # ax[0,0].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=12.5)
     all_neg_mean_tol0 = np.array(all_neg_mean_tol0)
     all_neg_mean_tol3 = np.array(all_neg_mean_tol3)
     all_neg_std_tol0 = np.array(all_neg_std_tol0)
@@ -3395,8 +3615,8 @@ def plot_perf_over_data_perc():
 
     ax[0,1].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.45, box.width, box.height * 0.75])
     ax[0,1].set_xticks([0.25, 0.5, 0.75, 1])
-    ax[0,1].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=8)
-    ax[0,1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+    ax[0,1].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=12.5)
+    ax[0,1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
 
     all_pos_mean_tol0 = np.array(all_pos_mean_tol0)
     all_pos_mean_tol3 = np.array(all_pos_mean_tol3)
@@ -3412,17 +3632,17 @@ def plot_perf_over_data_perc():
     ax[1,0].plot(subsets, all_pos_mean_tol3, '--', label='gp bacteria tol 3', color='purple')
     ax[1,0].fill_between(subsets, all_pos_mean_tol3 - 2 * all_pos_std_tol3, all_pos_mean_tol3 + 2 * all_pos_std_tol3,
                     alpha=0.2, color='purple')
-    ax[1, 0].set_ylabel("F1 score", fontsize=8)
+    ax[1, 0].set_ylabel("F1 score", fontsize=12.5)
     ax[1, 0].yaxis.set_label_coords(-0.2, 0.45)
     ax[1, 0].set_xticks([0.25, 0.5, 0.75, 1])
 
     box = ax[1,0].get_position()
     ax[1,0].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.6, box.width, box.height * 0.75])
-    ax[1,0].set_xlabel("data percentage", fontsize=8)
+    ax[1,0].set_xlabel("data percentage", fontsize=12.5)
     ax[1,0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
 
-    ax[1,0].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=8)
-    ax[1,0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+    ax[1,0].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=12.5)
+    ax[1,0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
     # plt.show()
     all_archaea_mean_tol0 = np.array(all_archaea_mean_tol0)
     all_archaea_mean_tol3 = np.array(all_archaea_mean_tol3)
@@ -3442,12 +3662,12 @@ def plot_perf_over_data_perc():
                     alpha=0.2, color='red')
     box = ax[1,1].get_position()
     ax[1,1].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.6, box.width, box.height * 0.75])
-    ax[1,1].set_xlabel("data percentage", fontsize=8)
+    ax[1,1].set_xlabel("data percentage", fontsize=12.5)
     ax[1,1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1    ])
     ax[1,1].set_xticks([0.25, 0.5, 0.75, 1])
 
-    ax[1,1].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=8)
-    ax[1,1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+    ax[1,1].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=12.5)
+    ax[1,1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
     ax[0, 0].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
     ax[0, 1].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
     ax[1, 0].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
@@ -3460,9 +3680,11 @@ def plot_perf_over_data_perc():
             all_handles.extend(handles)
             all_labels.extend(labels)
 
-    fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.03, 0.1), ncol=4, fontsize=8)
+    fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.03, 0.1), ncol=4, fontsize=12.5)
     # fig.text(0.5, 0.04, 'common X', ha='center')
     # fig.text(0.04, 0.5, 'common Y', va='center', rotation='vertical')
+    plt.savefig("some_plot_perf_over_data_perc.pdf")
+    exit(1)
     plt.show()
 
 def checkthis_():
@@ -3498,10 +3720,105 @@ def plot_ece_over_tolerance(lg_and_tol2_lg):
     plt.show()
 
 def extract_performance_over_tolerance():
+    def plot_spase12_pairs(negative_mean,positive_mean,archaea_mean,negative_std,positive_std,archaea_std,
+                           negative_sp2_mean,positive_sp2_mean,archaea_sp2_mean,negative_sp2_std,positive_sp2_std,archaea_sp2_std,
+                           type='Tat'):
+        tolerances = list(range(4))
+        import matplotlib as mpl
+        mpl.rcParams['figure.dpi'] = 350
+        mpl.rcParams['font.family'] = "Arial"
+        import matplotlib.gridspec as gridspec
+        fig, ax = plt.subplots(3, 2, figsize=(8, 6))
+        ax[0, 0].set_title(type+"/SPase " + "I" if type=='Tat' else type + "/SPase " + "II")
+        ax[0, 0].plot(tolerances, negative_mean, '-', label='gn negative', color='orange')
+        ax[0, 0].fill_between(tolerances, negative_mean - 2 * negative_std, negative_mean + 2 * negative_std, alpha=0.2,
+                              color='orange')
+        ax[0, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        ax[0, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
+        ax[0, 0].set_xticks([0, 1, 2, 3])
+        ax[0, 0].set_xticklabels(["0", "1", "2", "3"], fontsize=12.5)
+        box = ax[0, 0].get_position()
+        ax[0, 0].set_position([box.x0, box.y0 + box.height * 0.5, box.width, box.height * 0.78])
+        # ax[0, 0].yaxis.set_label_coords(-0.2, 0.5)
+
+        ax[1, 0].plot(tolerances, positive_mean, '-', label='gp bacteria', color='purple')
+        ax[1, 0].fill_between(tolerances, positive_mean - 2 * positive_std, positive_mean + 2 * positive_std, alpha=0.2,
+                              color='purple')
+        ax[1, 0].set_xticks([0, 1, 2, 3])
+        ax[1, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        ax[1, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
+        ax[1, 0].set_xticklabels(["0", "1", "2", "3"], fontsize=12.5)
+        box = ax[1, 0].get_position()
+        ax[1, 0].set_position([box.x0, box.y0 + box.height * 0.5, box.width, box.height * 0.78])
+
+
+        ax[2, 0].plot(tolerances, archaea_mean, '-', label='archaea', color='red')
+        ax[2, 0].fill_between(tolerances, archaea_mean - 2 * archaea_std, archaea_mean + 2 * archaea_std, alpha=0.2,
+                              color='red')
+        ax[2, 0].set_xticks([0, 1, 2, 3])
+        ax[2, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        ax[2, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
+        ax[2, 0].set_xticklabels(["0", "1", "2", "3"], fontsize=12.5)
+        box = ax[2, 0].get_position()
+        ax[2, 0].set_position([box.x0, box.y0 + box.height * 0.5, box.width, box.height * 0.78])
+
+        ax[0, 1].set_title(type + "/SPase " + "II" if type == 'Tat' else type + "/SPase " +  "IV")
+        ax[0, 1].plot(tolerances, negative_sp2_mean, '-', label='gn negative', color='orange')
+        ax[0, 1].fill_between(tolerances, negative_sp2_mean - 2 * negative_sp2_std, negative_sp2_mean + 2 * negative_sp2_std, alpha=0.2,
+                              color='orange')
+        ax[0, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        ax[0, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
+        ax[0, 1].set_xticks([0, 1, 2, 3])
+        ax[0, 1].set_xticklabels(["0", "1", "2", "3"], fontsize=12.5)
+        box = ax[0, 1].get_position()
+        ax[0, 1].set_position([box.x0, box.y0 + box.height * 0.5, box.width, box.height * 0.78])
+        ax[0, 1].yaxis.set_label_coords(-0.2, 0.5)
+
+        ax[1, 1].plot(tolerances, positive_sp2_mean, '-', label='gp bacteria', color='purple')
+        ax[1, 1].fill_between(tolerances, positive_sp2_mean - 2 * positive_sp2_std, positive_sp2_mean + 2 * positive_sp2_std, alpha=0.2,
+                              color='purple')
+        ax[1, 1].set_xticks([0, 1, 2, 3])
+        ax[1, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        ax[1, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
+        ax[1, 1].set_xticklabels(["0", "1", "2", "3"], fontsize=12.5)
+        box = ax[1, 1].get_position()
+        ax[1, 1].set_position([box.x0, box.y0 + box.height * 0.5, box.width, box.height * 0.78])
+
+        ax[2, 1].plot(tolerances, archaea_sp2_mean, '-', label='archaea', color='red')
+        ax[2, 1].fill_between(tolerances, archaea_sp2_mean - 2 * archaea_sp2_std, archaea_sp2_mean + 2 * archaea_sp2_std, alpha=0.2,
+                              color='red')
+        ax[2, 1].set_xticks([0, 1, 2, 3])
+        ax[2, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
+        ax[2, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
+        ax[2, 1].set_xticklabels(["0", "1", "2", "3"], fontsize=12.5)
+        box = ax[2, 1].get_position()
+        ax[2, 1].set_position([box.x0, box.y0 + box.height * 0.5, box.width, box.height * 0.78])
+        ax[0, 0].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+        ax[0, 1].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+        ax[1, 0].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+        ax[1, 1].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+        ax[2, 1].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+        ax[2, 0].grid(axis='y', color='black', linestyle='-', linewidth=0.5, alpha=0.4)
+        ax[0, 0].set_ylabel("F1 score", fontsize=12.5)
+        ax[1, 0].set_ylabel("F1 score", fontsize=12.5)
+        ax[2, 0].set_ylabel("F1 score", fontsize=12.5)
+
+        all_handles, all_labels = [], []
+        for ind in range(3):
+            handles, labels = ax[ind, 0].get_legend_handles_labels()
+            all_handles.extend(handles)
+            all_labels.extend(labels)
+
+        fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.125, 0.09), ncol=4, fontsize=12.5)
+        plt.savefig("some_plot_perf_over_tolerance_{}.pdf".format("tat" if type=="Tat" else "sp2"))
     all_mdl_2results = []
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
-    tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
+        tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat, \
+        tatlipo_f1s, tatlipo_recs, tatlipo_precs, pilin_f1s, pilin_recs, pilin_precs, \
+        mcc1_tatlipo, mcc2_tatlipo, mcc1_pilin, mcc2_pilin\
+        = [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [],[],[],[],[],[],[],[],[],[]
     runs = [32,34,37, 39,40, 47]
+    runs = [59,60,61,62,71]
 
     for run_no in runs:
         run_results_folder = "tuning_bert_repeat{}_only_decoder/".format(run_no) if run_no != 1 else "tuning_bert_only_decoder/"
@@ -3511,95 +3828,114 @@ def extract_performance_over_tolerance():
                                                 compare_mdl_plots=False,
                                                 remove_test_seqs=False,
                                                 benchmark=False,
-                                                prints=False)
+                                                prints=True)
         mdl_ind = 0
-        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
-        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][6]]))
-        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][7]]))
-        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-4])]))
-        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][8]]))
-        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][9]]))
-        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-3])]))
-        tat_f1s.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
-        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
+        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
+        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-6])]))
+        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][12]]))
+        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][13]]))
+        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
+        tat_recs.append(np.array([rec for rec in mdl2results[mdl_ind][14]]))
+        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][15]]))
+        print(np.concatenate(mdl2results[mdl_ind][-3]), np.concatenate(mdl2results[mdl_ind][-4]))
+        tatlipo_f1s.append(np.array([f1 for f1 in np.concatenate(mdl2results[mdl_ind][-4])]))
+        tatlipo_recs.append(np.array([rec for rec in mdl2results[mdl_ind][16]]))
+        tatlipo_precs.append(np.array([prec for prec in mdl2results[mdl_ind][17]]))
+        pilin_f1s.append(np.array([f1 for f1 in np.concatenate(mdl2results[mdl_ind][-3])]))
+        pilin_recs.append(np.array([rec for rec in mdl2results[mdl_ind][18]]))
+        pilin_precs.append(np.array([prec for prec in mdl2results[mdl_ind][19]]))
         mcc1_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][0]]))
         mcc2_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][1][1:]]))
         mcc1_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][2]]))
         mcc2_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
         mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
         mcc2_tat.append([mcc for mcc in mdl2results[mdl_ind][5]])
+        mcc1_tatlipo.append([mcc for mcc in mdl2results[mdl_ind][6]])
+        mcc2_tatlipo.append([mcc for mcc in mdl2results[mdl_ind][7]])
+        mcc1_pilin.append([mcc for mcc in mdl2results[mdl_ind][8]])
+        mcc2_pilin.append([mcc for mcc in mdl2results[mdl_ind][9]])
+
+
+    names = ["eukarya", "gn bacteria", "gp bacteria", "archaea"]
+    sp1_f1s = np.stack(sp1_f1s)
+    sp1_mean_f1s = np.mean(np.stack(sp1_f1s), axis=0)
+    sp2_mean_f1s = np.mean(np.stack(sp2_f1s), axis=0)
+    tat_mean_f1s = np.mean(np.stack(tat_f1s), axis=0)
+    tatlipo_mean_f1s = np.mean(np.stack(tatlipo_f1s), axis=0)
+    pilin_mean_f1s = np.mean(np.stack(pilin_f1s), axis=0)
+
+    sp1_std_f1s = np.std(np.stack(sp1_f1s), axis=0)
+    sp2_std_f1s = np.std(np.stack(sp2_f1s), axis=0)
+    tat_std_f1s = np.std(np.stack(tat_f1s), axis=0)
+    tatlipo_std_f1s = np.std(np.stack(tatlipo_f1s), axis=0)
+    pilin_std_f1s = np.std(np.stack(pilin_f1s), axis=0)
+    print(tatlipo_mean_f1s,  pilin_mean_f1s)
+    print(np.stack(pilin_f1s).shape,  np.stack(tat_f1s).shape)
+    euk_means_sp1, neg_means_sp1, pos_means_sp1, arch_means_sp1 = sp1_mean_f1s[:4], sp1_mean_f1s[4:8], sp1_mean_f1s[8:12], sp1_mean_f1s[12:]
+    neg_means_sp2, pos_means_sp2, arch_means_sp2 = sp2_mean_f1s[:4], sp2_mean_f1s[4:8], sp2_mean_f1s[8:]
+    neg_means_tat, pos_means_tat, arch_means_tat = tat_mean_f1s[:4], tat_mean_f1s[4:8], tat_mean_f1s[8:]
+    neg_means_tatlipo, pos_means_tatlipo, arch_means_tatlipo = tatlipo_mean_f1s[:4], tatlipo_mean_f1s[4:8], tatlipo_mean_f1s[8:]
+    neg_means_pilin, pos_means_pilin, arch_means_pilin = pilin_mean_f1s[:4], pilin_mean_f1s[4:8], pilin_mean_f1s[8:]
+
+    euk_std_sp1, neg_std_sp1, pos_std_sp1, arch_std_sp1 = sp1_std_f1s[:4], sp1_std_f1s[4:8], sp1_std_f1s[8:12], sp1_std_f1s[12:]
+    neg_std_sp2, pos_std_sp2, arch_std_sp2 = sp2_std_f1s[:4], sp2_std_f1s[4:8], sp2_std_f1s[8:]
+    neg_std_tat, pos_std_tat, arch_std_tat = tat_std_f1s[:4], tat_std_f1s[4:8], tat_std_f1s[8:]
+    neg_std_tatlipo, pos_std_tatlipo, arch_std_tatlipo = tatlipo_std_f1s[:4], tatlipo_std_f1s[4:8], tatlipo_std_f1s[8:]
+    neg_std_pilin, pos_std_pilin, arch_std_pilin = pilin_std_f1s[:4], pilin_std_f1s[4:8], pilin_std_f1s[8:]
+
+    plot_spase12_pairs(neg_means_tat, pos_means_tat, arch_means_tat,neg_std_tat, pos_std_tat, arch_std_tat,
+                       neg_means_tatlipo, pos_means_tatlipo, arch_means_tatlipo, neg_std_tatlipo, pos_std_tatlipo, arch_std_tatlipo)
+    plot_spase12_pairs(neg_means_sp2, pos_means_sp2, arch_means_sp2, neg_std_sp2, pos_std_sp2, arch_std_sp2,
+                       neg_means_pilin, pos_means_pilin, arch_means_pilin, neg_std_pilin, pos_std_pilin,
+                       arch_std_pilin, type="Sec")
 
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
     mpl.rcParams['font.family'] = "Arial"
     import matplotlib.gridspec as gridspec
-    fig, ax = plt.subplots(2, 2)
-
-    names = ["eukarya", "gn bacteria", "gp bacteria", "archaea"]
-    sp1_f1s = np.stack(sp1_f1s)
-    sp1_mean_f1s = np.mean(np.stack(sp1_f1s), axis=0)
-    sp1_mean_f1s = np.mean(np.stack(sp1_f1s), axis=0)
-    sp2_mean_f1s = np.mean(np.stack(sp2_f1s), axis=0)
-    sp2_mean_f1s = np.mean(np.stack(sp2_f1s), axis=0)
-    tat_mean_f1s = np.mean(np.stack(tat_f1s), axis=0)
-    tat_mean_f1s = np.mean(np.stack(tat_f1s), axis=0)
-
-    sp1_std_f1s = np.std(np.stack(sp1_f1s), axis=0)
-    sp1_std_f1s = np.std(np.stack(sp1_f1s), axis=0)
-    sp2_std_f1s = np.std(np.stack(sp2_f1s), axis=0)
-    sp2_std_f1s = np.std(np.stack(sp2_f1s), axis=0)
-    tat_std_f1s = np.std(np.stack(tat_f1s), axis=0)
-    tat_std_f1s = np.std(np.stack(tat_f1s), axis=0)
-
-    euk_means_sp1, neg_means_sp1, pos_means_sp1, arch_means_sp1 = sp1_mean_f1s[:4], sp1_mean_f1s[4:8], sp1_mean_f1s[8:12], sp1_mean_f1s[12:]
-    neg_means_sp2, pos_means_sp2, arch_means_sp2 = sp2_mean_f1s[:4], sp2_mean_f1s[4:8], sp2_mean_f1s[8:]
-    neg_means_tat, pos_means_tat, arch_means_tat = tat_mean_f1s[:4], tat_mean_f1s[4:8], tat_mean_f1s[8:]
-
-    euk_std_sp1, neg_std_sp1, pos_std_sp1, arch_std_sp1 = sp1_std_f1s[:4], sp1_std_f1s[4:8], sp1_std_f1s[8:12], sp1_std_f1s[12:]
-    neg_std_sp2, pos_std_sp2, arch_std_sp2 = sp2_std_f1s[:4], sp2_std_f1s[4:8], sp2_std_f1s[8:]
-    neg_std_tat, pos_std_tat, arch_std_tat = tat_std_f1s[:4], tat_std_f1s[4:8], tat_std_f1s[8:]
-
-
+    fig, ax = plt.subplots(2, 2,figsize=(8, 6))
     tolerances = list(range(4))
     ax[0, 0].plot(tolerances, euk_means_sp1, '-', label='eukarya', color='blue')
     ax[0, 0].fill_between(tolerances, euk_means_sp1 - 2 * euk_std_sp1, euk_means_sp1 + 2 * euk_std_sp1, alpha=0.2, color='blue')
     ax[0, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-    ax[0, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+    ax[0, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
     ax[0, 0].set_xticks([0, 1, 2, 3])
-    ax[0, 0].set_xticklabels(["0", "1", "2", "3"], fontsize=8)
+    ax[0, 0].set_xticklabels(["0", "1", "2", "3"], fontsize=12.5)
     box = ax[0, 0].get_position()
     ax[0, 0].set_position([box.x0 , box.y0 + box.height * 0.5, box.width, box.height * 0.78])
-    ax[0, 0].set_ylabel("F1 score", fontsize=8)
+    ax[0, 0].set_ylabel("F1 score", fontsize=12.5)
     ax[0, 0].yaxis.set_label_coords(-0.2, 0.5)
 
     ax[0, 1].plot(tolerances, neg_means_sp1, '-', label='gn bacteria', color='orange')
-    ax[0, 1].fill_between(tolerances, neg_means_sp1 - 2 * neg_std_sp1, neg_means_sp1 + 2 * neg_std_sp1, alpha=0.2, color='blue')
+    ax[0, 1].fill_between(tolerances, neg_means_sp1 - 2 * neg_std_sp1, neg_means_sp1 + 2 * neg_std_sp1, alpha=0.2, color='orange')
     ax[0, 1].set_xticks([0, 1, 2, 3])
     ax[0, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-    ax[0, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
-    ax[0, 1].set_xticklabels(["0", "1", "2", "3"], fontsize=8)
+    ax[0, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
+    ax[0, 1].set_xticklabels(["0", "1", "2", "3"], fontsize=12.5)
     box = ax[0, 1].get_position()
     ax[0, 1].set_position([box.x0 , box.y0 + box.height * 0.5, box.width, box.height * 0.78])
 
     ax[1, 0].plot(tolerances, pos_means_sp1, '-', label='gp bacteria', color='purple')
     ax[1, 0].fill_between(tolerances, pos_means_sp1 - 2 * pos_std_sp1, pos_means_sp1 + 2 * pos_std_sp1, alpha=0.2, color='purple')
     ax[1, 0].set_xticks([0, 1, 2, 3])
-    ax[1, 0].set_xticklabels(["0", "1", "2", "3"], fontsize=8)
+    ax[1, 0].set_xticklabels(["0", "1", "2", "3"], fontsize=12.5)
     ax[1, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-    ax[1, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+    ax[1, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
     box = ax[1, 0].get_position()
     ax[1, 0].set_position([box.x0 , box.y0 + box.height * 0.5, box.width, box.height * 0.78])
-    ax[1, 0].set_ylabel("F1 score", fontsize=8)
+    ax[1, 0].set_ylabel("F1 score", fontsize=12.5)
     ax[1, 0].yaxis.set_label_coords(-0.2, 0.5)
-    ax[1, 0].set_xlabel("tolerance", fontsize=8)
+    ax[1, 0].set_xlabel("tolerance", fontsize=12.5)
 
     ax[1, 1].plot(tolerances, arch_means_sp1, '-', label='archaea', color='red')
     ax[1, 1].fill_between(tolerances, arch_means_sp1 - 2 * arch_std_sp1, arch_means_sp1 + 2 * arch_std_sp1, alpha=0.2, color='red')
     ax[1, 1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-    ax[1, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
+    ax[1, 1].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
     ax[1, 1].set_xticks([0, 1, 2, 3])
-    ax[1, 1].set_xticklabels(["0", "1", "2", "3"], fontsize=8)
-    ax[1, 1].set_xlabel("tolerance", fontsize=8)
+    ax[1, 1].set_xticklabels(["0", "1", "2", "3"], fontsize=12.5)
+    ax[1, 1].set_xlabel("tolerance", fontsize=12.5)
     box = ax[1, 1].get_position()
     ax[1, 1].set_position([box.x0 , box.y0 + box.height * 0.5, box.width, box.height * 0.78])
 
@@ -3615,7 +3951,9 @@ def extract_performance_over_tolerance():
             all_handles.extend(handles)
             all_labels.extend(labels)
 
-    fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.125, 0.09),ncol=4, fontsize=8)
+    fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.125, 0.09),ncol=4, fontsize=12.5)
+    plt.savefig("some_plot_perf_over_tolerance.pdf")
+    exit(1)
     plt.show()
 
     # ax[0].plot(subsets, all_euk_mean_tol3, '--',label='e3', color='blue')
@@ -3673,17 +4011,17 @@ def plot_compare_pos_nopos():
         ax[i].set_ylim(0, 1)
         ax[i].set_xlim(-0.5, 15.5)
         ax[i].set_xticks(list(range(16)))
-        ax[i].set_xticklabels(xticklbls, fontsize=8)
+        ax[i].set_xticklabels(xticklbls, fontsize=12.5)
         ax[i].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-        ax[i].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
-        ax[i].set_ylabel(datasets[i], fontsize=8, rotation=0)
+        ax[i].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
+        ax[i].set_ylabel(datasets[i], fontsize=12.5, rotation=0)
         ax[i].yaxis.set_label_coords(-0.2, 0.35)
 
         # ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[i], 2)), str(total_counts_per_acc[i])) for i in
-        #             range(len(accs)//2 - 2)], fontsize=8)
+        #             range(len(accs)//2 - 2)], fontsize=12.5)
         # ax[i // 2, i % 2].set_yticks([0.5, 1])
         # ax[i // 2, i % 2].set_yticklabels([0.5, 1], fontsize=6)
-    ax[1].set_xlabel("   eukarya               gn bacteria           gp bacteria           archaea\n\n tolerance/life group", fontsize=8)
+    ax[1].set_xlabel("   eukarya               gn bacteria           gp bacteria           archaea\n\n tolerance/life group", fontsize=12.5)
     # ax[0].annotate('', xy=(3.5, 1), xycoords='axes fraction', xytext=(3.5, 2),
     #             arrowprops=dict(arrowstyle="-", color='b'))
     from matplotlib.patches import RegularPolygon, Rectangle
@@ -3699,7 +4037,7 @@ def plot_compare_pos_nopos():
 
 
 
-    fig.legend(loc='center left', bbox_to_anchor=(0, 0.05), fontsize=8, ncol=3)
+    fig.legend(loc='center left', bbox_to_anchor=(0, 0.05), fontsize=12.5, ncol=3)
     plt.show()
 
 
@@ -3753,13 +4091,13 @@ def compare_experiment_results():
     xticks = list(np.array(list(range(16)))*2)
     xticks.append(-3)
     ax.set_xticks(np.array(list(range(16)))*2)
-    ax.set_xticklabels(xticklbls, fontsize=8)
+    ax.set_xticklabels(xticklbls, fontsize=12.5)
     ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-    ax.set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=8)
-    ax.set_ylabel("F1 score", fontsize=8)
+    ax.set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
+    ax.set_ylabel("F1 score", fontsize=12.5)
     ax.set_xlim(-1, 31)
     ax.set_xlabel("eukarya                gn bacteria           gp bacteria                 archaea\n\n "
-                  "    tolerance/life group",fontsize=8)
+                  "    tolerance/life group",fontsize=12.5)
 
     ax.plot([7, 7], [0, 1.5], linestyle='--', dashes=(1, 1), color='black')
     ax.plot([15, 15], [0, 1.5], linestyle='--', dashes=(1, 1), color='black')
@@ -3767,11 +4105,11 @@ def compare_experiment_results():
     # ax.yaxis.set_label_coords(-0.18, 0.45)
 
         # ax[i//2, i%2].set_xticklabels(["{}\n{}".format(str(round(accs[i], 2)), str(total_counts_per_acc[i])) for i in
-        #             range(len(accs)//2 - 2)], fontsize=8)
+        #             range(len(accs)//2 - 2)], fontsize=12.5)
         # ax[i // 2, i % 2].set_yticks([0.5, 1])
         # ax[i // 2, i % 2].set_yticklabels([0.5, 1], fontsize=6)
-    # fig.legend(loc='center left', bbox_to_anchor=(0.8, 0.5), fontsize=8)
-    fig.legend(loc='center left', bbox_to_anchor=(0.05, 0.09), fontsize=8, ncol=2)
+    # fig.legend(loc='center left', bbox_to_anchor=(0.8, 0.5), fontsize=12.5)
+    fig.legend(loc='center left', bbox_to_anchor=(0.05, 0.09), fontsize=12.5, ncol=2)
     from matplotlib.patches import RegularPolygon, Rectangle
     # tri = Rectangle((587,150), width=2, height=800, color='black')
     # dotted_line(587, 150, patches=fig.patches)
@@ -3986,6 +4324,12 @@ def visualize_inp_gradients():
     # tobetestd = remake_ayer_bertGrads_fold23l
     # tobetestd = ongoing3lrunfold0
     # tobetestd = idkanymore
+    swa_sep_pe_added_oh_on_gen_0 = pickle.load(open("added_oh_gen_fold0.bin", "rb"))
+    swa_sep_pe_added_oh_on_gen_1 = pickle.load(open("added_oh_gen_fold1.bin", "rb"))
+    swa_sep_pe_added_oh_on_gen_2 = pickle.load(open("added_oh_gen_fold2.bin", "rb"))
+    tobetestd = swa_sep_pe_added_oh_on_gen_0.copy()
+    tobetestd.extend(swa_sep_pe_added_oh_on_gen_1)
+    tobetestd.extend(swa_sep_pe_added_oh_on_gen_2)
     ss = set()
     tbt = []
     for s, a1,a2,a3 in tobetestd:
@@ -4052,7 +4396,7 @@ def visualize_inp_gradients():
     mpl.rcParams['figure.dpi'] = 350
     mpl.rcParams['font.family'] = "Arial"
     from matplotlib.ticker import MultipleLocator, AutoMinorLocator
-    fig, axs = plt.subplots(2, 1)
+    fig, axs = plt.subplots(2, 1,figsize=(8, 6))
     # plt.bar(range(len(normalized_Tat_values))[:motif_pos], normalized_Tat_values[:motif_pos], color='#1f77b4')
     # plt.bar(range(len(normalized_Tat_values))[motif_pos:motif_pos+6], normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
     # plt.bar(range(len(normalized_Tat_values))[motif_pos+6:], normalized_Tat_values[motif_pos+6:], color='#1f77b4')
@@ -4085,8 +4429,8 @@ def visualize_inp_gradients():
 
     # for ajk, n_v in enumerate(all_norm_values):
     #     no = random.random()
-    #     # if 0.4 <= no <= 1:
-    #     #     continue
+    #     if 0.4 <= no <= 1:
+    #         continue
     #     strt_ind_indiv, end_ind_indiv = 0, 0
     #     for ind_, n_v_ in enumerate(n_v):
     #         if n_v_ != 0 and strt_ind_indiv == 0:
@@ -4151,15 +4495,15 @@ def visualize_inp_gradients():
     xtics = " _"*(motif_pos+2) + "RRXFLK_"+ " _"*(len(normalized_Tat_values)-motif_pos-4)
     # axs[0].set_xticks(list(range(len(normalized_Tat_values))))
     # axs[0].set_xticks(list(range(len(normalized_Tat_values))))
-    axs[0].set_ylabel('SP type (Tat/SPI)\nIE+PE scores',  fontsize=8)
+    axs[0].set_ylabel('SP type residue scores',  fontsize=12.5)
     axs[0].xaxis.set_major_locator(MultipleLocator(11))
     axs[0].xaxis.set_major_formatter('{x:.0f}')
     axs[0].xaxis.set_minor_locator(MultipleLocator(1))
     axs[0].set_yticks([0, 0.01,0.02,0.03,0.04,0.05])
-    axs[0].set_yticklabels([0, 0.01,0.02,0.03,0.04,0.05], fontsize=8)
+    axs[0].set_yticklabels([0, 0.01,0.02,0.03,0.04,0.05], fontsize=12.5)
     lbls =np.array(list(range(len(normalized_Tat_values)))) - motif_pos
     lbls = [5, -11, -0, 11 ,22, 33]
-    axs[0].set_xticklabels([str(n) for n in lbls ],fontsize=8)
+    axs[0].set_xticklabels([str(n) for n in lbls ],fontsize=12.5)
     axs[0].set_xlim(-2, 89)
     # axs[0].arrow(0,0,10,0.03, width=0.001)
     # axs[0].arrow(42,0.03,-20,0, width=0.0001)
@@ -4217,14 +4561,14 @@ def visualize_inp_gradients():
     # print(all_tat_seqs)
     # for i in range(6):
     #     axs[0].annotate("RRXFLK", xy=(22.8, normalized_Tat_values[75 - start_ind + 1]), xytext=(1, 0.025),
-    #                     arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=8, color='#ff7f0e')
+    #                     arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=12.5, color='#ff7f0e')
     #
     # axs[0].annotate("RRXFLK", xy=(22.8, normalized_Tat_values[75-start_ind+1]), xytext=(1, 0.025),
-    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#ff7f0e')
+    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=12.5, color='#ff7f0e')
     # axs[0].annotate("", xy=(13, normalized_Tat_values[13]), xytext=(23, 0.005),
-    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8)
+    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=12.5)
     # axs[0].annotate("Other residues", xy=(34, normalized_Tat_values[34]), xytext=(21, 0.001),
-    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=8, color='#1f77b4')
+    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=12.5, color='#1f77b4')
     # axs[0].annotate("Hydrophobic residue (KD=2.09)", xy=(26, normalized_Tat_values[26]), xytext=(29, 0.025),
     #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#1f77b4')
     # # axs[0].arrow(-100,0,100,100, width=1)
@@ -4240,7 +4584,7 @@ def visualize_inp_gradients():
     # axs[0].set_ylim(-0.02,0.1)
 
     axs[0].set_xlim(7,40)
-    axs[0].set_xlabel("Residue position (relative to RRXFLK motif)", fontsize=8)
+    axs[0].set_xlabel("Residue position (relative to RRXFLK motif of Tat/SPase I)", fontsize=12.5)
     # plt.show()
     # lc = LineCollection([left_segment, motif_segment, right_segment])
     # axs.add_collection(lc)
@@ -4284,6 +4628,13 @@ def visualize_inp_gradients():
     tobetestd.extend(swa_sep_pe_1)
     tobetestd.extend(swa_sep_pe_2)
 
+    swa_sep_pe_added_oh_on_gen_0 = pickle.load(open("added_oh_gen_fold0.bin", "rb"))
+    swa_sep_pe_added_oh_on_gen_1 = pickle.load(open("added_oh_gen_fold1.bin", "rb"))
+    swa_sep_pe_added_oh_on_gen_2 = pickle.load(open("added_oh_gen_fold2.bin", "rb"))
+    tobetestd = swa_sep_pe_added_oh_on_gen_0.copy()
+    tobetestd.extend(swa_sep_pe_added_oh_on_gen_1)
+    tobetestd.extend(swa_sep_pe_added_oh_on_gen_2)
+
     normalized_sp1_cs_values_pm_5aas = np.zeros(150)
     normalized_sp1_cs_values_pm_5aas_counts = np.zeros(150)
     for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
@@ -4325,7 +4676,7 @@ def visualize_inp_gradients():
         #     print(seq)
         #     print(lbls)
         #     print(true_lbl)
-        if lbls[0] == "L" and seq2lbls[seq][0] == "L" and seq[lbls.rfind("L")+1] == "C":
+        if lbls[0] == "L" and seq2lbls[seq][0] == "L" and lbls.rfind("L")+1 < len(seq) and seq[lbls.rfind("L")+1] == "C":
             normalized_C_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
             normalized_C_cs_values = normalized_C_cs_values[:len(seq)]
             # print(len(normalized_C_cs_values), len(seq))
@@ -4347,16 +4698,16 @@ def visualize_inp_gradients():
     box = axs[1].get_position()
     axs[1].set_position([box.x0 + box.width * 0.1, box.y0+box.height*0.1, box.width * 0.95, box.height * 0.85])
 
-    axs[1].set_ylabel('CS (Sec/SPI, Sec/SPII)\nIE+PE scores', fontsize=8)
+    axs[1].set_ylabel('CS residue scores', fontsize=12.5)
     print(start_ind)
     axs[1].xaxis.set_major_locator(MultipleLocator(18))
     axs[1].xaxis.set_major_formatter('{x:.0f}')
     axs[1].xaxis.set_minor_locator(MultipleLocator(1))
     axs[1].set_yticks([0,0.01,0.02,0.03])
-    axs[1].set_yticklabels([0,0.01,0.02,0.03], fontsize=8)
+    axs[1].set_yticklabels([0,0.01,0.02,0.03], fontsize=12.5)
     lbls = [1,-36, -18, 0, 18 ,36, 51]
-    axs[1].set_xticklabels([str(n) for n in lbls ], fontsize=8)
-    axs[1].set_xlabel("Residue position (relative to Cys/+1 Sec/SPII)", fontsize=8)
+    axs[1].set_xticklabels([str(n) for n in lbls ], fontsize=12.5)
+    axs[1].set_xlabel(r"Residue position (relative to $i_{c+1}$ of Sec/SPase I and Sec/SPase II)", fontsize=12.5)
     axs[1].set_xlim(-2, 100)
     axs[1].set_ylim(0,0.031)
     normalized_C_cs_values_pm_5aas = normalized_C_cs_values_pm_5aas[1:]
@@ -4386,15 +4737,17 @@ def visualize_inp_gradients():
     axs[1].plot([75 - start_ind_sp1 + 0.5, 75 - start_ind_sp1 + 1],[inbetween_sp1cs_2, normalized_sp1_cs_values_pm_5aas[75 - start_ind_sp1 + 1]], color='red')
     axs[1].plot(range(75 - start_ind_sp1 + 1, len(normalized_sp1_cs_values_pm_5aas)),normalized_sp1_cs_values_pm_5aas[75 - start_ind_sp1 + 1:], color='red', label='Other Sec/SPII residues')
 
-    axs[1].annotate("+1 Sec/SPI SP", xy=(75-start_ind_sp1, normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1]), xytext=(34, 0.001),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#ff7f0e')
-    axs[1].annotate("Sec/SPII", xy=(4, normalized_C_cs_values_pm_5aas[4]), xytext=(1, 0.027),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#1f77b4')
-    axs[1].annotate("Cys (+1 Sec/SPII SP)", xy=(75-start_ind, normalized_C_cs_values_pm_5aas[75-start_ind]), xytext=(35, 0.027),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#ff7f0e')
-    axs[1].annotate("Sec/SPI", xy=(4, normalized_sp1_cs_values_pm_5aas[4]), xytext=(1, 0.001),
-                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='red')
+    axs[1].annotate(r"$i_{c+1}$ Sec/SPase I", xy=(75-start_ind_sp1, normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1]), xytext=(34, 0.001),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=11.5, color='#ff7f0e')
+    axs[1].annotate("Sec/SPase II", xy=(4, normalized_C_cs_values_pm_5aas[4]), xytext=(1, 0.027),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=11.5, color='#1f77b4')
+    axs[1].annotate(r"$i_{c+1}$ Sec/SPase II (Cys residue)", xy=(75-start_ind, normalized_C_cs_values_pm_5aas[75-start_ind]), xytext=(30, 0.027),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=11.5, color='#ff7f0e')
+    axs[1].annotate("Sec/SPase I", xy=(4, normalized_sp1_cs_values_pm_5aas[4]), xytext=(1, 0.001),
+                arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=11.5, color='red')
     axs[1].set_xlim(0,50)
+    plt.savefig("some_plot_imp_grads.pdf")
+    exit(1)
     plt.show()
 
 
@@ -4557,12 +4910,15 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
 
 if __name__ == "__main__":
     plot_sp6_vs_tnmt_mcc()
+    extract_performance_over_tolerance()
+    plot_sp6_vs_tnmt()
+
+
+    plot_perf_over_data_perc()
+    visualize_inp_gradients()
+    plot_comparative_performance_sp1_mdls()
+
     # compute_mcc_sp_only_mdls()
-    # plot_perf_over_data_perc()
-    # extract_performance_over_tolerance()
-    # visualize_inp_gradients()
-    # plot_sp6_vs_tnmt()
-    # plot_comparative_performance_sp1_mdls()
     # exit(1)
     #
     # mdl2results = extract_all_param_results(only_cs_position=False,
