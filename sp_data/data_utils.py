@@ -17,16 +17,16 @@ class SPCSpredictionData:
         self.simplified = simplified if not very_simplified else True
         self.very_simplified = very_simplified
         self.data_folder = self.get_data_folder()
-        self.lg2ind = {}
+        self.og2ind = {}
         self.extended_sublbls = extended_sublbls
         self.form_sp_reg_data = form_sp_reg_data
         if form_sp_reg_data:
             self.set_dicts(form_sp_reg_data)
             if extended_sublbls:
-                self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(
+                self.lbl2ind, self.og2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(
                     open("sp6_dicts_subregion_lbls.bin", "rb"))
             else:
-                self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(
+                self.lbl2ind, self.og2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(
                     open("sp6_dicts_subregion_lbls.bin", "rb"))
             # {'P': 0, 'n': 1, 'h': 2, 'c': 3, 'N': 4, 'H': 5, 'R': 6, 'C': 7, 'B': 8, 'O': 9, 'M': 10, 'I': 11,
             #  'PD': 12, 'BS': 13, 'ES': 14},
@@ -34,13 +34,13 @@ class SPCSpredictionData:
             # {'NO_SP': 0, 'SP': 1, 'TATLIPO': 2, 'LIPO': 3, 'TAT': 4, 'PILIN': 5},
             # {'V': 0, 'R': 1, 'D': 2, 'E': 3, 'H': 4, 'A': 5, 'G': 6, 'Y': 7, 'W': 8, 'F': 9, 'M': 10, 'K': 11, 'L': 12, 'I': 13, 'C': 14, 'Q': 15, 'S': 16, 'P': 17, 'N': 18, 'T': 19, 'PD': 20, 'BS': 21, 'ES': 22}]
         else:
-            self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
+            self.lbl2ind, self.og2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
         if not extended_sublbls and not os.path.exists(self.get_data_folder() + "sp6_partitioned_data_sublbls_test_0.bin"):
             self.form_subregion_sp_data()
         elif extended_sublbls and not os.path.exists(self.get_data_folder() + "sp6_partitioned_data_sublbls_test_0.bin"):
             self.form_subregion_sp_data()
         # if os.path.exists("sp6_dicts.bin"):
-        #     self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
+        #     self.lbl2ind, self.og2ind, self.glbl_lbl_2ind, self.aa2ind = pickle.load(open("sp6_dicts.bin", "rb"))
         # else:
         #     self.form_lbl_inds()
 
@@ -329,9 +329,9 @@ class SPCSpredictionData:
                 for (_, _, lg, glb_ind) in part_dict.values():
                     all_unique_lgs.add(lg)
                     all_unique_global_inds.add(glb_ind)
-        self.lg2ind = {l: ind for ind, l in enumerate(all_unique_lgs)}
+        self.og2ind = {l: ind for ind, l in enumerate(all_unique_lgs)}
         self.glbl_lbl_2ind = {l: ind for ind, l in enumerate(all_unique_global_inds)}
-        pickle.dump([self.lbl2ind, self.lg2ind, self.glbl_lbl_2ind, self.aa2ind], open("sp6_dicts.bin", "wb"))
+        pickle.dump([self.lbl2ind, self.og2ind, self.glbl_lbl_2ind, self.aa2ind], open("sp6_dicts.bin", "wb"))
 
     def get_data_folder(self):
         if os.path.exists("/scratch/work/dumitra1"):

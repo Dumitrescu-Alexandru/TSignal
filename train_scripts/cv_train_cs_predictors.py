@@ -39,14 +39,14 @@ def init_sptype_classifier(args, glbl_lbls,deep_mdl, is_cnn2=False, no_of_layers
 
     return model
 
-def init_model(ntoken, lbl2ind={}, lg2ind=None, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
+def init_model(ntoken, lbl2ind={}, og2ind=None, dropout=0.5, use_glbl_lbls=False, no_glbl_lbls=6,
                ff_dim=1024 * 4, nlayers=3, nheads=8, aa2ind={}, train_oh=False, glbl_lbl_version=1,
                form_sp_reg_data=False, version2_agregation="max", input_drop=False, no_pos_enc=False,
                linear_pos_enc=False, scale_input=False, tuned_bert_embs_prefix="", tune_bert=False,train_only_decoder=False,
                add_bert_pe_from_dec_to_bert_out=False,concat_pos_enc=False,pe_extra_dims=64,
-               residue_emb_extra_dims=0, add_extra_embs2_generator=False,use_blosum=False, use_extra_oh = False):
+               residue_emb_extra_dims=0, add_extra_embs2_decoder=False,use_blosum=False, use_extra_oh = False):
     model = TransformerModel(ntoken=ntoken, d_model=1024, nhead=nheads, d_hid=1024, nlayers=nlayers,
-                             lbl2ind=lbl2ind, lg2ind=lg2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
+                             lbl2ind=lbl2ind, og2ind=og2ind, dropout=dropout, use_glbl_lbls=use_glbl_lbls,
                              no_glbl_lbls=no_glbl_lbls, ff_dim=ff_dim, aa2ind=aa2ind, train_oh=train_oh,
                              glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
                              version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
@@ -54,7 +54,7 @@ def init_model(ntoken, lbl2ind={}, lg2ind=None, dropout=0.5, use_glbl_lbls=False
                              tuning_bert=tune_bert, train_only_decoder=train_only_decoder,
                              add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out,
                              concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims,
-                             residue_emb_extra_dims=residue_emb_extra_dims,add_extra_embs2_generator=add_extra_embs2_generator,
+                             residue_emb_extra_dims=residue_emb_extra_dims,add_extra_embs2_decoder=add_extra_embs2_decoder,
                              use_blosum=use_blosum, use_extra_oh = use_extra_oh)
     for p in model.parameters():
         if p.dim() > 1:
@@ -860,6 +860,7 @@ def load_sptype_model(model_path):
 
 def load_model(model_path, dict_file=None, tuned_bert_embs_prefix="", tune_bert=False, testing=False, opt=False):
     folder = get_data_folder()
+    print(folder,model_path)
     model = torch.load(folder + model_path)
     if not tune_bert:
         model.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
@@ -1258,89 +1259,90 @@ def train_sp_type_predictor(args):
         logging.info("On epoch {} saving the model with TEST avg mcc {}".format(best_epoch, avg_mcc))
 
 
-def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
-                        test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
-                        patience=30, train_oh=False, deployment_model=False, lr_scheduler_swa=False, lr_sched_warmup=0,
-                        test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False,
-                        validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
-                        validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
-                        separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
-                        test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
-                        tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
-                        random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
-                        high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False,
-                        reinint_swa_decoder=False,anneal_start=-1,anneal_epochs=20,annealed_lr=0.00002,bert_pe_for_decoder=False,
-                        frozen_pe_epochs=-1, no_bert_pe_training=False, add_bert_pe_from_dec_to_bert_out=False,
-                        concat_pos_enc=False, pe_extra_dims=64,lipbobox_predictions=False,test_sptype_preds="none",
-                        residue_emb_extra_dims=0, add_extra_embs2_generator=False,
-                        use_blosum=False, use_extra_oh = False):
-    if validate_partition is not None:
-        test_partition = {0, 1, 2} - {partitions[0], validate_partition}
+# def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
+#                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
+#                         patience=30, train_oh=False, deployment_model=False, lr_scheduler_swa=False, lr_sched_warmup=0,
+#                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False,
+#                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
+#                         validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
+#                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
+#                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
+#                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
+#                         random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
+#                         high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False,
+#                         reinint_swa_decoder=False,anneal_start=-1,anneal_epochs=20,annealed_lr=0.00002,bert_pe_for_decoder=False,
+#                         frozen_pe_epochs=-1, no_bert_pe_training=False, add_bert_pe_from_dec_to_bert_out=False,
+#                         concat_pos_enc=False, pe_extra_dims=64,lipbobox_predictions=False,test_sptype_preds="none",
+#                         residue_emb_extra_dims=0, add_extra_embs2_decoder=False,
+#                         use_blosum=False, use_extra_oh = False):
+def train_cs_predictors(args):
+    if args.validate_partition is not None:
+        test_partition = {0, 1, 2} - {args.train_folds[0], args.validate_partition}
     else:
-        test_partition = set() if deployment_model else {0, 1, 2} - set(partitions)
-    partitions = [0, 1, 2] if deployment_model else partitions
+        test_partition = set() if args.deployment_model else {0, 1, 2} - set(args.train_folds)
+    args.train_folds = [0, 1, 2] if args.deployment_model else args.train_folds
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified,
-                                 extended_sublbls=extended_sublbls)
-    sp_data.lbl2ind = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7, 'BS': 8, 'ES': 9} if lipbobox_predictions else sp_data.lbl2ind
-    train_sets = ['test', 'train'] if validate_on_test or validate_partition is not None else ['train']
-    if len(partitions) == 3:
-        tuned_bert_embs_prefix = "bert_tuned_{}_{}_{}_".format(*partitions) if tuned_bert_embs else ""
+    sp_data = SPCSpredictionData(form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified, very_simplified=args.very_simplified,
+                                 extended_sublbls=args.extended_sublbls)
+    sp_data.lbl2ind = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7, 'BS': 8, 'ES': 9} if args.lipbobox_predictions else sp_data.lbl2ind
+    train_sets = ['test', 'train'] if args.validate_on_test or args.validate_partition is not None else ['train']
+    if len(args.train_folds) == 3:
+        tuned_bert_embs_prefix = "bert_tuned_{}_{}_{}_".format(*args.train_folds) if args.tuned_bert_embs else ""
     else:
-        tuned_bert_embs_prefix = "bert_tuned_{}_{}_".format(*partitions) if tuned_bert_embs else ""
-    random_folds_prefix = "random_folds_" if random_folds else ""
-    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
-                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=form_sp_reg_data,
-                                tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=extended_sublbls,
-                                random_folds_prefix=random_folds_prefix, train_on_subset=train_on_subset,
-                                lipbobox_predictions=lipbobox_predictions)
+        tuned_bert_embs_prefix = "bert_tuned_{}_{}_".format(*args.train_folds) if args.tuned_bert_embs else ""
+    random_folds_prefix = "random_folds_" if args.random_folds else ""
+    sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=args.train_folds, data_folder=sp_data.data_folder,
+                                glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=train_sets, form_sp_reg_data=args.form_sp_reg_data,
+                                tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=args.extended_sublbls,
+                                random_folds_prefix=random_folds_prefix, train_on_subset=args.train_on_subset,
+                                lipbobox_predictions=args.lipbobox_predictions)
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                 batch_size=bs, shuffle=True,
+                                                 batch_size=args.batch_size, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
     swa_start = 60
-    if len(sp_data.lg2ind.keys()) <= 1 or not use_lg_info:
-        lg2ind = None
-    elif len(sp_data.lg2ind.keys()) > 1 and use_lg_info:
-        lg2ind = sp_data.lg2ind
-    aa2ind = sp_data.aa2ind if train_oh else None
-    if tune_bert:
+    if len(sp_data.og2ind.keys()) <= 1 or not args.add_lg_info:
+        og2ind = None
+    elif len(sp_data.og2ind.keys()) > 1 and args.add_lg_info:
+        og2ind = sp_data.og2ind
+    aa2ind = sp_data.aa2ind if args.train_oh else None
+    if args.tune_bert:
         hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
         hparams.train_enc_dec_sp6 = True
-        hparams.use_glbl_lbls = use_glbl_lbls
+        hparams.use_glbl_lbls = args.use_glbl_lbls
         # form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False
         # the form_sp_reg_data param is used to both denote teh RR/C... usage and usually had a mandatory glbl label
         # in the SP-cs. The current experiment however tests no-glbl-cs tuning
-        classification_head = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
-                           dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
-                           ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
-                           glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False,
-                           version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
-                           linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                                         tune_bert=tune_bert,train_only_decoder=train_only_decoder,
-                                         add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out,
-                                         concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims,
-                                         residue_emb_extra_dims=residue_emb_extra_dims,add_extra_embs2_generator=add_extra_embs2_generator,
-                                         use_blosum=use_blosum, use_extra_oh = use_extra_oh)
+        classification_head = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, og2ind=og2ind,
+                           dropout=args.dropout, use_glbl_lbls=args.use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
+                           ff_dim=args.ff_d, nlayers=args.nlayers, nheads=args.nheads, train_oh=args.train_oh, aa2ind=aa2ind,
+                           glbl_lbl_version=args.glbl_lbl_version, form_sp_reg_data=args.form_sp_reg_data if not args.extended_sublbls else False,
+                           version2_agregation=args.version2_agregation, input_drop=args.input_drop, no_pos_enc=args.no_pos_enc,
+                           linear_pos_enc=args.linear_pos_enc, scale_input=args.scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                                         tune_bert=args.tune_bert,train_only_decoder=args.train_only_decoder,
+                                         add_bert_pe_from_dec_to_bert_out=args.add_bert_pe_from_dec_to_bert_out,
+                                         concat_pos_enc=args.concat_pos_enc, pe_extra_dims=args.pe_extra_dims,
+                                         residue_emb_extra_dims=args.residue_emb_extra_dims,add_extra_embs2_decoder=args.add_extra_embs2_decoder,
+                                         use_blosum=args.use_blosum, use_extra_oh = args.use_extra_oh)
         model = ProtBertClassifier(hparams)
-        if remove_bert_layers != 0:
-            model.ProtBertBFD.encoder.layer = model.ProtBertBFD.encoder.layer[:-remove_bert_layers]
+        if args.remove_bert_layers != 0:
+            model.ProtBertBFD.encoder.layer = model.ProtBertBFD.encoder.layer[:-args.remove_bert_layers]
         model.classification_head = classification_head
         model.to(device)
-        if frozen_epochs > 0:
+        if args.frozen_epochs > 0:
             model.freeze_encoder()
     else:
-        model = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, lg2ind=lg2ind,
-                           dropout=dropout, use_glbl_lbls=use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
-                           ff_dim=ff_d, nlayers=nlayers, nheads=nheads, train_oh=train_oh, aa2ind=aa2ind,
-                           glbl_lbl_version=glbl_lbl_version, form_sp_reg_data=form_sp_reg_data,
-                           version2_agregation=version2_agregation, input_drop=input_drop, no_pos_enc=no_pos_enc,
-                           linear_pos_enc=linear_pos_enc, scale_input=scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                           concat_pos_enc=concat_pos_enc, pe_extra_dims=pe_extra_dims)
+        model = init_model(len(sp_data.lbl2ind.keys()), lbl2ind=sp_data.lbl2ind, og2ind=og2ind,
+                           dropout=args.dropout, use_glbl_lbls=args.use_glbl_lbls, no_glbl_lbls=len(sp_data.glbl_lbl_2ind.keys()),
+                           ff_dim=args.ff_d, nlayers=args.nlayers, nheads=args.nheads, train_oh=args.train_oh, aa2ind=aa2ind,
+                           glbl_lbl_version=args.glbl_lbl_version, form_sp_reg_data=args.form_sp_reg_data,
+                           version2_agregation=args.version2_agregation, input_drop=args.input_drop, no_pos_enc=args.no_pos_enc,
+                           linear_pos_enc=args.linear_pos_enc, scale_input=args.scale_input, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                           concat_pos_enc=args.concat_pos_enc, pe_extra_dims=args.pe_extra_dims)
 
-    if bert_pe_for_decoder:
-        model.classification_head.update_pe(model.ProtBertBFD.embeddings.position_embeddings, frozen_pe_epochs > -1)
+    if args.bert_pe_for_decoder:
+        model.classification_head.update_pe(model.ProtBertBFD.embeddings.position_embeddings, args.frozen_pe_epochs > -1)
 
-    if weight_class_loss:
+    if args.weight_class_loss:
         glbl_lbl_2weights = get_sp_type_loss_weights()
         ind2glbl_lbl = {v:k for k,v in sp_data.glbl_lbl_2ind.items()}
         glbl_lbl_weights = [glbl_lbl_2weights[ind2glbl_lbl[i]] for i in range(6)]
@@ -1348,7 +1350,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     else:
         loss_fn_glbl = torch.nn.CrossEntropyLoss()
 
-    if weight_lbl_loss:
+    if args.weight_lbl_loss:
         ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
         lbl2weights = get_residue_label_loss_weights()
         label_weights = [lbl2weights[ind2lbl[i]] for i in range(len(sp_data.lbl2ind.values()))]
@@ -1359,8 +1361,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     loss_fn_tune = torch.nn.CrossEntropyLoss(ignore_index=sp_data.lbl2ind["PD"], reduction='none')
 
 
-    if tune_bert:
-        if use_swa:
+    if args.tune_bert:
+        if args.use_swa:
             # in this case, we will use a cyclic scheduler on the best model found based on early stopping. few problems:
             # 1. the BERT lr is much more sensitive than classification_head optimizer
             # 2. We need to load the optimizer(best_model) found in early stopping to resume training
@@ -1378,12 +1380,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 {"params": other_params},
                 {
                     "params": additional_emb,
-                    "lr": lr * 0.1,
+                    "lr": args.lr * 0.1,
                 },
             ]
-            classification_head_optimizer = optim.Adam(parameters, lr=lr * 10 if high_lr
-                                                                else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
-            bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
+            classification_head_optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr
+                                                                else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
         else:
             # BERT model always has this LR, as any higher lr worsens the results
@@ -1395,10 +1397,10 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 },
             ]
             # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
-            optimizer = optim.Adam(parameters,  lr=lr * 10 if high_lr else lr,  eps=1e-9, weight_decay=wd, betas=(0.9, 0.98),)
+            optimizer = optim.Adam(parameters,  lr=args.lr * 10 if args.high_lr else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
     else:
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=wd)
-    if anneal_start != -1:
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=args.wd)
+    if args.anneal_start != -1:
         if type(optimizer) != list:
             print("WARNING!!!: You tried to use annealing lr on both BERT and class_head; Only the classification_head "
                          "may be annealed, as BERT parameters are much more sensitive. Check implementation; Currently this only works with SWA (--use_swa)")
@@ -1406,9 +1408,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                          "may be annealed, as BERT parameters are much more sensitive. Check implementation; Currently this only works with SWA (--use_swa)")
             anneal_scheduler = None
         else:
-            anneal_scheduler = SWALR(optimizer[0], swa_lr=annealed_lr, anneal_epochs=anneal_epochs, anneal_strategy='linear')
-            print("Using annealing LR ({}-{}) from epochs ({}-{})".format(lr, annealed_lr, anneal_start,anneal_epochs+anneal_start))
-            logging.info("Using annealing LR ({}-{}) from epochs ({}-{})".format(lr, annealed_lr, anneal_start,anneal_epochs+anneal_start))
+            anneal_scheduler = SWALR(optimizer[0], swa_lr=args.annealed_lr, anneal_epochs=args.anneal_epochs, anneal_strategy='linear')
+            print("Using annealing LR ({}-{}) from epochs ({}-{})".format(args.lr, args.annealed_lr, args.anneal_start,args.anneal_epochs+args.anneal_start))
+            logging.info("Using annealing LR ({}-{}) from epochs ({}-{})".format(args.lr, args.annealed_lr, args.anneal_start,args.anneal_epochs+args.anneal_start))
     else:
         anneal_scheduler = None
     # if not use_swa and lr_scheduler_swa != "none":
@@ -1421,24 +1423,25 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
     best_epoch = 0
     bestf1_sp_type = 0
     current_sptype_f1 = 0
-    warmup_epochs = warmup_epochs if validate_on_mcc else 0
+    warmup_epochs = 20 if args.validate_on_mcc else 0
     e = -1
     iter_no = 0
+    patience = args.patience
     while patience != 0:
         if type(optimizer) == list:
             print("LR:", optimizer[0].param_groups[0]['lr'], "LR_bert:", optimizer[1].param_groups[0]['lr'])
-        if tune_bert and frozen_epochs > e:
+        if args.tune_bert and args.frozen_epochs > e:
             model.eval()
             model.classification_head.train()
-        elif tune_bert and frozen_epochs == e:
-            model.unfreeze_encoder(no_bert_pe_training)
+        elif args.tune_bert and args.frozen_epochs == e:
+            model.unfreeze_encoder(args.no_bert_pe_training)
             model.train()
-        elif frozen_epochs > e:
+        elif args.frozen_epochs > e:
             model.train()
         else:
             model.train()
-        if frozen_pe_epochs == e and frozen_pe_epochs != -1:
-            if tune_bert:
+        if args.frozen_pe_epochs == e and args.frozen_pe_epochs != -1:
+            if args.tune_bert:
                 for name, param in model.classification_head.pos_encoder.pos_enc.named_parameters():
                     param.requires_grad = True
             else:
@@ -1449,12 +1452,12 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
         e += 1
         losses = 0
         losses_glbl = 0
-        if anneal_scheduler is not None and anneal_start < e <= swa_start:
+        if anneal_scheduler is not None and args.anneal_start < e <= swa_start:
             anneal_scheduler.step()
         for ind, batch in tqdm(enumerate(dataset_loader), "Epoch {} train:".format(e), total=len(dataset_loader)):
-            if lr_scheduler_swa != "none" and e >= swa_start:
-                scheduler.step(iter_no % cycle_length)
-                if iter_no % (cycle_length+1) == 1:
+            if args.lr_scheduler_swa != "none" and e >= swa_start:
+                scheduler.step(iter_no % args.cycle_length)
+                if iter_no % (args.cycle_length+1) == 1:
                     # if the last training step was the one corresponding to training with the lowest lr, update swa
                     swa_model.to("cuda:0")
                     swa_model.update_parameters(model)
@@ -1463,13 +1466,13 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             seqs, lbl_seqs, _, glbl_lbls = batch
             # if augment_trimmed_seqs:
             cuts = np.random.randint(0,10,len(seqs))
-            if augment_trimmed_seqs:
+            if args.augment_trimmed_seqs:
                 cut_seqs = [s[:-cuts[cut_ind]]  if cut_ind != 0 else s for cut_ind, s in enumerate(seqs)]
                 lbl_seqs = [l[:-cuts[cut_ind]] if cut_ind != 0  else l for cut_ind, l in enumerate(lbl_seqs)]
             else:
                 cut_seqs = None
-            if use_glbl_lbls:
-                if tune_bert:
+            if args.use_glbl_lbls:
+                if args.tune_bert:
                     seq_lengths = [len(s) for s in seqs]
                     seqs = [" ".join(r_ for r_ in s) for s in seqs]
                     inputs = model.tokenizer.batch_encode_plus(seqs,
@@ -1489,7 +1492,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 else:
                     optimizer.zero_grad()
                 targets = padd_add_eos_tkn(lbl_seqs, sp_data.lbl2ind)
-                if tune_cs > 0 and e > 35:
+                if args.tune_cs > 0 and e > 35:
                     seq_indices = []
                     seq_dim = logits.shape[0]
                     for ind_, (gl, t) in enumerate(zip(glbl_lbls, targets)):
@@ -1497,7 +1500,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                             t = list(t.cpu().numpy())
                             t.reverse()
                             last_sp_ind = len(t) - t.index(0) - 1
-                            sp_inds = list(range(last_sp_ind - tune_cs, last_sp_ind + tune_cs))
+                            sp_inds = list(range(last_sp_ind - args.tune_cs, last_sp_ind + args.tune_cs))
                             seq_indices.extend([si + seq_dim * ind_ for si in sp_inds])
 
                     loss = loss_fn_tune(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
@@ -1508,7 +1511,7 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
                     loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
                     losses_glbl += loss_glbl.item()
-                    loss += loss_glbl * glbl_lbl_weight
+                    loss += loss_glbl * args.glbl_lbl_weight
                 else:
                     # if "MKIFFAVLVILVLFSMLIWTAYGTPYPVNCKTDRDCVMCGLGISCKNGYCQGCTR" in seqs:
                     #     datruind = -1
@@ -1521,8 +1524,8 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     losses += loss.item()
                     loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
                     losses_glbl += loss_glbl.item()
-                    loss += loss_glbl * glbl_lbl_weight
-            elif form_sp_reg_data and not extended_sublbls:
+                    loss += loss_glbl * args.glbl_lbl_weight
+            elif args.form_sp_reg_data and not args.extended_sublbls:
                 logits, glbl_logits = model(seqs, lbl_seqs)
                 if type(optimizer) == "list":
                     optimizer[0].zero_grad()
@@ -1535,20 +1538,20 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
                 loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
                 losses_glbl += loss_glbl.item()
-                loss += loss_glbl * glbl_lbl_weight
+                loss += loss_glbl * args.glbl_lbl_weight
             else:
-                if tune_bert:
+                if args.tune_bert:
                     seq_lengths = [len(s) for s in seqs]
                     seqs = [" ".join(r_ for r_ in s) for s in seqs]
                     cut_seqs = [" ".join(r_ for r_ in s) for s in cut_seqs] if cut_seqs is not None else None
-                    inputs = model.tokenizer.batch_encode_plus(cut_seqs if augment_trimmed_seqs else seqs,
+                    inputs = model.tokenizer.batch_encode_plus(cut_seqs if args.augment_trimmed_seqs else seqs,
                                                                add_special_tokens=model.hparams.special_tokens,
                                                                padding=True,
                                                                truncation=True,
                                                                max_length=model.hparams.max_length)
                     inputs['targets'] = lbl_seqs
                     inputs['seq_lengths'] = seq_lengths
-                    if  augment_trimmed_seqs:
+                    if  args.augment_trimmed_seqs:
                         inputs['sequences'] = seqs
                     logits = model(**inputs)
                 else:
@@ -1568,45 +1571,45 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                 optimizer[1].step()
             else:
                 optimizer.step()
-        if use_swa and e >= swa_start and lr_scheduler_swa == "none":
+        if args.use_swa and e >= swa_start and args.lr_scheduler_swa == "none":
             swa_model.to("cuda:0")
             swa_model.update_parameters(model)
             swa_model.to("cpu")
 
-        if validate_on_test:
+        if args.validate_on_test:
             validate_partitions = list(test_partition)
-            _ = evaluate(swa_model.module.to(device) if use_swa and e + 1>= swa_start else model , sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions, sets=["test"],
-                         epoch=e, form_sp_reg_data=form_sp_reg_data, simplified=simplified,very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
-                         tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=extended_sublbls, random_folds_prefix=random_folds_prefix, train_oh=train_oh,
-                         lipbobox_predictions=lipbobox_predictions, sptype_preds=test_sptype_preds)
+            _ = evaluate(swa_model.module.to(device) if args.use_swa and e + 1>= swa_start else model , sp_data.lbl2ind, run_name=args.run_name, partitions=validate_partitions, sets=["test"],
+                         epoch=e, form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified,very_simplified=args.very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
+                         tuned_bert_embs_prefix=tuned_bert_embs_prefix, extended_sublbls=args.extended_sublbls, random_folds_prefix=random_folds_prefix, train_oh=args.train_oh,
+                         lipbobox_predictions=args.lipbobox_predictions, sptype_preds=args.test_sptype_preds)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
-                get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
-            valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
-                                             sets=["test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
-                                             very_simplified=very_simplified, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
-                                             random_folds_prefix=random_folds_prefix,lipbobox_predictions=lipbobox_predictions)
+                get_cs_and_sp_pred_results(filename=args.run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
+            valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=args.run_name, partitions=validate_partitions,
+                                             sets=["test"], form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified,
+                                             very_simplified=args.very_simplified, tune_bert=args.tune_bert, extended_sublbls=args.extended_sublbls,
+                                             random_folds_prefix=random_folds_prefix,lipbobox_predictions=args.lipbobox_predictions)
             # revert valid_loss to not change the loss condition next ( this won't be a loss
             # but it's the quickest way to test performance when validation with the test set
         else:
-            valid_sets = ["train", "test"] if validate_partition is not None else ["test"]
-            validate_partitions = [validate_partition] if validate_partition is not None else partitions
-            valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=run_name, partitions=validate_partitions,
-                                             sets=valid_sets, form_sp_reg_data=form_sp_reg_data, simplified=simplified,
-                                             very_simplified=very_simplified, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
-                                             random_folds_prefix=random_folds_prefix,lipbobox_predictions=lipbobox_predictions)
-            _ = evaluate(swa_model.module.to(device) if use_swa and e >= swa_start else model, sp_data.lbl2ind, run_name=run_name,
-                         partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
-                         simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
-                         tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
-                         random_folds_prefix=random_folds_prefix, train_oh=train_oh,lipbobox_predictions=lipbobox_predictions, sptype_preds=test_sptype_preds)
+            valid_sets = ["train", "test"] if args.validate_partition is not None else ["test"]
+            validate_partitions = [args.validate_partition] if args.validate_partition is not None else args.train_folds
+            valid_loss = eval_trainlike_loss(model, sp_data.lbl2ind, run_name=args.run_name, partitions=validate_partitions,
+                                             sets=valid_sets, form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified,
+                                             very_simplified=args.very_simplified, tune_bert=args.tune_bert, extended_sublbls=args.extended_sublbls,
+                                             random_folds_prefix=random_folds_prefix,lipbobox_predictions=args.lipbobox_predictions)
+            _ = evaluate(swa_model.module.to(device) if args.use_swa and e >= swa_start else model, sp_data.lbl2ind, run_name=args.run_name,
+                         partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=args.form_sp_reg_data,
+                         simplified=args.simplified, very_simplified=args.very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
+                         tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=args.tune_bert, extended_sublbls=args.extended_sublbls,
+                         random_folds_prefix=random_folds_prefix, train_oh=args.train_oh,lipbobox_predictions=args.lipbobox_predictions, sptype_preds=args.test_sptype_preds)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
-                get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
+                get_cs_and_sp_pred_results(filename=args.run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
 
-        if validate_on_mcc:
+        if args.validate_on_mcc:
             no_of_seqs_sp1 = list(np.array([2040, 44, 142, 356]).repeat(4))
             no_of_seqs_sp2 = list(np.array([1087, 516, 12]).repeat(4))
             no_of_seqs_tat = list(np.array([313, 39, 13]).repeat(4))
@@ -1622,14 +1625,14 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             # print(summary)
             # patiente_metric = np.mean(sp_pred_mccs2)
             patiente_metric = summary
-            if separate_save_sptype_preds:
+            if args.separate_save_sptype_preds:
                 current_sptype_f1 = sptype_f1[0] * 0.5 + sptype_f1[1] * 0.2 + sptype_f1[2] * 0.2  + sptype_f1[3] * 0.1
         else:
             patiente_metric = valid_loss
-            if separate_save_sptype_preds:
+            if args.separate_save_sptype_preds:
                 current_sptype_f1 = sptype_f1[0] * 0.5 + sptype_f1[1] * 0.2 + sptype_f1[2] * 0.2  + sptype_f1[3] * 0.1
         # sp_pred_mccs
-        if use_glbl_lbls or form_sp_reg_data:
+        if args.use_glbl_lbls or args.form_sp_reg_data:
             print("On epoch {} total train/validation loss and glbl loss: {}/{}, {}".format(e, losses / len(
                 dataset_loader),
                                                                                             valid_loss,
@@ -1644,9 +1647,9 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             print("On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
             logging.info(
                 "On epoch {} total train/validation loss: {}/{}".format(e, losses / len(dataset_loader), valid_loss))
-        if current_sptype_f1 > bestf1_sp_type and separate_save_sptype_preds:
+        if current_sptype_f1 > bestf1_sp_type and args.separate_save_sptype_preds:
             bestf1_sp_type = current_sptype_f1
-            save_sptype_model(model.glbl_generator, run_name, best=True, optimizer=optimizer if use_swa else None)
+            save_sptype_model(model.glbl_generator, args.run_name, best=True, optimizer=optimizer if args.use_swa else None)
             print("Best SP type has been saved with score {}".format(current_sptype_f1))
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                                                            list(np.array(all_precisions).flatten()), list(
@@ -1654,20 +1657,20 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
 
             log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e,
                                              all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
-        elif separate_save_sptype_preds:
+        elif args.separate_save_sptype_preds:
             print("SP type has not been saved with score {}".format(current_sptype_f1))
             eval_model = deepcopy(model)
-            eval_model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
-            _ = evaluate(eval_model, sp_data.lbl2ind, run_name=run_name,
-                         partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=form_sp_reg_data,
-                         simplified=simplified, very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
-                         tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
-                         random_folds_prefix=random_folds_prefix, train_oh=train_oh,lipbobox_predictions=lipbobox_predictions,
-                         sptype_preds=test_sptype_preds)
+            eval_model.glbl_generator = load_sptype_model(args.run_name + "_best_sptye_eval.pth")
+            _ = evaluate(eval_model, sp_data.lbl2ind, run_name=args.run_name,
+                         partitions=validate_partitions, sets=valid_sets, epoch=e, form_sp_reg_data=args.form_sp_reg_data,
+                         simplified=args.simplified, very_simplified=args.very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
+                         tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=args.tune_bert, extended_sublbls=args.extended_sublbls,
+                         random_folds_prefix=random_folds_prefix, train_oh=args.train_oh,lipbobox_predictions=args.lipbobox_predictions,
+                         sptype_preds=args.test_sptype_preds)
             sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
             all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat, all_f1_scores_lipo, all_f1_scores_tat, \
             all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
-                get_cs_and_sp_pred_results(filename=run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
+                get_cs_and_sp_pred_results(filename=args.run_name + ".bin", v=False, return_everything=True, return_class_prec_rec=True)
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), \
                                                            list(np.array(all_precisions).flatten()), list(
                 np.array(total_positives).flatten())
@@ -1681,21 +1684,21 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="VALIDATION", ep=e,
                                              all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
         print("VALIDATION: avg mcc on epoch {}: {}".format(e, np.mean(sp_pred_mccs2)))
-        if validate_on_mcc:
+        if args.validate_on_mcc:
             print("VALIDATION: avg f1 score on epoch {}: {}".format(e,patiente_metric))
             logging.info("VALIDATION: avg f1 score on epoch {}: {}".format(e,patiente_metric))
-        if e == eps - 1:
+        if e == args.epochs - 1:
             patience = 0
-        if (valid_loss < best_valid_loss and eps == -1 and not validate_on_mcc) or (eps != -1 and e == eps - 1) or \
-                (patiente_metric > best_valid_mcc_and_recall and eps == -1 and validate_on_mcc):
+        if (valid_loss < best_valid_loss and args.epochs == -1 and not args.validate_on_mcc) or (args.epochs != -1 and e == args.epochs - 1) or \
+                (patiente_metric > best_valid_mcc_and_recall and args.epochs == -1 and args.validate_on_mcc):
             best_epoch = e
             best_valid_loss = valid_loss
             best_valid_mcc_and_recall = patiente_metric
-            save_model(swa_model.module if use_swa and swa_start <= e else model, run_name,
-                tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, optimizer=optimizer if use_swa and not reinint_swa_decoder else None)
-        elif (e > warmup_epochs and valid_loss > best_valid_loss and eps == -1 and not validate_on_mcc) or \
-                (e > warmup_epochs and best_valid_mcc_and_recall > patiente_metric and eps == -1 and validate_on_mcc):
-            if validate_on_mcc:
+            save_model(swa_model.module if args.use_swa and swa_start <= e else model, args.run_name,
+                tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=args.tune_bert, optimizer=optimizer if args.use_swa and not args.reinint_swa_decoder else None)
+        elif (e > warmup_epochs and valid_loss > best_valid_loss and args.epochs == -1 and not args.validate_on_mcc) or \
+                (e > warmup_epochs and best_valid_mcc_and_recall > patiente_metric and args.epochs == -1 and args.validate_on_mcc):
+            if args.validate_on_mcc:
                 best_val_metrics, val_metric = best_valid_mcc_and_recall, patiente_metric
             else:
                 best_val_metrics, val_metric = best_valid_loss, valid_loss
@@ -1704,13 +1707,13 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
             logging.info("On epoch {} dropped patience to {} because on valid result {} from epoch {} compared to best {}.".
                          format(e, patience, val_metric, best_epoch, best_val_metrics))
             patience -= 1
-        if use_swa and swa_start == e + 1:
-            if reinint_swa_decoder:
-                model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                                   tune_bert=tune_bert, opt=True if not reinint_swa_decoder else False)
+        if args.use_swa and swa_start == e + 1:
+            if args.reinint_swa_decoder:
+                model = load_model(args.run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                                   tune_bert=args.tune_bert, opt=True if not args.reinint_swa_decoder else False)
             else:
-                model, optimizer_state_d = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                                   tune_bert=tune_bert, opt=True if not reinint_swa_decoder else False)
+                model, optimizer_state_d = load_model(args.run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix,
+                                   tune_bert=args.tune_bert, opt=True if not args.reinint_swa_decoder else False)
             if type(optimizer) == list:
                 additional_emb =[]
                 other_params = []
@@ -1723,29 +1726,29 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     {"params": other_params},
                     {
                         "params": additional_emb,
-                        "lr": lr * 0.1,
+                        "lr": args.lr * 0.1,
                     },
                 ]
-                classification_head_optimizer = optim.Adam(parameters,  lr=0.00001 * lr_multiplier_swa, eps=1e-9,
-                                                           weight_decay=wd, betas=(0.9, 0.98), )
-                bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(), lr=0.00001, eps=1e-9, weight_decay=wd, betas=(0.9, 0.98), )
-                if change_swa_decoder_optimizer:
+                classification_head_optimizer = optim.Adam(parameters,  lr=0.00001 * args.lr_multiplier_swa, eps=1e-9,
+                                                           weight_decay=args.wd, betas=(0.9, 0.98), )
+                bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(), lr=0.00001, eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98), )
+                if args.change_swa_decoder_optimizer:
                     classification_head_optimizer = optim.SGD(model.classification_head.parameters(), lr=0.0001)
                 # dont know how to set the optimizer for StepLR to start with 0.0002 lr but have the rest of the states
                 # the same (momentum...
                 # classification_head_optimizer.load_state_dict(optimizer_state_d[0])
-                if not reinint_swa_decoder:
+                if not args.reinint_swa_decoder:
                     bert_optimizer.load_state_dict(optimizer_state_d[1])
-                if not change_swa_decoder_optimizer and not reinint_swa_decoder:
+                if not args.change_swa_decoder_optimizer and not args.reinint_swa_decoder:
                     # if lr scheduler is none, simply load the optimizer and continue training...
                     classification_head_optimizer.load_state_dict(optimizer_state_d[0])
                 optimizer = [classification_head_optimizer, bert_optimizer]
                 # set the cycle s.t. after cycle_length steps, the lr will be decreased at 10^-5 from 2*10*-4
-                if lr_scheduler_swa != "none":
-                    scheduler = torch.optim.lr_scheduler_swa.StepLR(optimizer[0], step_size=1, gamma=np.exp(np.log(1/lr_multiplier_swa)/cycle_length))
+                if args.lr_scheduler_swa != "none":
+                    scheduler = torch.optim.lr_scheduler_swa.StepLR(optimizer[0], step_size=1, gamma=np.exp(np.log(1/args.lr_multiplier_swa)/args.cycle_length))
                 swa_model = AveragedModel(model)
                 swa_model.module.to("cpu")
-                eps = e + int(best_epoch * 0.5)
+                args.epochs = e + int(best_epoch * 0.5)
                 # set 0 dropout when swa starts to move along all directions
                 for dec_layer in model.classification_head.transformer.decoder.layers:
                     dec_layer.p = 0
@@ -1757,78 +1760,78 @@ def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001
                     {"params": model.classification_head.parameters()},
                     {
                         "params": model.ProtBertBFD.parameters(),
-                        "lr": lr,
+                        "lr": args.lr,
                     },
                 ]
-                optimizer = optim.Adam(parameters, lr=lr * 10 if high_lr else lr, eps=1e-9, weight_decay=wd,
+                optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr else args.lr, eps=1e-9, weight_decay=args.wd,
                                        betas=(0.9, 0.98), )
                 optimizer.load_state_dict(optimizer_state_d)
                 scheduler = None
                 warmup_scheduler = None
             # since we dont use early stopping anymore, add these seqs
-            if add_val_data_on_swa:
+            if args.add_val_data_on_swa:
                 sp_dataset.add_test_seqs()
                 dataset_loader = torch.utils.data.DataLoader(sp_dataset,
-                                                             batch_size=bs, shuffle=True,
+                                                             batch_size=args.batch_size, shuffle=True,
                                                              num_workers=4, collate_fn=collate_fn)
-    if use_swa:
+    if args.use_swa:
         update_bn(dataset_loader, swa_model.to(device))
-        save_model(swa_model.module, run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
+        save_model(swa_model.module, args.run_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=args.tune_bert)
 
-    other_mdl_name = other_fold_mdl_finished(run_name, partitions[0], validate_partition)
-    model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert)
-    if not deployment_model and not validate_partition is not None or (
-            validate_partition is not None and other_mdl_name):
-        if separate_save_sptype_preds:
-            model.glbl_generator = load_sptype_model(run_name + "_best_sptye_eval.pth")
+    other_mdl_name = other_fold_mdl_finished(args.run_name, args.train_folds[0], args.validate_partition)
+    model = load_model(args.run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=args.tune_bert)
+    if not args.deployment_model and not args.validate_partition is not None or (
+            args.validate_partition is not None and other_mdl_name):
+        if args.separate_save_sptype_preds:
+            model.glbl_generator = load_sptype_model(args.run_name + "_best_sptye_eval.pth")
         # other model is used for the D1 train, D2 validate, D3 test CV (sp6 cv method)
         second_model = load_model(other_mdl_name, tuned_bert_embs_prefix=tuned_bert_embs_prefix) if other_mdl_name else None
-        evaluate(model, sp_data.lbl2ind, run_name=run_name + "_best", partitions=test_partition, sets=["train", "test"],
-                 form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model, very_simplified=very_simplified,
+        evaluate(model, sp_data.lbl2ind, run_name=args.run_name + "_best", partitions=test_partition, sets=["train", "test"],
+                 form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified, second_model=second_model, very_simplified=args.very_simplified,
                  glbl_lbl_2ind=sp_data.glbl_lbl_2ind, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                 tune_bert=tune_bert, extended_sublbls=extended_sublbls,random_folds_prefix=random_folds_prefix,
-                 train_oh=train_oh,lipbobox_predictions=lipbobox_predictions,sptype_preds=test_sptype_preds)
+                 tune_bert=args.tune_bert, extended_sublbls=args.extended_sublbls,random_folds_prefix=random_folds_prefix,
+                 train_oh=args.train_oh,lipbobox_predictions=args.lipbobox_predictions,sptype_preds=args.test_sptype_preds)
         sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
-            get_cs_and_sp_pred_results(filename=run_name + "_best.bin".format(e), v=False, return_class_prec_rec=True)
+            get_cs_and_sp_pred_results(filename=args.run_name + "_best.bin".format(e), v=False, return_class_prec_rec=True)
         all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
             np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
         log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch,
                                          all_f1_scores=all_f1_scores, sptype_f1=sptype_f1)
         pos_fp_info = total_positives
         pos_fp_info.extend(false_positives)
-        if account_lipos:
-            evaluate(model, sp_data.lbl2ind, run_name=run_name + "_lippos_best", partitions=test_partition,
-                     sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model,
-                     very_simplified=very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind, account_lipos=account_lipos,
-                     tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
-                     random_folds_prefix=random_folds_prefix, train_oh=train_oh,lipbobox_predictions=lipbobox_predictions,
-                     sptype_preds=test_sptype_preds)
-        if test_only_cs:
-            evaluate(model, sp_data.lbl2ind, run_name=run_name + "_onlycs_best", partitions=test_partition,
-                     sets=["train", "test"], form_sp_reg_data=form_sp_reg_data, simplified=simplified,
-                     second_model=second_model, very_simplified=very_simplified, test_only_cs=test_only_cs, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
-                     tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=tune_bert, extended_sublbls=extended_sublbls,
-                     random_folds_prefix=random_folds_prefix, train_oh=train_oh,lipbobox_predictions=lipbobox_predictions,
-                     sptype_preds=test_sptype_preds)
+        if args.account_lipos:
+            evaluate(model, sp_data.lbl2ind, run_name=args.run_name + "_lippos_best", partitions=test_partition,
+                     sets=["train", "test"], form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified, second_model=second_model,
+                     very_simplified=args.very_simplified, glbl_lbl_2ind=sp_data.glbl_lbl_2ind, account_lipos=args.account_lipos,
+                     tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=args.tune_bert, extended_sublbls=args.extended_sublbls,
+                     random_folds_prefix=random_folds_prefix, train_oh=args.train_oh,lipbobox_predictions=args.lipbobox_predictions,
+                     sptype_preds=args.test_sptype_preds)
+        if args.test_only_cs:
+            evaluate(model, sp_data.lbl2ind, run_name=args.run_name + "_onlycs_best", partitions=test_partition,
+                     sets=["train", "test"], form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified,
+                     second_model=second_model, very_simplified=args.very_simplified, test_only_cs=args.test_only_cs, glbl_lbl_2ind=sp_data.glbl_lbl_2ind,
+                     tuned_bert_embs_prefix=tuned_bert_embs_prefix, tune_bert=args.tune_bert, extended_sublbls=args.extended_sublbls,
+                     random_folds_prefix=random_folds_prefix, train_oh=args.train_oh,lipbobox_predictions=args.lipbobox_predictions,
+                     sptype_preds=args.test_sptype_preds)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores, sptype_f1 = \
-                get_cs_and_sp_pred_results(filename=run_name + "_onlycs_best.bin".format(e), v=False,
+                get_cs_and_sp_pred_results(filename=args.run_name + "_onlycs_best.bin".format(e), v=False,
                                            return_class_prec_rec=True)
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
                 np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
             log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch,
                                              all_f1_scores=all_f1_scores, sptype_f1=sptype_f1, only_cs=True)
 
-        if test_beam:
-            model = load_model(run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix)
-            evaluate(model, sp_data.lbl2ind, run_name="best_beam_" + run_name + "_best", partitions=test_partition,
+        if args.test_beam:
+            model = load_model(args.run_name + "_best_eval.pth", tuned_bert_embs_prefix=tuned_bert_embs_prefix)
+            evaluate(model, sp_data.lbl2ind, run_name="best_beam_" + args.run_name + "_best", partitions=test_partition,
                      sets=["train", "test"],
-                     form_sp_reg_data=form_sp_reg_data, simplified=simplified, second_model=second_model,
-                     very_simplified=very_simplified,
+                     form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified, second_model=second_model,
+                     very_simplified=args.very_simplified,
                      glbl_lbl_2ind=sp_data.glbl_lbl_2ind, tuned_bert_embs_prefix=tuned_bert_embs_prefix,
-                     tune_bert=tune_bert,use_beams_search=True, random_folds_prefix=random_folds_prefix,
-                     train_oh=train_oh,lipbobox_predictions=lipbobox_predictions,sptype_preds=test_sptype_preds)
+                     tune_bert=args.tune_bert,use_beams_search=True, random_folds_prefix=random_folds_prefix,
+                     train_oh=args.train_oh,lipbobox_predictions=args.lipbobox_predictions,sptype_preds=args.test_sptype_preds)
             sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-                get_cs_and_sp_pred_results(filename="best_beam_" + run_name + ".bin".format(e), v=False)
+                get_cs_and_sp_pred_results(filename="best_beam_" + args.run_name + ".bin".format(e), v=False)
             all_recalls, all_precisions, total_positives = list(np.array(all_recalls).flatten()), list(
                 np.array(all_precisions).flatten()), list(np.array(total_positives).flatten())
             log_and_print_mcc_and_cs_results(sp_pred_mccs, all_recalls, all_precisions, test_on="TEST", ep=best_epoch,
@@ -1872,7 +1875,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
     hparams.train_enc_dec_sp6 = True
     hparams.use_glbl_lbls = False
-    lg2ind = sp_data.lg2ind
+    og2ind = sp_data.og2ind
     aa2ind = None
     tuned_bert_embs_prefix = ""
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

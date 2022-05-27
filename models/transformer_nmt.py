@@ -7,25 +7,33 @@ from typing import Tuple
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
-from torch.nn import TransformerEncoder, TransformerEncoderLayer, Transformer
+from torch.nn.modules import LayerNorm
+from torch.nn import TransformerEncoder, TransformerEncoderLayer, Transformer, TransformerDecoder, TransformerDecoderLayer
 from torch.utils.data import dataset
 from models.binary_sp_classifier import BinarySPClassifier, CNN3
 
 
 class TokenEmbedding(nn.Module):
     def __init__(self, vocab_size: int, emb_size, lbl2ind=None):
+        """
+        Module used in vector representations of the ouput labels or the organism group identifiers
+
+        :param int vocab_size: number of unique tokens (e.g. 11 the output label embedding or 4 for organism group
+                representation)
+        :param int emb_size: dimensionality of the embedding layer (needs to match the ProtBERT dimension for the
+                label encoding
+        :param dict lbl2ind: dictionary of labels (output labels or organism group) to indices.
+        """
         super(TokenEmbedding, self).__init__()
         self.emb_size = emb_size
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.embedding = nn.Embedding(vocab_size, emb_size).to(self.device)
         self.lbl2ind = lbl2ind
 
-    def forward(self, tokens: Tensor, no_append_bs=False):
-        # no_append_bs is used when testing. Automatic "BS" token appending is done while training
+    def forward(self, tokens: Tensor):
         token_tensors = []
         if self.lbl2ind is not None:
             max_len = max([len(tk_seq) for tk_seq in tokens])
-
             for tk_seq in tokens:
                 tk_tensor = [self.lbl2ind["BS"]]
                 tk_tensor.extend(tk_seq)
@@ -38,11 +46,29 @@ class TokenEmbedding(nn.Module):
 
 
 class InputEmbeddingEncoder(nn.Module):
-    def __init__(self, partitions=[0, 1, 2], data_folder="sp_data/", lg2ind=None, use_glbl_lbls=False, aa2ind=None,
-                 glbl_lbl_version=1, form_sp_reg_data=False, tuned_bert_embs_prefix="", tuning_bert=False,
+    def __init__(self, partitions=[0, 1, 2], og2ind=None, use_glbl_lbls=False, aa2ind=None,
+                 glbl_lbl_version=1, tuned_bert_embs_prefix="", tuning_bert=False,
                  residue_emb_extra_dims=0, use_blosum=False, use_extra_oh=False):
-        # only create dictionaries from sequences to embeddings (as sequence embeddings are already computed by a bert
-        # model
+        """
+        Module that processes the inputs given to TransformermModel (these inputs will be added/concatenate to
+        PositionalEncoding outputs).
+
+        :param list partitions: list of SignalP 6.0 partitions needed (when not tuning ProtBERT together with TSignal,
+                these embeddings are pre-computed and fixed, and for efficiency they are loaded and used during
+                training/testing)
+        :param dict og2ind: dictionary of organism groups to index
+        :param bool use_glbl_lbls: an extra token <CLS> may be added to the sequence and the SP type be predicted based
+                on its representation
+        :param dict aa2ind: residue label to index dictionary (used when extra embeddings, along with ProtBERT are used)
+        :param int glbl_lbl_version: 1,2,3 or 4. Global label version (specify the way in which SP prediction will be
+                conducted)
+        :param str tuned_bert_embs_prefix: when tuning ProtBERT separately, the embeddings are again computed offline
+                and loaded here from binary files (this specifies the prefix of the file names)
+        :param bool tuning_bert: if true, ProtBERT is tuned together with TSignal and <partitions> argument is irrelevant
+        :param int residue_emb_extra_dims: number of extra dimensions to use for the decoder's inputs
+        :param bool use_blosum: residue_emb_extra_dims is fixed to 16, blosum extra (non-contextual) embeddings are used
+        :type bool use_extra_oh: residue_emb_extra_dims is fixed to 32, oh extra (non-contextual) embeddings are used
+        """
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.data_folder = get_data_folder()
         self.use_extra_oh = use_extra_oh
@@ -67,9 +93,9 @@ class InputEmbeddingEncoder(nn.Module):
 
         self.glbl_lbl_version = glbl_lbl_version
         seq2emb = {}
-        self.lg2ind = pickle.load(open("sp6_dicts.bin", "rb"))[1]
+        self.og2ind = pickle.load(open("sp6_dicts.bin", "rb"))[1]
         seq2lg = {}
-        self.use_lg = lg2ind is not None
+        self.use_lg = og2ind is not None
         if aa2ind is None:
             # if aa2ind is None, train on oh using an InputEmbeddingLayer. A single emb layer having everything (EOS, BOS,
             # CLS, LG) embs should be good
@@ -79,8 +105,8 @@ class InputEmbeddingEncoder(nn.Module):
                                                  "sp6_partitioned_data_sublbls_{}_{}.bin".format(t, p), "rb"))
                     if not tuning_bert:
                         seq2emb.update({seq: emb for seq, (emb, _, _, _) in part_dict.items()})
-                    if lg2ind is not None:
-                        seq2lg.update({seq: lg2ind[lg] for seq, (_, _, lg, _) in part_dict.items()})
+                    if og2ind is not None:
+                        seq2lg.update({seq: og2ind[lg] for seq, (_, _, lg, _) in part_dict.items()})
             self.seq2lg = seq2lg
             self.seq2emb = seq2emb
             self.aa2ind = aa2ind
@@ -88,12 +114,12 @@ class InputEmbeddingEncoder(nn.Module):
             # 2x1024 for that. When using global classification, an additional <CLS> token will be added during training,
             # that will be used for global classification
             self.eos_bos_cls_embs = TokenEmbedding(3, 1024) if use_glbl_lbls else TokenEmbedding(2, 1024)
-            self.lg_embs = TokenEmbedding(len(lg2ind.keys()), 1024) if lg2ind is not None else None
+            self.lg_embs = TokenEmbedding(len(og2ind.keys()), 1024) if og2ind is not None else None
             self.use_glbl_lbls = use_glbl_lbls
         else:
             # add CLS, LG tokens:
             self.use_glbl_lbls = use_glbl_lbls
-            self.use_lg = lg2ind is not None
+            self.use_lg = og2ind is not None
             self.aa2ind = aa2ind
             no_of_tokens = len(self.aa2ind.keys())
             self.aa2ind['CLS'], self.aa2ind['LG'] = no_of_tokens, no_of_tokens+1
@@ -105,42 +131,63 @@ class InputEmbeddingEncoder(nn.Module):
         return mask
 
     def create_empty_mask(self, shape):
+        """
+        Function used to create esentially a "no-masking" matrix for the inputs (every label has access to all inputs)
+
+        :param int shape: length (should be equal to some encoder layer's representation - coming from ProtBERT)
+        """
         src_mask = torch.zeros((shape, shape), device=self.device).type(torch.bool)
         return src_mask
 
-    def add_bos_eos_lg_glb_cls_tkns(self, seq, inp_seqs=None):
-        aa_embedding = torch.tensor(self.seq2emb[seq], device=self.device) if inp_seqs is None else seq
-        bos = self.eos_bos_cls_embs(torch.tensor(0, device=self.device)).reshape(1, -1)
-        eos = self.eos_bos_cls_embs(torch.tensor(1, device=self.device)).reshape(1, -1)
-        # input_tensor = [bos]
-        input_tensor = [aa_embedding[:len(inp_seqs)]]
+    def add_bos_eos_lg_glb_cls_tkns(self, strseq_or_inpemb, inp_seq=None):
+        """
+        Method used for:
+            - adding {CLS} token in the case of type 1 global label training (predicting SP-type based on a {CLS} token
+            - adding {BOS}/{EOS} tokens: as the sequences are of the same length, adding/leving the removed
+                shouldn't affect in any way the final performance
+            - concatenating blosum/oh/NN(ri) for each ri representation of the ProtBERT model. Used for the non-
+                non-contextualized representation "injected" in the TSignal's decoder
+
+        :param str_or_torch.tesnor strseq_or_inpemb: can be a string (when not tuning PortBERT model, the sequence embeddings are
+            computed prior to TSignal's training and are simply loaded; as such, a dictionary {seq:embedding} is created
+            and used here, and the parameter strseq_or_inpemb would retrieve the corresponding embedding; when seq is a tensor (i.e.
+            ProtBERT is tuned along with the TSignal model and the embeddings are computed "online") inp_seqs will
+            instead hold the actual sequence.
+
+        :type strseq_or_inpemb:
+        :param str_or_None inp_seq:
+        :return torch.tensor: tensor containing the input to TSignal's decoder
+        """
+        aa_embedding = torch.tensor(self.seq2emb[strseq_or_inpemb], device=self.device) if inp_seq is None else strseq_or_inpemb
+
+        # uncomment and use if you with to add to input_tensor the {BOS}/{EOS}; it most likely shouldn't affect the
+        # final results
+        # bos = self.eos_bos_cls_embs(torch.tensor(0, device=self.device)).reshape(1, -1)
+        # eos = self.eos_bos_cls_embs(torch.tensor(1, device=self.device)).reshape(1, -1)
+
+        input_tensor = [aa_embedding[:len(inp_seq)]]
         if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             cls_emb = self.eos_bos_cls_embs(torch.tensor(2, device=self.device)).reshape(1,-1)
             input_tensor.append(cls_emb)
         if self.use_lg:
-            lg_emb = self.lg_embs(torch.tensor([self.seq2lg[seq]], device=self.device)) if inp_seqs is None else \
-                self.lg_embs(torch.tensor([self.seq2lg[inp_seqs]], device=self.device))
+            lg_emb = self.lg_embs(torch.tensor([self.seq2lg[strseq_or_inpemb]], device=self.device)) \
+                if inp_seq is None else self.lg_embs(torch.tensor([self.seq2lg[inp_seq]], device=self.device))
             input_tensor.append(lg_emb)
         # input_tensor.append(eos)
         # add a padding/no residue if lg is used at the end of the sequence
         if self.extra_embs_dec_input:
             if self.use_blosum:
-                inp_extra_emb = inp_seqs if not self.use_lg else inp_seqs + "X"
+                inp_extra_emb = inp_seq if not self.use_lg else inp_seq + "X"
                 extra_emb_tensor = torch.cat([ torch.tensor([self.extra_embs_dec_input[r] for r in inp_extra_emb], device=self.device,dtype=torch.float32) ])
-                # print("mean inp", torch.mean(torch.cat(input_tensor, dim=0), dim=0))
-                # print("std inp", torch.mean(torch.std(torch.cat(input_tensor, dim=0), dim=0)))
-                # print("mean extra emb", torch.mean(extra_emb_tensor, dim=0))
-                # print("std extra emb", torch.mean(torch.std(extra_emb_tensor, dim=0)))
                 return torch.cat([torch.cat(input_tensor, dim=0), extra_emb_tensor], dim=1)
             elif self.use_extra_oh:
-                inp_extra_emb = inp_seqs if not self.use_lg else inp_seqs + "X"
+                inp_extra_emb = inp_seq if not self.use_lg else inp_seq + "X"
                 extra_emb_tensor = self.make_oh(inp_extra_emb)
                 return torch.cat([torch.cat(input_tensor, dim=0), extra_emb_tensor], dim=1)
 
             else:
-                inp_extra_emb = inp_seqs if not self.use_lg else inp_seqs + "X"
+                inp_extra_emb = inp_seq if not self.use_lg else inp_seq + "X"
                 extra_emb_tensor = self.extra_emb_layer_norm(self.extra_embs_dec_input(torch.tensor([self.aa2ind_extra[r] for r in inp_extra_emb], device=self.device)))
-                # extra_emb_tensor = self.extra_embs_dec_input(torch.tensor([self.aa2ind_extra[r] for r in inp_extra_emb], device=self.device))
                 return torch.cat([torch.cat(input_tensor, dim=0), extra_emb_tensor], dim=1)
         return torch.cat(input_tensor, dim=0)
 
@@ -210,10 +257,10 @@ class InputEmbeddingEncoder(nn.Module):
         self.data_folder = get_data_folder()
         seq2emb = {}
         if emb_f_name is not None:
-            self.lg2ind = pickle.load(open("sp6_dicts.bin", "rb"))[1]
+            self.og2ind = pickle.load(open("sp6_dicts.bin", "rb"))[1]
             dict_ = pickle.load(open(self.data_folder + emb_f_name, "rb"))
             seq2emb.update({seq: emb for seq, (emb, _, _, _) in dict_.items()})
-            self.seq2lg = {seq: self.lg2ind[lg] for seq, (_, _, lg, _) in dict_.items()}
+            self.seq2lg = {seq: self.og2ind[lg] for seq, (_, _, lg, _) in dict_.items()}
         else:
             for p in partitions:
                 for t in ["test", "train"]:
@@ -227,70 +274,124 @@ class InputEmbeddingEncoder(nn.Module):
 class TransformerModel(nn.Module):
 
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float = 0.5,
-                 data_folder="sp_data/", lbl2ind={}, lg2ind=None, use_glbl_lbls=False,
+                 lbl2ind={}, og2ind=None, use_glbl_lbls=False,
                  no_glbl_lbls=6, ff_dim=4096, aa2ind = None, train_oh=False, glbl_lbl_version=1, form_sp_reg_data=False,
                  version2_agregation="max", input_drop=False, no_pos_enc=False, linear_pos_enc=False, scale_input=False,
                  tuned_bert_embs_prefix="", tuning_bert=False,train_only_decoder=False, add_bert_pe_from_dec_to_bert_out=False,
                  concat_pos_enc=False, pe_extra_dims=64,residue_emb_extra_dims=0, use_blosum=False,use_extra_oh=False,
-                 add_extra_embs2_generator=False):
+                 add_extra_embs2_decoder=False):
+        """
+        Transformer model (TSignal). When tuning ProtBERT together with TSignal model, this model will be the
+        classification head of the ProtBERT model. If <train_only_decoder> parameter is set to true, the model
+        will only have a Transformer Decoder module, and otherwise it is a full encoder-decoder architecture. When
+        <tune_bert> parameter is true, the embeddings given to TransformerModel will be computed (on-line) by ProtBERT.
+        Otherwise, for efficiency, pre-computed embeddings are required and will be read from sp_data/ fodler
+
+        :param int ntoken: number of unique tokens (residues)
+        :param int d_model: model dimensionality d (old, unused)
+        :param int nhead: number of heads per layer
+        :param int d_hid: dimensionality of the model d (without extra vectors)
+        :param int nlayers: number of layers (both encoder and decoder)
+        :param float dropout: dropout at each layer (excluding the Input Embedding)
+        :param string data_folder: data path folder
+        :param dict lbl2ind: token label dictionary (residues as characters to numbers r -> l)  
+        :param dict og2ind: organism group dictionary (residues as characters to numbers og -> l)
+        :param bool use_glbl_lbls: specify wether to use global labels asscociated to sequences or not
+        :param int no_glbl_lbls: number of global labels (4 in this experiment, eukarya, archaea, gp and gn bacteria)
+        :param int ff_dim: expanding dimension of Transformer layers (usually 4x d_hid)
+        :param dict aa2ind: amino acid to index dictionary
+        :param train_oh: train using one-hot vectors instead of ProtBERT
+        :param int glbl_lbl_version: specify the global label approach to be used (1,2 or 3)
+        :param bool form_sp_reg_data:
+        :param str version2_agregation: old argument. Used when a global label was predicted based on residue embs
+        :param float input_drop: amount of dropout from the input embeddings ( drop(E_0) )
+        :param bool no_pos_enc: use to not add extra positional encoding added to the decoder
+        :param bool linear_pos_enc: use a linear layer for positional encoding in the decoder (instead of fixed, sine-based)
+        :param bool scale_input: scale bert embs (e.g. E_30) to have the same norm as the added positional encoding
+        :param str tuned_bert_embs_prefix: if tune is tuned separately, load the (fixed) bert embeddings
+        :param bool tuning_bert: tune ProtBert together with TSignal
+        :param bool train_only_decoder: do not add any extra encoder layers (just nlayers decoder layers)
+        :param bool add_bert_pe_from_dec_to_bert_out: initialize linear embedding for the decoder from the ProtBERT
+                positional encoding layer
+        :param bool concat_pos_enc: at the decoder, concatenate the positional encoding (instead of adding)
+        :param int pe_extra_dims: number of extra dimensions to be used with concatenated positional encoding (has to be
+                divisible by nhead)
+        :param int residue_emb_extra_dims: number of extra dimensions the output layer W_O receives (which receives in
+                this case concatenate(D_3[ri], NN(ri)) - i.e. concatenates the final decoder output D_3 and an
+                additional, non-contextual representation of the corresponding residue ri from a neural-network.
+        :param bool use_blosum: for the additional, non-contextual representation that the last layer W_O receives,
+                add 16 fixed dimensions of Blosum62 encoding (trimmed down with PCA to 16, to be divisible by nhead
+                we use)
+        :param bool use_extra_oh: 32 extra dimensions are added to the last layer W_O which receives one-hot
+                representations of the
+        :param add_extra_embs2_decoder: the additional one-hot/blosum/NN(ri) (uncontextualized) representations will be
+                added to the decoder (note this means predictions will still not have completely uncontextualized
+                representations using this)
+        """
         super().__init__()
-        # use_blosum = True
         aa_dict = pickle.load(open("sp6_dicts.bin", "rb"))
         aa_dict = {k: v for k, v in aa_dict[-1].items() if v not in ['ES', 'PD', 'BS']}
         aa_dict['X'] = 20
         self.aa2ind_extra = aa_dict
         self.use_blosum = use_blosum
         self.use_extra_oh = use_extra_oh
-        self.add_extra_embs2_generator = add_extra_embs2_generator
+        self.add_extra_embs2_decoder = add_extra_embs2_decoder
+        if use_blosum or use_extra_oh and residue_emb_extra_dims:
+            print("!!! WARNING !!!: you have used residue_emb_extra_dims specifying extra dims added to the output layer "
+                  "W_O but use_blosum or use_extra_oh fix the extra dimensions to 16/32 respectively")
         if use_extra_oh:
             residue_emb_extra_dims = 32
         elif use_blosum:
             residue_emb_extra_dims = 16
-        if add_extra_embs2_generator:
-            self.add_extra_embs2_generator = residue_emb_extra_dims
-            residue_emb_extra_dims = 0
-        if use_blosum and add_extra_embs2_generator:
             self.extra_embs_gen_input = pickle.load(open("blusum_m.bin", "rb"))
         else:
             self.extra_embs_gen_input = None
         self.bert_pe_for_decoder = False
-        self.pe_extra_dims = pe_extra_dims
+        self.pe_extra_dims = pe_extra_dims if concat_pos_enc else 0
         self.residue_emb_extra_dims = residue_emb_extra_dims
+
         self.concat_pos_enc = concat_pos_enc
         self.add_bert_pe_from_dec_to_bert_out=add_bert_pe_from_dec_to_bert_out
         self.train_only_decoder = train_only_decoder
-        self.add_lg_info = lg2ind is not None
+        self.add_lg_info = og2ind is not None
         self.form_sp_reg_data = form_sp_reg_data
         self.model_type = 'Transformer'
-        self.version2_agregation = "max"
+        self.version2_agregation = version2_agregation
         self.no_pos_enc=no_pos_enc
         self.scale_input = scale_input
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.pos_encoder = PositionalEncoding(d_model, dropout=dropout if input_drop else 0, no_pos_enc=no_pos_enc,
-                                              linear_pos_enc=linear_pos_enc, concat_pos_enc=concat_pos_enc,pe_extra_dims=pe_extra_dims,
-                                              residue_emb_extra_dims=residue_emb_extra_dims, use_blosum=use_blosum,)
-        self.transformer = Transformer(d_model=d_hid + pe_extra_dims  + residue_emb_extra_dims if concat_pos_enc else d_hid + residue_emb_extra_dims,
-                                       nhead=nhead,
-                                       num_encoder_layers=nlayers,
-                                       num_decoder_layers=nlayers,
-                                       dim_feedforward=ff_dim,
-                                       dropout=dropout).to(self.device)
+        self.pos_encoder = PositionalEncoding(d_model, dropout=dropout if input_drop else 0, linear_pos_enc=
+                        linear_pos_enc, concat_pos_enc=concat_pos_enc,pe_extra_dims=pe_extra_dims,
+                        residue_emb_extra_dims=residue_emb_extra_dims, use_blosum=use_blosum, use_extra_oh=use_extra_oh)
+        extra_dims_decoder = residue_emb_extra_dims if add_extra_embs2_decoder else 0
+        self.extra_dims_decoder = extra_dims_decoder
+        if not train_only_decoder:
+            self.transformer = Transformer(d_model=d_hid + pe_extra_dims,
+                                           nhead=nhead,
+                                           num_encoder_layers=nlayers,
+                                           num_decoder_layers=nlayers,
+                                           dim_feedforward=ff_dim,
+                                           dropout=dropout).to(self.device)
+        else:
+            decoder_layer = TransformerDecoderLayer(d_model = d_hid + pe_extra_dims + extra_dims_decoder, nhead=nhead,
+                                                    dim_feedforward=ff_dim, dropout=dropout)
+            decoder_norm = LayerNorm(d_hid + pe_extra_dims + extra_dims_decoder)
+
+            self.transformer = TransformerDecoder(decoder_layer, num_layers=nlayers, norm=decoder_norm).to(self.device)
         # input_encoder is just a dictionary with {sequence:embedding} with embeddings from bert LM
         aa2ind = None if not train_oh else aa2ind
-        self.input_encoder = InputEmbeddingEncoder(partitions=[0, 1, 2], data_folder=data_folder, lg2ind=lg2ind,
+        self.input_encoder = InputEmbeddingEncoder(partitions=[0, 1, 2], og2ind=og2ind,
                                                    use_glbl_lbls=use_glbl_lbls, aa2ind=aa2ind, glbl_lbl_version=glbl_lbl_version,
-                                                   form_sp_reg_data=form_sp_reg_data,
                                                    tuned_bert_embs_prefix=tuned_bert_embs_prefix, tuning_bert=tuning_bert,
-                                                   residue_emb_extra_dims=residue_emb_extra_dims, use_blosum=use_blosum,
-                                                   use_extra_oh=use_extra_oh)
+                                                   residue_emb_extra_dims=extra_dims_decoder,
+                                                   use_blosum=use_blosum, use_extra_oh=use_extra_oh)
         # the label encoder is an actualy encoder layer with dim (10 x 1000)
-        self.label_encoder = TokenEmbedding(ntoken, d_hid + residue_emb_extra_dims, lbl2ind=lbl2ind)
+        self.label_encoder = TokenEmbedding(ntoken, d_hid + extra_dims_decoder, lbl2ind=lbl2ind)
         self.d_model = d_model
         # self.generator = nn.Sequential(nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
         #                            if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, 512).to(self.device),
         #                                    nn.LayerNorm(512).to(self.device), nn.ReLU(),nn.Linear(512, ntoken).to(self.device))
-        self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
-                                   if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, ntoken).to(self.device)
+        self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims, ntoken).to(self.device)
         self.use_glbl_lbls = use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
         if self.form_sp_reg_data and not use_glbl_lbls:
@@ -327,6 +428,8 @@ class TransformerModel(nn.Module):
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor, padding_mask_src:Tensor):
         tgt = self.pos_encoder(self.label_encoder(tgt).transpose(0,1))
+        if self.train_only_decoder:
+            return self.transformer(tgt, memory, tgt_mask, memory_key_padding_mask=padding_mask_src)
         return self.transformer.decoder(tgt, memory, tgt_mask, memory_key_padding_mask=padding_mask_src)
 
     def forward_glb_lbls(self, src, tgt):
@@ -354,7 +457,7 @@ class TransformerModel(nn.Module):
 
     def get_extra_tensor(self, inp_seqs, outs):
         extra_embs = []
-        if self.use_blosum and self.add_extra_embs2_generator:
+        if self.use_blosum:
             for i_s in inp_seqs:
                 inp_extra_emb = i_s + "X" * (outs.shape[0] - len(i_s))
                 if outs.shape[0] < len(inp_extra_emb):
@@ -363,7 +466,7 @@ class TransformerModel(nn.Module):
                 extra_emb_tensor = torch.cat([torch.tensor([self.extra_embs_gen_input[r] for r in inp_extra_emb],
                                                            device=self.device, dtype=torch.float32)])
                 extra_embs.append(extra_emb_tensor )
-        elif self.use_extra_oh and self.add_extra_embs2_generator:
+        elif self.use_extra_oh:
             for i_s in inp_seqs:
                 inp_extra_emb = i_s + "X" * (outs.shape[0] - len(i_s))
                 if outs.shape[0] < len(inp_extra_emb):
@@ -393,7 +496,7 @@ class TransformerModel(nn.Module):
         padded_src = self.pos_encoder(padded_src.transpose(0, 1), scale=self.scale_input, no_pos_enc=no_pos_enc, add_lg_info=self.add_lg_info)
         # [ FALSE FALSE ... TRUE TRUE FALSE FALSE FALSE ... TRUE TRUE ...]
         outs = self.decode(tgt, padded_src, tgt_mask, padding_mask_src)
-        if self.add_extra_embs2_generator:
+        if self.residue_emb_extra_dims:
             outs = self.get_extra_tensor(inp_seqs, outs)
         return self.generator(outs)
 
@@ -443,10 +546,32 @@ class TransformerModel(nn.Module):
 
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000, no_pos_enc=False, linear_pos_enc=False, concat_pos_enc=False,pe_extra_dims=64,
-                 residue_emb_extra_dims=32, use_blosum=False):
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000, linear_pos_enc=False, concat_pos_enc=False,pe_extra_dims=64,
+                 residue_emb_extra_dims=32, use_blosum=False, use_extra_oh=False):
+        """
+        Positional encoding module used both for the decoder's inputs, as well as the extra pe. added to the
+        ProtBERT embeddings.
+
+        :param int d_model: dimension of the model
+        :param float dropout: dropout used for input encoding
+        :param int max_len: the sine-based positional encoding (pe. - W_S in manuscript) is pre-computed, and will be
+                able to encode positions for sequences of length at most <max_len>
+        :param bool linear_pos_enc: if true, instead of sine-based W_S decoder pe., use a linear pe
+        :param bool concat_pos_enc: instead of additive pe., concatenate W_S over embedding dimension
+        :param int pe_extra_dims: (must be exactly divisible by nhead from TransformerModel); when concatenating the pe.
+                specify how many extra dimensions to add to the vectors
+        :param int residue_emb_extra_dims: Used only when <concat_pos_enc> is false. When using extra (oh/blosum/linear)
+                residue embeddings (at the decoder stage) and <concat_pos_enc> is false (the pe. is additive), the pe.
+                dimension needs to be the same as the full model dimension d, and thus pe will have:
+                <residue_emb_extra_dims> + d_model
+        :param bool use_blosum: <residue_emb_extra_dims> is fixed to 16
+        :param bool use_extra_oh: <residue_emb_extra_dims> is fixed to 32
+        """
         super().__init__()
-        residue_emb_extra_dims = 32 if use_blosum else residue_emb_extra_dims
+        if use_blosum:
+            residue_emb_extra_dims = 16
+        elif use_blosum:
+            residue_emb_extra_dims = 32
         self.concat_pos_enc = concat_pos_enc
         self.pe_extra_dims = pe_extra_dims
         self.linear_pos_enc = linear_pos_enc
