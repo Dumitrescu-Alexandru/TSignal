@@ -229,7 +229,7 @@ class InputEmbeddingEncoder(nn.Module):
         if self.aa2ind is not None:
             return self.oh_forward(seqs)
         if inp_seqs is not None:
-            tensor_inputs = [self.add_bos_eos_lg_glb_cls_tkns(s, inp_seqs=is_) for (s, is_) in zip(seqs, inp_seqs)]
+            tensor_inputs = [self.add_bos_eos_lg_glb_cls_tkns(s, inp_seq=is_) for (s, is_) in zip(seqs, inp_seqs)]
         else:
             tensor_inputs = [self.add_bos_eos_lg_glb_cls_tkns(s) for s in seqs]
         if inp_seqs is None:
