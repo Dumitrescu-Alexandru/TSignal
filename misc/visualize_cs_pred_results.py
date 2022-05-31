@@ -1672,8 +1672,8 @@ def duplicate_Some_logs():
 
 def prep_sp1_sp2():
 
-    file = "../sp_data/sp6_data/benchmark_set_sp5.fasta"
-    file_new = "../sp_data/sp6_data/train_set.fasta"
+    file = "../sp_data/benchmark_set_sp5.fasta"
+    file_new = "../sp_data/train_set.fasta"
     ids_benchmark_sp5 = []
     for seq_record in SeqIO.parse(file, "fasta"):
         ids_benchmark_sp5.append(seq_record.id.split("|")[0])
@@ -1786,8 +1786,8 @@ def extract_id2seq_dict(file="train_set.fasta"):
                    'B1AIC4', 'Q2FZJ9', ' P0ABJ2', 'P0AD46', 'P0ABJ2', 'Q99V36', 'Q7A698', 'Q5HH23', 'Q6GI23', 'Q7A181',
                    'Q2YX14', 'Q6GAF2', 'P65628', 'P65629', 'P65630', 'Q5HEA9', 'P0DC86', 'Q2YUI9', 'Q5XDY9', 'Q2FF36',
                    'Q1R3H8', 'P0DC87', 'A5IUN6', 'A6QIT4', 'A7X4S6', 'Q6G7M0', 'Q1CHD5']
-    file = "../sp_data/sp6_data/benchmark_set_sp5.fasta"
-    file_new = "../sp_data/sp6_data/train_set.fasta"
+    file = "../sp_data/benchmark_set_sp5.fasta"
+    file_new = "../sp_data/train_set.fasta"
     id2seq = {}
     id2lg = {}
     id2type = {}
@@ -3165,7 +3165,6 @@ def plot_comparative_performance_sp1_mdls():
 
     for run_no in runs:
         print("Computing results for run number {}".format(run_no))
-        run_results_folder = "tuning_bert_only_decoder_rf_noswa_run{}/".format(run_no)
         run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
 
         mdl2results = extract_all_param_results(only_cs_position=False,
@@ -3811,7 +3810,6 @@ def extract_performance_over_tolerance():
 
         fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.125, 0.09), ncol=4, fontsize=12.5)
         plt.savefig("some_plot_perf_over_tolerance_{}.pdf".format("tat" if type=="Tat" else "sp2"))
-    all_mdl_2results = []
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
         tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat, \
         tatlipo_f1s, tatlipo_recs, tatlipo_precs, pilin_f1s, pilin_recs, pilin_precs, \
@@ -3821,7 +3819,6 @@ def extract_performance_over_tolerance():
     runs = [59,60,61,62,71]
 
     for run_no in runs:
-        run_results_folder = "tuning_bert_repeat{}_only_decoder/".format(run_no) if run_no != 1 else "tuning_bert_only_decoder/"
         run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
         mdl2results = extract_all_param_results(only_cs_position=False,
                                                 result_folder=run_results_folder,
@@ -3839,7 +3836,6 @@ def extract_performance_over_tolerance():
         tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
         tat_recs.append(np.array([rec for rec in mdl2results[mdl_ind][14]]))
         tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][15]]))
-        print(np.concatenate(mdl2results[mdl_ind][-3]), np.concatenate(mdl2results[mdl_ind][-4]))
         tatlipo_f1s.append(np.array([f1 for f1 in np.concatenate(mdl2results[mdl_ind][-4])]))
         tatlipo_recs.append(np.array([rec for rec in mdl2results[mdl_ind][16]]))
         tatlipo_precs.append(np.array([prec for prec in mdl2results[mdl_ind][17]]))
@@ -4909,12 +4905,21 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
+    # extract_performance_over_tolerance()
+
+    mdl2results = extract_all_param_results(only_cs_position=False,
+                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat71/",
+                                            compare_mdl_plots=False,
+                                            remove_test_seqs=False,
+                                            benchmark=False)
+    exit(1)
+
+
     plot_comparative_performance_sp1_mdls()
     visualize_inp_gradients()
     plot_sp6_vs_tnmt()
     plot_sp6_vs_tnmt_mcc()
     plot_perf_over_data_perc()
-    extract_performance_over_tolerance()
     # compute_mcc_sp_only_mdls()
     # exit(1)
     #

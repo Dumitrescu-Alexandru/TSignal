@@ -617,7 +617,7 @@ class ProtBertClassifier(pl.LightningModule):
 
     def extract_embeddnings(self, sample):
         inputs = self.tokenizer.batch_encode_plus(sample["seq"],
-                                                  add_special_tokens=True,
+                                                  add_special_tokens=False,
                                                   padding=True,
                                                   truncation=True,
                                                   max_length=self.hparams.max_length)

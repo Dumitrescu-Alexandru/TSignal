@@ -102,7 +102,7 @@ class InputEmbeddingEncoder(nn.Module):
             for p in partitions:
                 for t in ["test", "train"]:
                     part_dict = pickle.load(open(self.data_folder + tuned_bert_embs_prefix +
-                                                 "sp6_partitioned_data_sublbls_{}_{}.bin".format(t, p), "rb"))
+                                                 "sp6_partitioned_data_{}_{}.bin".format(t, p), "rb"))
                     if not tuning_bert:
                         seq2emb.update({seq: emb for seq, (emb, _, _, _) in part_dict.items()})
                     if og2ind is not None:
@@ -164,7 +164,7 @@ class InputEmbeddingEncoder(nn.Module):
         # final results
         # bos = self.eos_bos_cls_embs(torch.tensor(0, device=self.device)).reshape(1, -1)
         # eos = self.eos_bos_cls_embs(torch.tensor(1, device=self.device)).reshape(1, -1)
-
+        inp_seq = strseq_or_inpemb if inp_seq is None else inp_seq
         input_tensor = [aa_embedding[:len(inp_seq)]]
         if self.use_glbl_lbls and self.glbl_lbl_version == 1:
             cls_emb = self.eos_bos_cls_embs(torch.tensor(2, device=self.device)).reshape(1,-1)
@@ -366,16 +366,16 @@ class TransformerModel(nn.Module):
         extra_dims_decoder = residue_emb_extra_dims if add_extra_embs2_decoder else 0
         self.extra_dims_decoder = extra_dims_decoder
         if not train_only_decoder:
-            self.transformer = Transformer(d_model=d_hid + pe_extra_dims,
+            self.transformer = Transformer(d_model=d_hid + self.pe_extra_dims,
                                            nhead=nhead,
                                            num_encoder_layers=nlayers,
                                            num_decoder_layers=nlayers,
                                            dim_feedforward=ff_dim,
                                            dropout=dropout).to(self.device)
         else:
-            decoder_layer = TransformerDecoderLayer(d_model = d_hid + pe_extra_dims + extra_dims_decoder, nhead=nhead,
+            decoder_layer = TransformerDecoderLayer(d_model = d_hid + self.pe_extra_dims + extra_dims_decoder, nhead=nhead,
                                                     dim_feedforward=ff_dim, dropout=dropout)
-            decoder_norm = LayerNorm(d_hid + pe_extra_dims + extra_dims_decoder)
+            decoder_norm = LayerNorm(d_hid + self.pe_extra_dims + extra_dims_decoder)
 
             self.transformer = TransformerDecoder(decoder_layer, num_layers=nlayers, norm=decoder_norm).to(self.device)
         # input_encoder is just a dictionary with {sequence:embedding} with embeddings from bert LM
@@ -391,7 +391,7 @@ class TransformerModel(nn.Module):
         # self.generator = nn.Sequential(nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims + self.add_extra_embs2_generator
         #                            if concat_pos_enc else d_model + residue_emb_extra_dims + self.add_extra_embs2_generator, 512).to(self.device),
         #                                    nn.LayerNorm(512).to(self.device), nn.ReLU(),nn.Linear(512, ntoken).to(self.device))
-        self.generator = nn.Linear(d_model + pe_extra_dims + residue_emb_extra_dims, ntoken).to(self.device)
+        self.generator = nn.Linear(d_model + self.pe_extra_dims + residue_emb_extra_dims, ntoken).to(self.device)
         self.use_glbl_lbls = use_glbl_lbls
         self.glbl_lbl_version = glbl_lbl_version
         if self.form_sp_reg_data and not use_glbl_lbls:
@@ -448,12 +448,13 @@ class TransformerModel(nn.Module):
             src = [src_[:len(s_)] for src_, s_ in zip(src, inp_seqs)]
         src_mask, tgt_mask, padding_mask_src, padding_mask_tgt, src = self.input_encoder(src, inp_seqs=inp_seqs)
         if self.add_lg_info:
-            trim_ind_l , trim_ind_r = 2, 1
+            trim_ind_l, trim_ind_r = 2, 1
+            src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for i in range(len(src))]
         else:
-            trim_ind_l , trim_ind_r = 0, 0
-        src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for  i in range(len(src))]
+            trim_ind_l, trim_ind_r = 0, 0
+            src_for_glbl_l = [src[i] for i in range(len(src))]
         padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
-        return self.glbl_generator(padded_src_glbl.transpose(2, 1))
+        return self.glbl_generator(padded_src_glbl)
 
     def get_extra_tensor(self, inp_seqs, outs):
         extra_embs = []
@@ -518,9 +519,10 @@ class TransformerModel(nn.Module):
         if self.glbl_lbl_version == 3:
             if self.add_lg_info:
                 trim_ind_l , trim_ind_r = 2, 1
+                src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for i in range(len(src))]
             else:
                 trim_ind_l , trim_ind_r = 0, 0
-            src_for_glbl_l = [src[i][trim_ind_l:-trim_ind_r, :] for  i in range(len(src))]
+                src_for_glbl_l = [src[i] for  i in range(len(src))]
         padded_src = torch.nn.utils.rnn.pad_sequence(src, batch_first=True)
         padded_src = self.pos_encoder(padded_src.transpose(0,1), scale=self.scale_input, no_pos_enc=self.no_pos_enc)
         padded_tgt = torch.nn.utils.rnn.pad_sequence(self.label_encoder(tgt), batch_first=True).to(self.device)
@@ -535,7 +537,7 @@ class TransformerModel(nn.Module):
                 return self.generator(outs), self.glbl_generator(torch.mean(outs.transpose(0,1), dim=1))
         elif self.glbl_lbl_version == 3 and self.use_glbl_lbls:
             padded_src_glbl = torch.nn.utils.rnn.pad_sequence(src_for_glbl_l, batch_first=True)
-            return self.generator(outs), self.glbl_generator(padded_src_glbl.transpose(2,1))
+            return self.generator(outs), self.glbl_generator(padded_src_glbl)
         elif self.form_sp_reg_data:
             preds = self.generator(outs)
             return preds, self.glbl_generator(torch.mean(torch.sigmoid(preds.transpose(0,1)), dim=1))

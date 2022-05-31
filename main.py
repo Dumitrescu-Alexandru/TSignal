@@ -225,11 +225,6 @@ def sanity_check(file, args2):
     if len(param_names) != len(set(param_names)):
         print("WARNING: THE NUMBER OF UNIQUE MODEL NAMES IS NOT EQUAL TO THE NUMBER OF PARAMETERS! EXITING...")
         exit(1)
-    # print(" ".join(param_names))
-    # print(" ".join(param_logs))
-    # print(" ".join(param_bins))
-    # print(" ".join(param_bins_best))
-    # exit(1)
 
 if __name__ == "__main__":
     date_now = str(datetime.datetime.now()).split(".")[0].replace("-", "").replace(":", "").replace(" ", "")
@@ -257,33 +252,6 @@ if __name__ == "__main__":
         logging.info("Started training")
         args.train_folds = [int(tf) for tf in args.train_folds]
         a = train_cs_predictors(args)
-        # a = train_cs_predictors(bs=args.batch_size, eps=args.epochs, run_name=args.run_name, use_lg_info=args.add_lg_info,
-        #                         lr=args.lr, dropout=args.dropout, test_freq=args.test_freq, use_glbl_lbls=args.use_glbl_lbls,
-        #                         ff_d=args.ff_d, partitions=args.train_folds, nlayers=args.nlayers, nheads=args.nheads, patience=args.patience,
-        #                         train_oh=args.train_oh, deployment_model=args.deployment_model, lr_scheduler_swa=args.lr_scheduler_swa,
-        #                         lr_sched_warmup=args.lr_sched_warmup, test_beam=args.test_beam, wd=args.wd,
-        #                         glbl_lbl_weight=args.glbl_lbl_weight,glbl_lbl_version=args.glbl_lbl_version,
-        #                         validate_on_test=args.validate_on_test, form_sp_reg_data=args.form_sp_reg_data,
-        #                         simplified=args.simplified, version2_agregation=args.version2_agregation,
-        #                         validate_partition=args.validate_partition,very_simplified=args.very_simplified,
-        #                         validate_on_mcc=args.validate_on_mcc, tune_cs=args.tune_cs, input_drop=args.input_drop,
-        #                         use_swa=args.use_swa, separate_save_sptype_preds=args.separate_save_sptype_preds,
-        #                         no_pos_enc=args.no_pos_enc, linear_pos_enc=args.linear_pos_enc, scale_input=args.scale_input,
-        #                         test_only_cs=args.test_only_cs, weight_class_loss=args.weight_class_loss, weight_lbl_loss=args.weight_lbl_loss,
-        #                         account_lipos=args.account_lipos, tuned_bert_embs=args.tuned_bert_embs,
-        #                         tune_bert=args.tune_bert, frozen_epochs=args.frozen_epochs, extended_sublbls=args.extended_sublbls,
-        #                         random_folds=args.random_folds, train_on_subset=args.train_on_subset, train_only_decoder=args.train_only_decoder,
-        #                         remove_bert_layers=args.remove_bert_layers, augment_trimmed_seqs=args.augment_trimmed_seqs,
-        #                         high_lr=args.high_lr, cycle_length=args.cycle_length,lr_multiplier_swa=args.lr_multiplier_swa,
-        #                         change_swa_decoder_optimizer=args.change_swa_decoder_optimizer, add_val_data_on_swa=args.add_val_data_on_swa,
-        #                         reinint_swa_decoder=args.reinint_swa_decoder,anneal_start=args.anneal_start,
-        #                         anneal_epochs=args.anneal_epochs,annealed_lr=args.annealed_lr, bert_pe_for_decoder=args.bert_pe_for_decoder,
-        #                         frozen_pe_epochs=args.frozen_pe_epochs,no_bert_pe_training=args.no_bert_pe_training,
-        #                         add_bert_pe_from_dec_to_bert_out=args.add_bert_pe_from_dec_to_bert_out, concat_pos_enc=args.concat_pos_enc,
-        #                         pe_extra_dims=args.pe_extra_dims,lipbobox_predictions=args.lipbobox_predictions,test_sptype_preds=args.test_sptype_preds,
-        #                         residue_emb_extra_dims=args.residue_emb_extra_dims,add_extra_embs2_generator=args.add_extra_embs2_generator,
-        #                         use_blosum=args.use_blosum, use_extra_oh=args.use_extra_oh)
-
     else:
         if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
             create_parameter_set()

@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import re
 import numpy as np
 import torch
@@ -7,10 +8,52 @@ import pickle
 import pandas as pd
 import os
 from Bio import SeqIO
+from sp_data.bert_tuning_tnmt import ProtBertClassifier, parse_arguments_and_retrieve_logger
+from sp_data.sp6_data.read_extract_sp6_data import extract_raw_data
 
+def check_compatibility(tune_bert=True):
+    data = pickle.load(open("sp_data/sp6_partitioned_data_train_0.bin", "rb"))
+    # if the embeddings are "dummy" embeddings (used for compatibility in the dataloader, when assuming the ProtBERT
+    # model is tuning with TSignal, therefore not needing precomputed embeddings) AND the run is in fact NOT tuning
+    # the BERT model, then precompute bert embeddings
+    if (type(list(data.values())[0][0]) == int or len(list(data.values())[0][0]) == 1) and not tune_bert:
+
+        print("The current binary files sp6_partitioned_data_<train/test>_<fold>.bin are not containing precomputed BERT"
+              " embeddings but the run does not tune bert (i.e. embeddings will be precomputed for efficiency). Will "
+              "attempt to extract the embeddings with pretrained ProtBERT.")
+        hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
+        hparams.train_enc_dec_sp6 = False
+        hparams.use_glbl_lbls = False
+        model = ProtBertClassifier(hparams)
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        model.to(device)
+        dict_w_precomputed_embs = {}
+        # used for batching
+        seqs, lbls, glbl_lbls, og = [], [], [], []
+        for tr_or_tst in ['train','test']:
+            for tr_f in [0,1,2]:
+                data = pickle.load(open("sp_data/sp6_partitioned_data_{}_{}.bin".format(tr_or_tst, tr_f), "rb"))
+                for ind, (k,v) in tqdm(enumerate(data.items()), "computing for {} set fold {}".format(tr_or_tst,tr_f), total=len(data.items())):
+                    seqs.append(" ".join([k_ for k_ in k]))
+                    lbls.append(v[1])
+                    og.append(v[2])
+                    glbl_lbls.append(v[3])
+                    # gather 20 sequences, then compute embeddings and save in the new dictionary
+                    if len(seqs) > 49:
+                        embeddings = model.extract_embeddnings({"seq":seqs})
+                        for emb,s,l,gl,o in zip(embeddings, seqs, lbls, glbl_lbls,og):
+                            dict_w_precomputed_embs[s.replace(" ","")] = (emb[:len(s.replace(" ",""))], l,o,gl)
+                        seqs, lbls, glbl_lbls, og = [], [], [], []
+                # compute the leftover sequences
+                if len(seqs) != 0:
+                    for emb, s, l, gl, o in zip(embeddings, seqs, lbls, glbl_lbls, og):
+                        dict_w_precomputed_embs[s.replace(" ", "")] = (emb[:len(s.replace(" ",""))], l, o, gl)
+                    seqs, lbls, glbl_lbls, og = [], [], [], []
+                pickle.dump(dict_w_precomputed_embs, open("sp_data/sp6_partitioned_data_{}_{}.bin".format(tr_or_tst, tr_f), "wb"))
+                dict_w_precomputed_embs = {}
 
 class SPCSpredictionData:
-    def __init__(self, lbl2ind=None, form_sp_reg_data=False, simplified=True, very_simplified=True, extended_sublbls=False):
+    def __init__(self, lbl2ind=None, form_sp_reg_data=False, simplified=True, very_simplified=True, extended_sublbls=False, tune_bert=True):
         self.aa2ind = {}
         self.lbl2ind = {}
         self.glbl_lbl_2ind = {}
@@ -20,6 +63,13 @@ class SPCSpredictionData:
         self.og2ind = {}
         self.extended_sublbls = extended_sublbls
         self.form_sp_reg_data = form_sp_reg_data
+        if not os.path.isfile("sp_data/sp6_partitioned_data_train_0.bin"):
+
+            print("Did not find the sp6_partitioned_data_train_0.bin file in sp_data folder. "
+                  "Extracting files...")
+            extract_raw_data(folder=get_data_folder())
+        check_compatibility(tune_bert=tune_bert)
+            # exit(1)
         if form_sp_reg_data:
             self.set_dicts(form_sp_reg_data)
             if extended_sublbls:
@@ -684,7 +734,7 @@ def get_data_folder():
     elif os.path.exists("/home/alex"):
         return "sp_data/"
     else:
-        return "/scratch/project2003818/dumitra1/sp_data/"
+        return "sp_data/"
 
 
 def get_sp_type_loss_weights():
@@ -720,7 +770,6 @@ def get_residue_label_loss_weights():
 if __name__=="__main__":
     sp_data = SPCSpredictionData(form_sp_reg_data=True, extended_sublbls=True, simplified=True,very_simplified=False)
     data_folder ="./"
-    print(sp_data.simplified)
     for tr_f in [0, 1, 2]:
         for t_set in ["train", "test"]:
             print(t_set, tr_f)

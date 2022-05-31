@@ -253,7 +253,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             else:
                 out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
         else:
-            out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+            out = model.decode(ys, memory.to(device), tgt_mask.to(device), padding_mask_src=padding_mask_src)
 
         if tune_bert:
             if model.classification_head.train_only_decoder:
@@ -262,6 +262,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 out = out.transpose(0, 1)
                 prob = model.classification_head.generator(out[:, -1])
         else:
+            out = out.transpose(0, 1)
             prob = model.generator(out[:, -1])
         _, next_words = torch.max(prob, dim=1)
         next_word = [nw.item() for nw in next_words]
@@ -359,7 +360,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                         prob = model.classification_head.generator(out[:, -1])
                         all_outs.append(out[:, -1])
                 else:
-                    out = model.decode(ys, memory.to(device), tgt_mask.to(device))
+                    out = model.decode(ys, memory.to(device), tgt_mask.to(device), padding_mask_src=padding_mask_src)
                     out = out.transpose(0, 1)
                     prob = model.generator(out[:, -1])
                     all_outs.append(out[:, -1])
@@ -613,7 +614,7 @@ def eval_trainlike_loss(model, lbl2ind, run_name="", test_batch_size=50, partiti
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=lbl2ind["PD"])
     model.eval()
     sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified, very_simplified=very_simplified,
-                                 extended_sublbls=extended_sublbls)
+                                 extended_sublbls=extended_sublbls, tune_bert=tune_bert)
     sp_data.lbl2ind = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7, 'BS': 8, 'ES': 9} if lipbobox_predictions else sp_data.lbl2ind
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data,
@@ -761,7 +762,7 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
     if dataset_loader is None:
         sp_data = SPCSpredictionData(form_sp_reg_data=form_sp_reg_data, simplified=simplified,
                                      very_simplified=very_simplified,
-                                     extended_sublbls=extended_sublbls)
+                                     extended_sublbls=extended_sublbls, tune_bert=tune_bert)
         sp_data.lbl2ind = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7, 'BS': 8, 'ES': 9} if lipbobox_predictions else sp_data.lbl2ind
         sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=partitions, data_folder=sp_data.data_folder,
                                     glbl_lbl_2ind=sp_data.glbl_lbl_2ind, sets=sets, form_sp_reg_data=form_sp_reg_data,
@@ -977,7 +978,7 @@ def test_mcc_sptype_clasifier(args, model, val_or_test="validate", epoch=-1):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData(form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified,
                                  very_simplified=args.very_simplified,
-                                 extended_sublbls=args.extended_sublbls)
+                                 extended_sublbls=args.extended_sublbls, tune_bert=args.tune_bert)
     random_folds_prefix = "random_folds_" if args.random_folds else ""
     if len(partitions) == 3:
         tuned_bert_embs_prefix = "bert_tuned_{}_{}_{}_".format(*partitions) if args.tuned_bert_embs else ""
@@ -1028,7 +1029,7 @@ def train_sp_type_predictor(args):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData(form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified,
                                  very_simplified=args.very_simplified,
-                                 extended_sublbls=args.extended_sublbls)
+                                 extended_sublbls=args.extended_sublbls, tune_bert=args.tune_bert)
     train_sets = ['test', 'train'] if args.validate_on_test or args.validate_partition is not None else ['train']
     if len(partitions) == 3:
         tuned_bert_embs_prefix = "bert_tuned_{}_{}_{}_".format(*partitions) if args.tuned_bert_embs else ""
@@ -1283,7 +1284,7 @@ def train_cs_predictors(args):
     args.train_folds = [0, 1, 2] if args.deployment_model else args.train_folds
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     sp_data = SPCSpredictionData(form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified, very_simplified=args.very_simplified,
-                                 extended_sublbls=args.extended_sublbls)
+                                 extended_sublbls=args.extended_sublbls, tune_bert=args.tune_bert)
     sp_data.lbl2ind = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7, 'BS': 8, 'ES': 9} if args.lipbobox_predictions else sp_data.lbl2ind
     train_sets = ['test', 'train'] if args.validate_on_test or args.validate_partition is not None else ['train']
     if len(args.train_folds) == 3:
@@ -1522,7 +1523,7 @@ def train_cs_predictors(args):
                     #     print(targets[datruind])
                     loss = loss_fn(logits.transpose(0, 1).reshape(-1, logits.shape[-1]), targets.reshape(-1))
                     losses += loss.item()
-                    loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor(glbl_lbls, device=device))
+                    loss_glbl = loss_fn_glbl(glbl_logits, torch.tensor([sp_data.glbl_lbl_2ind[gl] for gl in glbl_lbls], device=device))
                     losses_glbl += loss_glbl.item()
                     loss += loss_glbl * args.glbl_lbl_weight
             elif args.form_sp_reg_data and not args.extended_sublbls:
@@ -1842,14 +1843,11 @@ def train_cs_predictors(args):
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert",
                                lipbobox_predictions=False, compute_saliency=False):
     folder = get_data_folder()
-    sp_data = SPCSpredictionData(form_sp_reg_data=False)
+    sp_data = SPCSpredictionData(form_sp_reg_data=False, tune_bert=tune_bert)
     # hard-code this for now to check some sequences
     # test_file = "sp6_partitioned_data_train_1.bin"
-    compute_saliency_scores = saliency_map_save_fn
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file, lipbobox_predictions=lipbobox_predictions)
-    gather_10 = [0, 0, 0]
-    sp_type_letters = ["S","L","T"]
     def visualize_importance(outs, grads, seqs_, ind2lbl_, batch_index_, sp_pred_inds_CS_spType_):
         corresponding_grads = {}
         seq_preds_grad_CSgrad = []
@@ -1871,14 +1869,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                              torch.sum(torch.abs(grads[grad_ind_CS][pred_sp_ind]), dim=-1).detach().cpu().numpy()))
         return seq_preds_grad_CSgrad
     hparams, logger = parse_arguments_and_retrieve_logger(save_dir="experiments")
-    ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
-    glbllbl2_ind = {v:k for k,v in ind2glbl_lbl.items()}
     hparams.train_enc_dec_sp6 = True
     hparams.use_glbl_lbls = False
-    og2ind = sp_data.og2ind
-    aa2ind = None
-    tuned_bert_embs_prefix = ""
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False
     # the form_sp_reg_data param is used to both denote teh RR/C... usage and usually had a mandatory glbl label
@@ -1887,15 +1879,13 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=10, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
-    seqs, some_output = [], []
     ind2lbl = {v:k for k,v in sp_data.lbl2ind.items()}
     all_seq_preds_grad_CSgrad = []
-    save_index = 0
     all_outs = []
     all_seqs = []
     all_lbls = []
     for ind, batch in enumerate(dataset_loader):
-        print("{} number of seqs out of {} tested".format(ind, len(dataset_loader)))
+        print("{} number of seqs out of {} tested".format(ind * len(batch), len(dataset_loader)))
         seqs, lbl_seqs, _, glbl_lbls = batch
         if compute_saliency:
             some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
@@ -1918,116 +1908,19 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
             all_outs.extend(some_output[1])
             all_seqs.extend(seqs)
             all_lbls.extend(lbl_seqs)
-    life_grp = []
     pred_lbls = []
     true_lbls = []
-    sptype_preds = {}
     if compute_saliency:
         pickle.dump(all_seq_preds_grad_CSgrad,
                 open(folder+saliency_map_save_fn, "wb"))
     for seq, pred, lbl in zip(all_seqs, all_outs,all_lbls):
         true_lbls.append("".join([ind2lbl[i] for i in lbl])[:70])
         pred_lbls.append("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
+        print()
         print(seq)
-        print(true_lbls[-1])
-        print(pred_lbls[-1])
-        if pred_lbls[-1][0] == "S":
-            sptype_preds[seq] = glbllbl2_ind['SP']
-        elif pred_lbls[-1][0] == "T":
-            sptype_preds[seq] = glbllbl2_ind['TAT']
-        elif pred_lbls[-1][0] == "L":
-            sptype_preds[seq] = glbllbl2_ind['LIPO']
-        life_grp.append('POSITIVE|SP')
-    all_recalls, all_precisions, \
-        total_positives, false_positives, predictions, all_f1_scores = get_cs_acc(life_grp, all_seqs, true_lbls,
-                                                                                   pred_lbls, v=False,
-                                                                                   only_cs_position=False,
-                                                                                   sp_type="SP", sptype_preds=sptype_preds)
-    with open("sp_data/synthetic_gp_bacteria_sps.fasta", "rt") as f:
-        lines = f.readlines()
-    seqid2seq = {}
-    for l in lines:
-        if ">" in l:
-            current_id = l.replace(">","").replace("\n", "")
-        else:
-            seqid2seq[current_id] = l.replace("\n","")
-    with open("sp_data/prediction_results_sp6_synthetic_data.txt", "rt") as f:
-        lines = f.readlines()
-    seq2new_preds = {}
-    for l in lines:
-        if "seq" in l:
-            current_seq = seqid2seq[l.split("\t")[0]]
-            sptype = glbllbl2_ind[l.split("\t")[1]]
-            pred_cs = int(l.split("\t")[-1].split(".")[0].split(" ")[-1].split("-")[0])
-            if sptype == 3:
-                sp6_pred = "L"*pred_cs + (70-pred_cs)*"O"
-            elif sptype == 1:
-                sp6_pred = "S"*pred_cs + (70-pred_cs)*"O"
-            else:
-                sp6_pred = "O" * 70
+        print("PRED:",true_lbls[-1])
+        print("TRUE:",pred_lbls[-1])
 
-            seq2new_preds[current_seq] = [sp6_pred, sptype]
-    print(all_f1_scores)
-    # update predictions from sp6
-    pred_lbls = []
-    for ind, seq in enumerate(all_seqs):#, all_outs,all_lbls):
-        # print(seq)
-        sptype_preds[seq] = seq2new_preds[seq][1]
-        pred_lbls.append(seq2new_preds[seq][0])
-        # print(pred_lbls[-1])
-        # print(true_lbls[ind])
-        # print()
-    all_recalls, all_precisions, \
-    total_positives, false_positives, predictions, all_f1_scores = get_cs_acc(life_grp, all_seqs, true_lbls,
-                                                                              pred_lbls, v=False,
-                                                                              only_cs_position=False,
-                                                                              sp_type="SP",
-                                                                              sptype_preds=sptype_preds)
-    print(all_f1_scores)
-
-    exit(1)
-    # sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
-    #     get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False,
-    #                                probabilities_file=test_file.replace(".bin", "") + "_results_sp_probs.bin")
-    # evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results", epoch=-1,
-    #          dataset_loader=dataset_loader,use_beams_search=False, partitions=[1], sets=['test'])
-    # exit(1)
-    # if verbouse:
-    #     sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
-    #         get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=True, return_everything=False)
-
-    # evaluate(model, sp_data.lbl2ind, test_file.replace(".bin", "") + "_results_beam", epoch=-1, dataset_loader=dataset_loader,
-    #          use_beams_search=True)
-    # if verbouse:
-    #     sp_pred_mccs, all_recalls, all_precisions, total_positives, false_positives, predictions = \
-    #         get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results_beam.bin", v=False, return_everything=True)
-    #     print(sp_pred_mccs, all_recalls, all_precisions)
-
-    sp_pred_mccs, sp_pred_mccs2, lipo_pred_mccs, lipo_pred_mccs2, tat_pred_mccs, tat_pred_mccs2, \
-    all_recalls_lipo, all_precisions_lipo, all_recalls_tat, all_precisions_tat = \
-        get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results.bin", v=False,
-                                   return_everything=True)
-    beam_sp_pred_mccs, beam_sp_pred_mccs2, beam_lipo_pred_mccs, beam_lipo_pred_mccs2, beam_tat_pred_mccs, beam_tat_pred_mccs2, \
-    beam_all_recalls_lipo, beam_all_precisions_lipo, beam_all_recalls_tat, beam_all_precisions_tat = \
-        get_cs_and_sp_pred_results(filename=test_file.replace(".bin", "") + "_results_beam.bin", v=False,
-                                   return_everything=True)
-    print(sp_pred_mccs2, beam_sp_pred_mccs2)
-    print("MCC1/MCC2 SEC/SPII")
-    print(lipo_pred_mccs, lipo_pred_mccs2)
-    print(beam_lipo_pred_mccs, beam_lipo_pred_mccs2)
-
-    print("Recalls SEC/SPII")
-    print(all_recalls_lipo)
-    print(beam_all_recalls_lipo)
-
-    print(sp_pred_mccs2, beam_sp_pred_mccs2)
-    print("MCC1/MCC2 TAT/SPI")
-    print(tat_pred_mccs, tat_pred_mccs2)
-    print(beam_tat_pred_mccs, beam_tat_pred_mccs2)
-
-    print("Recalls TAT/SPI")
-    print(all_recalls_tat)
-    print(beam_all_recalls_tat)
 
 def test_w_precomputed_sptypes(args):
     partitions = [int(f) for f in args.train_folds]
@@ -2035,7 +1928,7 @@ def test_w_precomputed_sptypes(args):
     model = load_model(args.test_mdl, tune_bert=args.tune_bert)
     sp_data = SPCSpredictionData(form_sp_reg_data=args.form_sp_reg_data, simplified=args.simplified,
                                  very_simplified=args.very_simplified,
-                                 extended_sublbls=args.extended_sublbls)
+                                 extended_sublbls=args.extended_sublbls, tune_bert=args.tune_bert)
     sp_data.lbl2ind = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7, 'BS': 8,
                        'ES': 9} if args.lipbobox_predictions else sp_data.lbl2ind
     evaluate(model, sp_data.lbl2ind, run_name="sptype_tested_"+args.run_name + "_best", partitions=test_partition, sets=["train", "test"],

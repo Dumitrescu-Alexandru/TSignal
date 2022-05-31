@@ -111,24 +111,14 @@ class ResBlock(nn.Module):
         return self.relu(x + x_)
 
 class CNN3(nn.Module):
-    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum',is_cnn2=False,deep_mdl=False, no_of_layers=4, cnn_resnets=4,
-                 add_additional_emb=True, add_emb_dim=32):
+    def __init__(self,input_size,output_size,filters=[120,100,80,60],lengths=[5,9,15,21,3],dos=[0.1,0.2],pool='sum'):
         super(CNN3, self).__init__()
-        aa_dict = pickle.load(open("sp6_dicts.bin", "rb"))
-        aa_dict = {k:v for k,v in aa_dict[-1].items() if v not in ['ES','PD','BS']}
-        aa_dict['X'] = 20
-        self.add_additional_emb = add_additional_emb
-        self.deep_mdl=deep_mdl
-        self.residue_emb = EmbModule(aa_dict, emb_dim=add_emb_dim)
 
-        input_size = input_size + add_emb_dim if add_additional_emb else input_size
         #filters=[120,100,80,60] # dimensionality of outputspace
         n_f = sum(filters)
         #lengths=[5,10,15,20] # original kernel sizes
         #lengths=[5,9,15,21] # kernel sizes (compatible with pytorch and 'same' padding used in TF)
         self.dos=dos
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.is_cnn2 = is_cnn2
 
         self.output_size=output_size
         self.cnn1 = nn.Conv1d(input_size,filters[0],kernel_size=lengths[0],padding=(lengths[0]-1)//2)
@@ -146,36 +136,16 @@ class CNN3(nn.Module):
 
         self.cnn5 = nn.Conv1d(n_f,100,kernel_size=lengths[4],padding=(lengths[4]-1)//2)
         self.bn5 = nn.BatchNorm1d(100)
+
         self.dense_i = nn.Linear(input_size,256)
-        self.res_layers = []
-        if cnn_resnets != 0:
-            for i in range(cnn_resnets):
-                self.res_layers.append(ConvResBlock(100, 100, kernel_size=5))
-            self.conv_res_layers = nn.Sequential(*self.res_layers)
-        else:
-            self.conv_res_layers = None
-        self.res_layers = []
-        if self.deep_mdl:
-            for i in range(no_of_layers):
-                self.res_layers.append(ResBlock(100 if self.is_cnn2 else 100+256, dos[0]))
-            self.res_layers = nn.Sequential(*self.res_layers)
-            self.dense = nn.Linear(100,output_size) if is_cnn2 else nn.Linear(100+256,output_size)
-        else:
-            self.dense = nn.Linear(100,output_size) if is_cnn2 else nn.Linear(100+256,output_size)
-
-
-
+        self.dense = nn.Linear(100+256,output_size)
 
         self.softmax=nn.LogSoftmax(dim=1)
 
-    def forward(self,x, targets=None, inp_seqs=None):
+    def forward(self,x):
+        x = x.permute(0,2,1)
         #print('0. SHAPE x',x.shape)
         # CNN part
-        x = x.permute(0,2,1)
-        if self.add_additional_emb:
-            additional_imp = self.residue_emb(inp_seqs)
-            additional_imp = additional_imp.permute(1,2,0)
-            x = torch.cat([additional_imp, x], dim=1)
         xc = torch.cat((self.cnn1(x),self.cnn2(x),self.cnn3(x),self.cnn4(x)),dim=1)
         xc = self.bn(xc)
         xc = self.relu(xc)
@@ -183,38 +153,25 @@ class CNN3(nn.Module):
         xc = self.cnn5(xc)
         xc = self.bn5(xc)
         xc = self.relu(xc)
-        if self.conv_res_layers is not None:
-            xc = self.conv_res_layers(xc)
-
         #print('1. SHAPE x after convolutions',xc.shape)
         xc = self.pool(xc)
         xc = torch.squeeze(xc,dim=2)
 
         # PARALLEL LNN part
-        if not self.is_cnn2:
-            x = self.pool(x)
-            x = torch.squeeze(x,dim=2)
-            x = self.dense_i(x)
-            x = self.relu(x)
+        x = self.pool(x)
+        x = torch.squeeze(x,dim=2)
+        x = self.dense_i(x)
+        x = self.relu(x)
 
 
-            # COMBINED part
-            x = torch.cat((xc,x),dim=1)
-            #print('SHAPE x after cat (xc,x)',x.shape)
+        # COMBINED part
+        x = torch.cat((xc,x),dim=1)
+        #print('SHAPE x after cat (xc,x)',x.shape)
 
-            x = self.drop2(x)
-            #x = self.softmax(x)
-            #return x
-            if self.deep_mdl:
-                x = self.res_layers(x)
-            x = self.dense(x)
-        else:
-            if self.deep_mdl:
-                x = self.res_layers(xc)
-            else:
-                x = xc
-            x = self.dense(x)
-
+        x = self.drop2(x)
+        x = self.dense(x)
+        #x = self.softmax(x)
+        #return x
         return x
 
 class EmbModule(nn.Module):
