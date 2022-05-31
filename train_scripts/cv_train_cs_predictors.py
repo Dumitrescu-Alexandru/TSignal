@@ -1732,8 +1732,12 @@ def train_cs_predictors(args):
                 swa_model.module.to("cpu")
                 args.epochs = e + int(best_epoch * 0.5)
                 # set 0 dropout when swa starts to move along all directions
-                for dec_layer in model.classification_head.transformer.decoder.layers:
-                    dec_layer.p = 0
+                if args.train_only_decoder:
+                    for dec_layer in model.classification_head.transformer.layers:
+                        dec_layer.p = 0
+                else:
+                    for dec_layer in model.classification_head.transformer.decoder.layers:
+                        dec_layer.p = 0
                 # eps = e + int(best_epoch * 0.5)
                 print("Started SWA training for {} more epochs".format(int(best_epoch* 0.5)))
                 logging.info("Started SWA training for {} more epochs".format(int(best_epoch * 0.5)))
