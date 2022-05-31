@@ -63,7 +63,7 @@ class SPCSpredictionData:
         self.og2ind = {}
         self.extended_sublbls = extended_sublbls
         self.form_sp_reg_data = form_sp_reg_data
-        if not os.path.isfile("sp_data/sp6_partitioned_data_train_0.bin"):
+        if not os.path.isfile(get_data_folder() + "sp6_partitioned_data_train_0.bin"):
 
             print("Did not find the sp6_partitioned_data_train_0.bin file in sp_data folder. "
                   "Extracting files...")
