@@ -1089,8 +1089,7 @@ def train_sp_type_predictor(args):
                 {"params": additional_emb, "lr":0.00001}
             ]
             # print(len(dense_params), len(other_params))
-            classification_head_optimizer = optim.Adam(parameters,  lr=args.lr * 10 if args.high_lr
-                                                                else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            classification_head_optimizer = optim.Adam(parameters,  lr=args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             anneal_scheduler = SWALR(classification_head_optimizer, swa_lr=10**(-5), anneal_epochs=1, anneal_strategy='linear')
 
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
@@ -1105,7 +1104,7 @@ def train_sp_type_predictor(args):
                 },
             ]
             # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
-            optimizer = optim.Adam(parameters,  lr=args.lr * 10 if args.high_lr else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            optimizer = optim.Adam(parameters,  lr=args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=args.wd)
     patience = args.patience
@@ -1224,8 +1223,7 @@ def train_sp_type_predictor(args):
             if args.use_sgd_on_swa:
                 classification_head_optimizer = optim.SGD(parameters, lr=args.lr)
             else:
-                classification_head_optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr
-                                        else args.lr, eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98), )
+                classification_head_optimizer = optim.Adam(parameters, lr=args.lr, eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98), )
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
             swa_model = AveragedModel(model)
@@ -1260,22 +1258,6 @@ def train_sp_type_predictor(args):
         logging.info("On epoch {} saving the model with TEST avg mcc {}".format(best_epoch, avg_mcc))
 
 
-# def train_cs_predictors(bs=16, eps=20, run_name="", use_lg_info=False, lr=0.0001, dropout=0.5,
-#                         test_freq=1, use_glbl_lbls=False, partitions=[0, 1], ff_d=4096, nlayers=3, nheads=8,
-#                         patience=30, train_oh=False, deployment_model=False, lr_scheduler_swa=False, lr_sched_warmup=0,
-#                         test_beam=False, wd=0., glbl_lbl_weight=1, glbl_lbl_version=1, validate_on_test=False,
-#                         validate_on_mcc=True, form_sp_reg_data=False, simplified=False, version2_agregation="max",
-#                         validate_partition=None, very_simplified=False, tune_cs=5, input_drop=False,use_swa=False,
-#                         separate_save_sptype_preds=False, no_pos_enc=False, linear_pos_enc=False,scale_input=False,
-#                         test_only_cs=False, weight_class_loss=False, weight_lbl_loss=False, account_lipos=False,
-#                         tuned_bert_embs=False, warmup_epochs=20, tune_bert=False, frozen_epochs=3, extended_sublbls=False,
-#                         random_folds=False, train_on_subset=1., train_only_decoder=False, remove_bert_layers=0, augment_trimmed_seqs=False,
-#                         high_lr=False, cycle_length=5, lr_multiplier_swa=20,change_swa_decoder_optimizer=False,add_val_data_on_swa=False,
-#                         reinint_swa_decoder=False,anneal_start=-1,anneal_epochs=20,annealed_lr=0.00002,bert_pe_for_decoder=False,
-#                         frozen_pe_epochs=-1, no_bert_pe_training=False, add_bert_pe_from_dec_to_bert_out=False,
-#                         concat_pos_enc=False, pe_extra_dims=64,lipbobox_predictions=False,test_sptype_preds="none",
-#                         residue_emb_extra_dims=0, add_extra_embs2_decoder=False,
-#                         use_blosum=False, use_extra_oh = False):
 def train_cs_predictors(args):
     if args.validate_partition is not None:
         test_partition = {0, 1, 2} - {args.train_folds[0], args.validate_partition}
@@ -1301,9 +1283,9 @@ def train_cs_predictors(args):
                                                  batch_size=args.batch_size, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
     swa_start = 60
-    if len(sp_data.og2ind.keys()) <= 1 or not args.add_lg_info:
+    if len(sp_data.og2ind.keys()) <= 1 or not args.add_og_info:
         og2ind = None
-    elif len(sp_data.og2ind.keys()) > 1 and args.add_lg_info:
+    elif len(sp_data.og2ind.keys()) > 1 and args.add_og_infotest_freq:
         og2ind = sp_data.og2ind
     aa2ind = sp_data.aa2ind if args.train_oh else None
     if args.tune_bert:
@@ -1384,8 +1366,7 @@ def train_cs_predictors(args):
                     "lr": args.lr * 0.1,
                 },
             ]
-            classification_head_optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr
-                                                                else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            classification_head_optimizer = optim.Adam(parameters, lr=args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             bert_optimizer = optim.Adam(model.ProtBertBFD.parameters(),  lr=0.00001,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
             optimizer = [classification_head_optimizer, bert_optimizer]
         else:
@@ -1398,7 +1379,7 @@ def train_cs_predictors(args):
                 },
             ]
             # optimizer = Lamb(parameters, lr=self.hparams.learning_rate, weight_decay=0.01)
-            optimizer = optim.Adam(parameters,  lr=args.lr * 10 if args.high_lr else args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
+            optimizer = optim.Adam(parameters,  lr=args.lr,  eps=1e-9, weight_decay=args.wd, betas=(0.9, 0.98),)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=args.wd)
     if args.anneal_start != -1:
@@ -1764,7 +1745,7 @@ def train_cs_predictors(args):
                         "lr": args.lr,
                     },
                 ]
-                optimizer = optim.Adam(parameters, lr=args.lr * 10 if args.high_lr else args.lr, eps=1e-9, weight_decay=args.wd,
+                optimizer = optim.Adam(parameters, lr=args.lr * 10, eps=1e-9, weight_decay=args.wd,
                                        betas=(0.9, 0.98), )
                 optimizer.load_state_dict(optimizer_state_d)
                 scheduler = None

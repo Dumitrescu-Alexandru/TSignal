@@ -47,32 +47,39 @@ def create_parameter_set():
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--use_aa_len", default=200, type=int)
-    parser.add_argument("--lr", default=0.00001, type=float)
-    parser.add_argument("--anneal_start", default=-1, type=int)
-    parser.add_argument("--anneal_epochs", default=-1, type=int)
-    parser.add_argument("--annealed_lr", default=0.00002, type=float)
-    parser.add_argument("--high_lr", default=False, action="store_true", help="increase 10x the lr until swa stars")
-    parser.add_argument("--data", default="mammal", type=str)
-    parser.add_argument("--param_set_search_number", default=-1, type=int)
-    parser.add_argument("--train_cs_predictor", default=False, action="store_true")
-    parser.add_argument("--batch_size", default=16, type=int)
-    parser.add_argument("--run_name", default="some_run", type=str)
-    parser.add_argument("--epochs", default=-1, type=int, help="By default, model uses tolerence. Set this for a fixed"
-                                                               "number of epochs training")
-    parser.add_argument("--add_lg_info", default=False, action="store_true")
-    parser.add_argument("--dropout", default=0, type=float)
-    parser.add_argument("--test_freq", default=5, type=int)
-    parser.add_argument("--use_glbl_lbls", default=False, action="store_true")
-    parser.add_argument("--nlayers", default=3, type=int)
-    parser.add_argument("--nheads", default=8, type=int)
-    parser.add_argument("--patience", default=30, type=int)
-    parser.add_argument("--train_oh", default=False, action="store_true")
-    parser.add_argument("--train_folds", default=[0,1], nargs="+")
-    parser.add_argument("--deployment_model", default=False, action="store_true")
-    parser.add_argument("--test_seqs", default="", type=str)
-    parser.add_argument("--test_mdl", default="", type=str)
-    parser.add_argument("--lr_scheduler_swa", default="none", type=str)
+    parser.add_argument("--lr", default=0.00001, type=float, help="Learning rate for TSignal (not ProtBERT).")
+    parser.add_argument("--anneal_start", default=-1, type=int, help="Epoch where learning rate starts to be lowered.")
+    parser.add_argument("--anneal_epochs", default=-1, type=int, help="Number of epochs in which to reach the desired annealed_lr")
+    parser.add_argument("--annealed_lr", default=0.00002, type=float, help="Desired annealed_lr")
+    parser.add_argument("--param_set_search_number", default=-1, type=int, help="Create set of grid-search parameters "
+                "with create_param_set_cs_predictors and index them. Save the index2parameters in a binary and on a specific"
+                "run, load the param set specified by this argument (useful with e.g. slurm parallel runs)")
+    parser.add_argument("--train_cs_predictor", default=False, action="store_true", help="Train a CS predictor like TSignal"
+                         " (alternatively, can also train a binary SP type classifier)")
+    parser.add_argument("--batch_size", default=16, type=int, help="Training batch size")
+    parser.add_argument("--run_name", default="some_run", type=str, help="Name your run. This will be used as a prefix for all saved files: logs, models, etc.")
+    parser.add_argument("--epochs", default=-1, type=int, help="By default, model uses tolerence based stopping criteria. "
+                           "Set this for a fixed number of epochs training.")
+    parser.add_argument("--add_og_info", default=False, action="store_true", help="Use organism group information for the"
+                                                                                  "trained models.")
+    parser.add_argument("--dropout", default=0, type=float, help="Dropout on all TSignal layers (not ProtBERT).")
+    parser.add_argument("--use_glbl_lbls", default=False, action="store_true", help="Train a separate head/completely "
+                            "separate model taking ProtBERT's E_30 embeddings and predict the SP type. TSignal will"
+                            "then used that prediction (will set y1=pred of glbl_lbl_predictor) and predict the rest of seq from there.")
+    parser.add_argument("--nlayers", default=3, type=int, help="Number of layers for TSignal (3 layer on encoder, 3 for"
+                   "         decoder when using enc-dec transformer, or 3-layered decoder when using param train_only_decoder is true)")
+    parser.add_argument("--nheads", default=8, type=int, help="Number of heads to be used (same as paranthesis for nlayers)")
+    parser.add_argument("--patience", default=30, type=int, help="``Static'' patience (patience is not resetted on finding a better run. "
+                             "When patience number of epochs yield worse validation, stop and retrieve the best checkpoint)")
+    parser.add_argument("--train_oh", default=False, action="store_true", help="Use one-hot encoding instead of ProtBERT")
+    parser.add_argument("--train_folds", default=[0,1], nargs="+", help="Folds to train on. Need to have 3 separate runs trained"
+                                "on [0,1], [0,2], [1,2] if the paper experiments are to be repeated")
+    parser.add_argument("--deployment_model", default=False, action="store_true", help="If training a final (deployment) model,"
+                                   "the training fold will be [0,1,2] and the model is only validated (not tested at then end)")
+    parser.add_argument("--test_seqs", default="", type=str, help="filename of the binary containing sequences that will be tested. File needs to be in sp_data/ folder")
+    parser.add_argument("--test_mdl", default="", type=str, help="filename of model that will be tested on test_seqs file")
+    parser.add_argument("--lr_scheduler_swa", default="none", type=str, help="when using swa, one option is to cycle the learning rate after n training steps (instead of after each epoch)."
+                                     "")
     parser.add_argument("--lr_sched_warmup", default=0, type=int)
     parser.add_argument("--ff_d", default=4096, type=int, help='Expanding dimension')
     parser.add_argument("--test_beam", default=False, action="store_true")
@@ -137,6 +144,9 @@ def parse_arguments():
     parser.add_argument("--add_extra_embs2_decoder", default=False,action="store_true", help="Add the extra decoder inputs to the Transformer Decoder (this way, the final layer W_O still won't have access to non-contextualized residue representations")
     parser.add_argument("--use_blosum", default=False,action="store_true")
     parser.add_argument("--use_extra_oh", default=False,action="store_true")
+    parser.add_argument("--use_aa_len", default=200, type=int, help="When training binary classifiers (not for TSignal).")
+    parser.add_argument("--data", default="mammal", type=str, help="When training binary classifiers (not for TSignal).")
+
     return parser.parse_args()
 
 def modify_param_search_args(args):

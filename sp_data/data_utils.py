@@ -12,7 +12,7 @@ from sp_data.bert_tuning_tnmt import ProtBertClassifier, parse_arguments_and_ret
 from sp_data.sp6_data.read_extract_sp6_data import extract_raw_data
 
 def check_compatibility(tune_bert=True):
-    data = pickle.load(open("sp_data/sp6_partitioned_data_train_0.bin", "rb"))
+    data = pickle.load(open(get_data_folder()+"sp6_partitioned_data_train_0.bin", "rb"))
     # if the embeddings are "dummy" embeddings (used for compatibility in the dataloader, when assuming the ProtBERT
     # model is tuning with TSignal, therefore not needing precomputed embeddings) AND the run is in fact NOT tuning
     # the BERT model, then precompute bert embeddings
