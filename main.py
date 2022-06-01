@@ -4,27 +4,16 @@ import datetime
 from sp_data.data_utils import SPbinaryData
 from train_scripts.cv_train_cs_predictors import train_cs_predictors, test_seqs_w_pretrained_mdl, train_sp_type_predictor,\
     test_w_precomputed_sptypes
-from train_scripts.cv_train_binary_sp_model import train_bin_sp_mdl
 import argparse
 import logging
 
 def create_param_set_cs_predictors():
 
     from sklearn.model_selection import ParameterGrid
-    # parameters = { "lr_scheduler_swa":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],fparam_set_search_number
-    #               "run_number":list(range(5))}
-    # parameters = {"lr_sched_warmup":[0, 10], "lr_scheduler_swa":["step", "expo"], "train_folds":[[0,1],[1,2],[0,2]],
-    #               "run_number":list(range(5))}
-    # parameters = {'run_number':list(range(5)), "train_folds":[[0,1],[1,2],[0,2]],
-    #               'run_name':["glbl_lbl_search_"], 'use_glbl_lbls':[1], 'glbl_lbl_weight':[0.1, 1],
-    #               'glbl_lbl_version':[1,2]}
-    # parameters = {"wd":[0., 0.0001, 0.00001], "train_folds":[[0,1],[1,2],[0,2]] }
 
     parameters = {"train_folds": [[0,1],[0,2],[1,2]], "nlayers": [3],"nheads":[16],
                   "lr": [0.00001], 'dropout':[0.1], 'random_folds':[True], 'train_on_subset':[0.25,0.5,0.75,1],
                   "run_number":[3, 4, 5]}
-    # parameters = {"dos":[0.],"nlayers": [4], "ff_d": [4096], "nheads":[4],
-    #               "lr": [0.00001], "train_folds":[[0,1],[0,2],[1,2]], "run_number":list(range(10))}
     group_params = list(ParameterGrid(parameters))
     grpid_2_params = {}
     for i in range(len(group_params)):
@@ -262,8 +251,3 @@ if __name__ == "__main__":
         logging.info("Started training")
         args.train_folds = [int(tf) for tf in args.train_folds]
         a = train_cs_predictors(args)
-    else:
-        if args.param_set_search_number != -1 and not os.path.exists("param_groups_by_id.bin"):
-            create_parameter_set()
-        run_name = args.run_name + "_" + date_now
-        a = train_bin_sp_mdl(args.run_name, args.use_aa_len, args.lr, data=args.data, nested_cv=args.data == "mammal",)

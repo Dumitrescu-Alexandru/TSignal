@@ -336,14 +336,14 @@ class TransformerModel(nn.Module):
         self.use_blosum = use_blosum
         self.use_extra_oh = use_extra_oh
         self.add_extra_embs2_decoder = add_extra_embs2_decoder
-        if use_blosum or use_extra_oh and residue_emb_extra_dims:
+        if (use_blosum or use_extra_oh) and residue_emb_extra_dims:
             print("!!! WARNING !!!: you have used residue_emb_extra_dims specifying extra dims added to the output layer "
                   "W_O but use_blosum or use_extra_oh fix the extra dimensions to 16/32 respectively")
         if use_extra_oh:
             residue_emb_extra_dims = 32
         elif use_blosum:
             residue_emb_extra_dims = 16
-            self.extra_embs_gen_input = pickle.load(open("blusum_m.bin", "rb"))
+            self.extra_embs_gen_input = pickle.load(open(get_data_folder()+"blosum.bin", "rb"))
         else:
             self.extra_embs_gen_input = None
         self.bert_pe_for_decoder = False

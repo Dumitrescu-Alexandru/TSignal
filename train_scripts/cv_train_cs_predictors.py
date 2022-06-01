@@ -1903,8 +1903,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         pred_lbls.append("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
         print()
         print(seq)
-        print("PRED:",true_lbls[-1])
-        print("TRUE:",pred_lbls[-1])
+        print("TRUE:",true_lbls[-1])
+        print("PRED:",pred_lbls[-1])
 
 
 def test_w_precomputed_sptypes(args):
