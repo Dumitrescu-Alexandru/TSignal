@@ -27,7 +27,7 @@ on the downloaded fasta file (which should also be in sp_data folder) the first 
 
 ProtBERT will automatically be downloaded to sp_data/models folder when training with <tune_bert> parameter set to true.
 
-The base fasta file needs to be in the correct folder (refer to Section 2).
+The base fasta file needs to be in the correct folder for training (refer to Section 2).
 
 ### 3.1 Using our deployment model
 
@@ -44,12 +44,32 @@ To extract saliency maps of some sequences:
 - Follow the same procedures as in extracting predictions, and simply add "--compute_saliency" argument to your call.
 
 ### 3.2  Train a new model while tuning bert
-Follow the instructions on Section 2. If you wish to replicate the experiment results, refer to arguments --train_folds 
+First, follow the instructions on Section 2. If you wish to replicate the experiment results, refer to arguments --train_folds 
 from main.py. If you wish to create another deployment model (trained on D<sub>1,train</sub>, D<sub>2,train</sub>, 
 D<sub>3,train</sub>; validated on D<sub>1,test</sub>, D<sub>2,test</sub>, D<sub>3,test</sub>) refer to --deployment_model 
 argument in main.py.
 
 ### 3.3  Train a new model while not tuning bert
+
+Currently, a non-tuning-ProtBERT model only works with global label predictions. Therefore, use_glbl_lbls needs to be 
+true and glbl_lbl_version to the desired SP type prediction approach. Additionally, for efficiency reasons, when not 
+tuning the ProtBERT model, the embeddings for a dataset are pre-computed. When not calling main.py with --tune_bert, 
+these will be automatically computed for SignaP 6.0 data and the load will starts from there.
+
+### 3.4  Test on your own sequences
+
+If you want to test the model on your own sequences, please refer to create_test_files.py script, method for the method
+create_test_file(). If you want to use our pre-trained model, refer to Example 1 in example_runs.txt. To also create a 
+saliency map for the predictions, add --compute_saliency to the example 1.
+
+### 3.5  Test the performance of the model
+
+- To re-create a similar experiment on SignalP 6.0 data, 3 different runs are needed (refer to example 2 from
+example_runs.txt and its comments). At the end, extract_all_param_results method from misc/visualize_cs_pred_results.py 
+may be used.
+- If a different dataset needs to be tested, refer to the 3.4 to create your own sequence file. After predicting the 
+sequences, use the correct and true predictions with misc/visualize_cs_pred_results.py methods get_pred_perf_sptype and get_cs_perf
+to get the SP type/CS performance on your predictions.
 
 
 ## References 

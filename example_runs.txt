@@ -1,0 +1,17 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+Example 1. Test sequences:
+    python main.py --test_seqs some_test_seqs.bin  --test_mdl deployment_sep_pe_swa_extra_inpemb_on_gen_best_eval_only_dec.pth --tune_bert --train_only_decoder
+
+The corresponding parameters (tune_bert, train_only_decoder) are required when testing (if the model being tested was
+not trained using those, don't add them). Here we show a use case of our deployment model (see section 3.1 from README
+to download it)
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+Example 2. Training run with parameters set to the ones which yielded the beste performance:
+    python main.py --train_cs_predictor --run_name run_wo_anneal_0_1 --lr 0.0001 --batch_size 32 --train_folds 0 1 --nlayers 3 --nheads 16  --patience 50 --validate_on_mcc --tune_bert --frozen_epochs 3 --dropout 0.1 --train_only_decoder --use_swa --lr_scheduler none --add_val_data_on_swa --reinint_swa_decoder --lr_multiplier_swa 10 --use_extra_oh --add_val_data_on_swa --concat_pos_enc --pe_extra_dims 128
+
+The above run will train and validate on folds 0 1 and at the end compute a dictionary of {seq:predicted_lbls} and save it
+as a binary. If you wish to re-create the experiments, two additional runs with folds set to 0 2 and 1 2 respectively are
+needed (also change the run_name to run_wo_anneal_0_2/run_wo_anneal_1_2 respectively). Finally, gather all resulted
+files into a folder and follow the step 3.4 from the README.

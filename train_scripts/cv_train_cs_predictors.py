@@ -1828,7 +1828,7 @@ def train_cs_predictors(args):
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert",
                                lipbobox_predictions=False, compute_saliency=False):
     folder = get_data_folder()
-    sp_data = SPCSpredictionData(form_sp_reg_data=False, tune_bert=tune_bert)
+    sp_data = SPCSpredictionData(form_sp_reg_data=False, tune_bert=False)
     # hard-code this for now to check some sequences
     # test_file = "sp6_partitioned_data_train_1.bin"
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
@@ -1860,7 +1860,12 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     # form_sp_reg_data=form_sp_reg_data if not extended_sublbls else False
     # the form_sp_reg_data param is used to both denote teh RR/C... usage and usually had a mandatory glbl label
     # in the SP-cs. The current experiment however tests no-glbl-cs tuning
-    model = load_model(model_f_name, dict_file=test_file, tune_bert=tune_bert, testing=True)
+    model = load_model(model_f_name, dict_file=test_file, tune_bert=True, testing=True)
+    if not tune_bert:
+        # if the loaded model did not tune ProtBERT, load the initial ProtBERT to retrieve embeddigns
+        model_ = ProtBertClassifier(hparams)
+        model_.classification_head = model
+
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=10, shuffle=False,
                                                  num_workers=4, collate_fn=collate_fn)
@@ -1875,7 +1880,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         if compute_saliency:
             some_output, input_gradients, sp_pred_inds_CS_spType= greedy_decode(model, seqs, sp_data.lbl2ind['BS'], sp_data.lbl2ind, tgt=None,
                                                 form_sp_reg_data=False, second_model=None, test_only_cs=False,
-                                                         glbl_lbls=None, tune_bert=tune_bert, saliency_map=compute_saliency,
+                                                         glbl_lbls=None, tune_bert=True, saliency_map=compute_saliency,
                                                                                 hook_layer=hook_layer)
             all_seq_preds_grad_CSgrad.extend(
                 visualize_importance(some_output, input_gradients, seqs, ind2lbl, ind, sp_pred_inds_CS_spType))

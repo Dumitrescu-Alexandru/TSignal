@@ -39,7 +39,7 @@ def reassign_cs(s, p):
     else:
         return -1
 
-def get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=None):
+def get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=None):
     def get_acc_for_tolerence(ind, t_lbl, sp_letter):
         true_cs = 0
         while t_lbl[true_cs] == sp_letter and true_cs < len(t_lbl):
@@ -217,7 +217,7 @@ def get_class_sp_accs(life_grp, seqs, true_lbls, pred_lbls):
     return [ (2 * recs[i] * precs[i]) / (precs[i] + recs[i]) if precs[i] + recs[i] != 0 else 0 for i in range(4)]
 
 
-def get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="SP", sptype_preds=None):
+def get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="SP", sptype_preds=None):
     # S = signal_peptide; T = Tat/SPI or Tat/SPII SP; L = Sec/SPII SP; P = SEC/SPIII SP; I = cytoplasm; M = transmembrane; O = extracellular;
     # order of elemnts in below list:
     # (eukaria_tp, eukaria_tn, eukaria_fp, eukaria_fn)
@@ -583,22 +583,22 @@ def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabili
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename=filename)
     if probabilities_file is not None:
         get_prob_calibration_and_plot(probabilities_file, life_grp, seqs, true_lbls, pred_lbls)
-    sp_pred_mccs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v, sptype_preds=sptype_preds)
+    sp_pred_mccs = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=v, sptype_preds=sptype_preds)
     all_recalls, all_precisions, total_positives, \
-    false_positives, predictions, all_f1_scores = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, sptype_preds=sptype_preds)
+    false_positives, predictions, all_f1_scores = get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=v, sptype_preds=sptype_preds)
     if return_everything:
-        sp_pred_mccs, sp_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v,
+        sp_pred_mccs, sp_pred_mccs2 = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=v,
                                                                return_mcc2=True, sp_type="SP", sptype_preds=sptype_preds)
-        lipo_pred_mccs, lipo_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v,
+        lipo_pred_mccs, lipo_pred_mccs2 = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=v,
                                                                    return_mcc2=True, sp_type="LIPO", sptype_preds=sptype_preds)
-        tat_pred_mccs, tat_pred_mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=v,
+        tat_pred_mccs, tat_pred_mccs2 = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=v,
                                                                  return_mcc2=True, sp_type="TAT", sptype_preds=sptype_preds)
 
-        all_recalls_lipo, all_precisions_lipo, _, _, _, all_f1_scores_lipo = get_cs_acc(life_grp, seqs, true_lbls,
+        all_recalls_lipo, all_precisions_lipo, _, _, _, all_f1_scores_lipo = get_cs_perf(life_grp, seqs, true_lbls,
                                                                                         pred_lbls, v=False,
                                                                                         only_cs_position=False,
                                                                                         sp_type="LIPO", sptype_preds=sptype_preds)
-        all_recalls_tat, all_precisions_tat, _, _, _, all_f1_scores_tat = get_cs_acc(life_grp, seqs, true_lbls,
+        all_recalls_tat, all_precisions_tat, _, _, _, all_f1_scores_tat = get_cs_perf(life_grp, seqs, true_lbls,
                                                                                      pred_lbls, v=False,
                                                                                      only_cs_position=False,
                                                                                      sp_type="TAT", sptype_preds=sptype_preds)
@@ -935,35 +935,35 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
                     count2+=1
         print(count1, count2)
 
-    mccs, mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+    mccs, mccs2 = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                            sp_type="SP", sptype_preds=full_sptype_dict)
     # LIPO is SEC/SPII
-    mccs_lipo, mccs2_lipo = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+    mccs_lipo, mccs2_lipo = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                                      sp_type="LIPO", sptype_preds=full_sptype_dict)
     # TAT is TAT/SPI
-    mccs_tat, mccs2_tat = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+    mccs_tat, mccs2_tat = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                                    sp_type="TAT", sptype_preds=full_sptype_dict)
     # TATLIPO Tat/SPase II
-    mccs_tatlipo, mccs2_tatlipo = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+    mccs_tatlipo, mccs2_tatlipo = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                                    sp_type="TATLIPO", sptype_preds=full_sptype_dict)
     # PILIN Sec/SPase IV
-    mccs_pilin, mccs2_pilin = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+    mccs_pilin, mccs2_pilin = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                                    sp_type="PILIN", sptype_preds=full_sptype_dict)
     if "param_search_w_nl_nh_0.0_4096_1e-05_4_4" in run:
         v = False
     else:
         v = False
     all_recalls, all_precisions, _, _, _, f1_scores = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="SP", sptype_preds=full_sptype_dict)
+        get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="SP", sptype_preds=full_sptype_dict)
     all_recalls_lipo, all_precisions_lipo, _, _, _, f1_scores_lipo = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="LIPO", sptype_preds=full_sptype_dict )
+        get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="LIPO", sptype_preds=full_sptype_dict )
     all_recalls_tat, all_precisions_tat, _, _, _, f1_scores_tat = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TAT", sptype_preds=full_sptype_dict)
+        get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TAT", sptype_preds=full_sptype_dict)
     all_recalls_tatlipo, all_precisions_tatlipo, _, _, _, f1_scores_tatlipo = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TATLIPO",
+        get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="TATLIPO",
                    sptype_preds=full_sptype_dict)
     all_recalls_pilin, all_precisions_pilin, _, _, _, f1_scores_pilin = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="PILIN",
+        get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=v, only_cs_position=only_cs_position, sp_type="PILIN",
                    sptype_preds=full_sptype_dict)
     if return_sptype_f1:
         return mccs, mccs2, mccs_lipo, mccs2_lipo, mccs_tat, mccs2_tat, mccs_tatlipo, mccs2_tatlipo, mccs_pilin, mccs2_pilin, all_recalls, all_precisions, all_recalls_lipo, \
@@ -1869,20 +1869,20 @@ def extract_compatible_binaries_predtat(restrict_types=None, return_mcc=False):
                 seq2aalbls[id2seq[id]] = "O" * len(id2seq[id])
             pred_lbls.append(seq2aalbls[id2seq[id]])
     if return_mcc:
-        mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
+        mcc, mcc2 = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
         # print("computed here", mcc, mcc2)
         # print("reported in sp6", [0.34,0.736,0.839,0.781],[0.238, 0.209, 0.655])
-        mcc_tat= get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="TAT", sptype_preds=seq2sptype)
+        mcc_tat= get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=False, sp_type="TAT", sptype_preds=seq2sptype)
         # print(mcc_tat)
         return  mcc, mcc_tat
     # all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-    #     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT",
+    #     get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT",
     #                sptype_preds=seq2sptype)
     # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_precisions).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_f1_scores).reshape(-1)])
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
+        get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
                    sptype_preds=seq2sptype)
     # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_precisions).reshape(-1)])
@@ -1945,25 +1945,25 @@ def extract_compatible_binaries_lipop(restrict_types=None, return_mcc=False):
             # print(id, id2type[id])
             continue
     # all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-    #     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO", sptype_preds=seq2sptype)
+    #     get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO", sptype_preds=seq2sptype)
     # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_precisions).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_f1_scores).reshape(-1)])
     if return_mcc:
-        mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+        mcc, mcc2 = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                              sp_type="SP", sptype_preds=seq2sptype)
         # print("Computed here LIPOP", mcc, mcc2[1:], len(seqs))
         # print("Reported in SP6", [0.196, 0.71, 0.879, 0.733], [0.342, 0.484, 0.552])
-        mcc_lipop, mcc2_lipop = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+        mcc_lipop, mcc2_lipop = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                              sp_type="LIPO", sptype_preds=seq2sptype)
         return mcc, mcc_lipop
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
+        get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
     # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_precisions).reshape(-1)])
     # print([round(i, 2) for i in np.array(all_f1_scores).reshape(-1)])
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
+        get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
 
 
     return all_recalls, all_precisions, all_f1_scores
@@ -2033,7 +2033,7 @@ def extract_compatible_binaries_deepsig(restrict_types=None, return_mcc=False):
     # exit(1)
     if return_mcc:
         # print(len(seqs), len(set(seqs)))
-        mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
+        mcc, mcc2 = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
         # print("Computed here", mcc, mcc2[1:])
         # print("Reported in SP6", [0.792,0.735,0.798,0.711], [0.159,0.146,"n.d."])
         if return_mcc:
@@ -2042,7 +2042,7 @@ def extract_compatible_binaries_deepsig(restrict_types=None, return_mcc=False):
         # exit(1)
 
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
+        get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
                    sptype_preds=seq2sptype)
     # print([round(i, 2) for i in np.array(all_recalls).reshape(-1)])
     # print([round (i, 2) for i in np.array(all_precisions).reshape(-1)])
@@ -2108,16 +2108,16 @@ def extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"], return_m
             pred_lbls.append(predicted)
 
     if return_mcc:
-        mcc, mcc2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
+        mcc, mcc2 = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
         # print(len(seqs))
         # print("Computed here", mcc, mcc2[1:])
         # print("Reported in SP6", [0.531,0.766,0.716,0.796], [0.766,0.716,0.551])
         return mcc
     all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-        get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
+        get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
                    sptype_preds=seq2sptype)
     # all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-    #     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
+    #     get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
     return all_recalls, all_precisions, all_f1_scores
     # common_sp6_phob_seqs = extract_phobius_trained_data()
     # remove_inds = [i for i in range(len(seqs)) if seqs[i] in common_sp6_phob_seqs]
@@ -2128,7 +2128,7 @@ def extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"], return_m
     # pred_lbls = [pred_lbls[i] for i in range(len(seqs)) if i not in remove_inds]
     # seqs = [seqs[i] for i in range(len_) if i not in remove_inds]
     # all_recalls, all_precisions, total_positives, false_positives, predictions, all_f1_scores = \
-    #     get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
+    #     get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP", sptype_preds=seq2sptype)
     # print(all_recalls, all_precisions)
 
 def extract_phobius_trained_data():
@@ -3408,23 +3408,23 @@ def visualize_data_amount2_results(benchmark_ds=False):
             result_dict = {k:v for k,v in result_dict.items() if k in unique_bench_seqs}
         life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin",
                                                                                        dict_=result_dict)
-        mccs, mccs2 = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+        mccs, mccs2 = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                                sp_type="SP")
         # LIPO is SEC/SPII
-        mccs_lipo, mccs2_lipo = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+        mccs_lipo, mccs2_lipo = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                                          sp_type="LIPO")
         # TAT is TAT/SPI
-        mccs_tat, mccs2_tat = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
+        mccs_tat, mccs2_tat = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                                        sp_type="TAT")
         # print(mccs)
         all_recalls, all_precisions, _, _, _, f1_scores_sp1 = \
-            get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
+            get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
                        sptype_preds=sptype_dict)
         all_recalls, all_precisions, _, _, _, f1_scores_sp2 = \
-            get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO",
+            get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="LIPO",
                        sptype_preds=sptype_dict)
         all_recalls, all_precisions, _, _, _, f1_scores_tat = \
-            get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT",
+            get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="TAT",
                        sptype_preds=sptype_dict)
         lg2f1_tol0_sp1['EUKARYA'].append(f1_scores_sp1[0][0])
         lg2f1_tol3_sp1['EUKARYA'].append(f1_scores_sp1[0][3])
@@ -3533,7 +3533,7 @@ def plot_perf_over_data_perc():
                 dict_=aa_pred_dict)
 
             all_recalls, all_precisions, _, _, _, f1_scores = \
-                get_cs_acc(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
+                get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
                            sptype_preds=glbl_lbl_dict)
             # print(f1_scores)
             subset_2_f1[subset].append(f1_scores)
@@ -4880,9 +4880,9 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
         true_lbls.append(id2truelbls[id_])
         pred_lbls.append("J"*len(id2truelbls[id_]))
     print(len(seqs), len(res_dict.items()))
-    mcc_sp1, mcc2_sp1 = get_pred_accs_sp_vs_nosp(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="SP",sptype_preds=res_dict)
-    mcc_sp2, mcc2_sp2 = get_pred_accs_sp_vs_nosp(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="LIPO",sptype_preds=res_dict)
-    mcc_tat, mcc2_tat = get_pred_accs_sp_vs_nosp(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="TAT",sptype_preds=res_dict)
+    mcc_sp1, mcc2_sp1 = get_pred_perf_sptype(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="SP",sptype_preds=res_dict)
+    mcc_sp2, mcc2_sp2 = get_pred_perf_sptype(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="LIPO",sptype_preds=res_dict)
+    mcc_tat, mcc2_tat = get_pred_perf_sptype(life_grps, seqs,true_lbls,pred_lbls,v=False,return_mcc2=True,sp_type="TAT",sptype_preds=res_dict)
     mcc_sp1 = np.array(mcc_sp1)
     mcc_sp2 = np.array(mcc_sp2)
     mcc_tat = np.array(mcc_tat)
@@ -6374,5 +6374,5 @@ if __name__ == "__main__":
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[0,2])
     # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[1,2])
     # life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin")
-    # sp_pred_accs = get_pred_accs_sp_vs_nosp(life_grp, seqs, true_lbls, pred_lbls,v=True)
-    # all_recalls, all_precisions, total_positives, false_positives, predictions = get_cs_acc(life_grp, seqs, true_lbls, pred_lbls)
+    # sp_pred_accs = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls,v=True)
+    # all_recalls, all_precisions, total_positives, false_positives, predictions = get_cs_perf(life_grp, seqs, true_lbls, pred_lbls)
