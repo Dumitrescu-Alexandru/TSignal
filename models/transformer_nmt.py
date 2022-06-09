@@ -293,8 +293,7 @@ class TransformerModel(nn.Module):
         :param int d_hid: dimensionality of the model d (without extra vectors)
         :param int nlayers: number of layers (both encoder and decoder)
         :param float dropout: dropout at each layer (excluding the Input Embedding)
-        :param string data_folder: data path folder
-        :param dict lbl2ind: token label dictionary (residues as characters to numbers r -> l)  
+        :param dict lbl2ind: token label dictionary (residues as characters to numbers r -> l)
         :param dict og2ind: organism group dictionary (residues as characters to numbers og -> l)
         :param bool use_glbl_lbls: specify wether to use global labels asscociated to sequences or not
         :param int no_glbl_lbls: number of global labels (4 in this experiment, eukarya, archaea, gp and gn bacteria)

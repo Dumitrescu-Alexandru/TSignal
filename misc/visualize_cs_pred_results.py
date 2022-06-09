@@ -92,10 +92,6 @@ def get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=
         # I previously re-replace Tatlipo seqs to have lbls W instead of T; correct prediction of type is based on
         # dictionary sptype_preds anyways
         t = t.replace("W", "T")
-        if sp_info == "TATLIPO" and ind2glbl_lbl[sptype_preds[s]]== "TATLIPO":
-            print(p)
-            print(t)
-            print(s)
         #     print(p)
         #     print(t)
         #     print(s)
@@ -891,7 +887,7 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
     full_sptype_dict = {}
     epochs = []
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
-        with open(result_folder + run + "_{}_{}.log".format(tr_folds[0], tr_folds[1]), "rt") as f:
+        with open(os.path.join(result_folder, run + "_{}_{}.log".format(tr_folds[0], tr_folds[1])), "rt") as f:
             lines = f.readlines()
             try:
                 epochs.append(int(lines[-2].split(" ")[2]))
@@ -905,13 +901,13 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
     for id, seq in id2seq.items():
         seq2type[seq] = id2type[id]
     for tr_folds in [[0, 1], [1, 2], [0, 2]]:
-        res_dict = pickle.load(open(result_folder + run + "_{}_{}_best.bin".format(tr_folds[0], tr_folds[1]), "rb"))
+        res_dict = pickle.load(open(os.path.join(result_folder, run + "_{}_{}_best.bin".format(tr_folds[0], tr_folds[1])), "rb"))
         if benchmark:
             res_dict = {k:v for k,v in res_dict.items() if k in unique_bench_seqs}
         if restrict_types is not None:
             res_dict = {k:v for k,v in res_dict.items() if seq2type[k] in restrict_types}
-        if os.path.exists(result_folder + run + "_{}_{}_best_sptype.bin".format(tr_folds[0], tr_folds[1])):
-            sptype_dict = pickle.load(open(result_folder + run + "_{}_{}_best_sptype.bin".format(tr_folds[0], tr_folds[1]), "rb"))
+        if os.path.exists(os.path.join(result_folder, run + "_{}_{}_best_sptype.bin".format(tr_folds[0], tr_folds[1]))):
+            sptype_dict = pickle.load(open(os.path.join(result_folder, run + "_{}_{}_best_sptype.bin".format(tr_folds[0], tr_folds[1])), "rb"))
             full_sptype_dict.update(sptype_dict)
         else:
             full_sptype_dict = None
@@ -925,16 +921,6 @@ def extract_mean_test_results(run="param_search_0.2_2048_0.0001", result_folder=
 
     life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin",
                                                                                    dict_=full_dict_results)
-    count1, count2 = 0,0
-    if benchmark:
-        for s in seqs:
-            if id2lg[seq2id[s]] == "NEGATIVE":
-                if id2type[seq2id[s]] == "TATLIPO":
-                    count1+=1
-                elif id2type[seq2id[s]] == "NO_SP":
-                    count2+=1
-        print(count1, count2)
-
     mccs, mccs2 = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls, v=False, return_mcc2=True,
                                            sp_type="SP", sptype_preds=full_sptype_dict)
     # LIPO is SEC/SPII
@@ -977,7 +963,7 @@ def get_best_corresponding_eval_mcc(result_folder="results_param_s_2/", model=""
     tr_fold = [[0, 1], [1, 2], [0, 2]]
     all_best_mccs = []
     for t_f in tr_fold:
-        with open(result_folder + model + "_{}_{}.log".format(t_f[0], t_f[1])) as f:
+        with open(os.path.join(result_folder, model + "_{}_{}.log".format(t_f[0], t_f[1]))) as f:
             lines = f.readlines()
         ep2mcc = {}
         best_mcc = -1
@@ -2481,39 +2467,34 @@ def print_tables(sp1rec, sp1prec, sp2rec,sp2prec,tatrec,tatprec,sp6_sp1rec, sp6_
     print("Precision tat")
     print_vecs_as_tbls(mean_tatprec, sp6_tatprec, std_tatprec)
 
-def plot_sp6_vs_tnmt():
+def plot_sp6_vs_tnmt(result_folders=("only_decoder_tune_bert_extraOhOnOut_swa_run_1",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_2",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_3",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_4",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_5")):
+    """
+    Method for bar plots with mean and variance on CS performance results for Sec/SPase I and II and Tat/SPase I compared
+    to SignalP 6.0
+
+    :param list_or_tuple result_folders: contains the folders containing the sequence prediction binaries. Multiple
+    runs are averaged and result variance is also computed, but the method may be used for a single run also (e.g.
+    have result_folders = ["one_single_folder_with_results"]
+    """
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
     mpl.rcParams['font.family'] = "Arial"
 
-    # plt.show()
-    all_mdl_2results = []
-
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
-    runs = [21,22,23,24,25]
-    runs = [32,34]
-    runs = [32,34,37,39]
-    runs = [32]
-    # separate pe
-    runs = [32,34,37, 39,40, 47]
-    # separate pe w blosum on generator
-    runs = [65,66]
-    # runs = [42]
-    # lipobox training + separate pe + blosum on generator
-    runs = [67]
-    runs = [32,34,37, 39,40, 47]
-    runs = [59,60,61,62,71]
 
-    for run_no in runs:
-        print("Computing results for run number {}".format(run_no))
-        run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
+    for run_foldername in result_folders:
+        print("Computing results for run {}".format(run_foldername))
         mdl2results = extract_all_param_results(only_cs_position=False,
-                                                result_folder=run_results_folder,
+                                                result_folder=run_foldername,
                                                 compare_mdl_plots=False,
                                                 remove_test_seqs=False,
                                                 benchmark=True,
-                                                prints=True)
+                                                prints=False)
         mdl_ind = 0
         sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
         sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
@@ -2530,54 +2511,24 @@ def plot_sp6_vs_tnmt():
         mcc2_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
         mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
         mcc2_tat.append([mcc for mcc in mdl2results[mdl_ind][5]])
-    tnmt_f1 = [[0.692, 0.737, 0.769, 0.782 ], [0.462, 0.564, 0.59, 0.59 ], [0.526, 0.684, 0.684, 0.684],
-               [0.606, 0.697, 0.667, 0.727]]
-    tnmt_f1_sp2 = [[0.906, 0.912, 0.914, 0.917] , [0.927 , 0.933 , 0.933 , 0.933] , [0.75 , 0.75 , 0.75 , 0.75]]
-    tnmt_f1_tat = [[0.613 , 0.79 , 0.806 , 0.855] , [0.634 , 0.732 ,  0.829 ,  0.829] , [ 0.3 , 0.5 , 0.7 , 0.7]]
-    sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
-                       0.556, 0.583]
-    sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
-    sp6_recalls_tat = [0.706, 0.765, 0.784, 0.804, 0.556, 0.556, 0.667, 0.667, 0.333, 0.444, 0.444, 0.444]
-    sp6_precs_sp1 = [0.661, 0.685, 0.715, 0.733, 0.534, 0.562, 0.575, 0.603, 0.632, 0.632, 0.632, 0.632, 0.643, 0.714,
-                     0.714, 0.75]
-    sp6_precs_sp2 = [0.913, 0.913, 0.917, 0.925, 0.929, 0.938, 0.938, 0.938, 0.583, 0.583, 0.583, 0.583]
-    sp6_precs_tat = [0.679, 0.736, 0.755, 0.774, 0.714, 0.714, 0.857, 0.857, 0.375, 0.5, 0.5, 0.5]
-    sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
-    sp6_f1_sp2 = get_f1_scores(sp6_recalls_sp2, sp6_precs_sp2)
-    sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
     arrange_tol_lg_sp1 = []
-    for lg_ind in [0, 4, 8, 12]:
-        arrange_tol_lg_ = []
+    for og_ind in [0, 4, 8, 12]:
         for tol in range(4):
-            arrange_tol_lg_ = [sp1_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_ = [sp1_f1s[run_no][og_ind + tol] for run_no in range(len(result_folders))]
             arrange_tol_lg_sp1.append(arrange_tol_lg_)
     arrange_tol_lg_sp2 = []
-    for lg_ind in [0, 4, 8]:
-        arrange_tol_lg_ = []
+    for og_ind in [0, 4, 8]:
         for tol in range(4):
-            arrange_tol_lg_ = [sp2_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_ = [sp2_f1s[run_no][og_ind + tol] for run_no in range(len(result_folders))]
             arrange_tol_lg_sp2.append(arrange_tol_lg_)
     arrange_tol_lg_tat = []
-    for lg_ind in [0, 4, 8]:
-        arrange_tol_lg_ = []
+    for og_ind in [0, 4, 8]:
         for tol in range(4):
-            arrange_tol_lg_ = [tat_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_ = [tat_f1s[run_no][og_ind + tol] for run_no in range(len(result_folders))]
             arrange_tol_lg_tat.append(arrange_tol_lg_)
     arrange_sptype_tol_lg = [np.array(arrange_tol_lg_sp1), np.array(arrange_tol_lg_sp2), np.array(arrange_tol_lg_tat)]
-    resulted_dict = {}
-    f1s = []
-    names = []
 
-    # enc+dec arch
-    # tnmt_f1 = [[0.693, 0.733, 0.759, 0.779 ], [0.493, 0.563, 0.592, 0.606 ], [0.486, 0.541, 0.541, 0.541],
-    #            [0.533, 0.633, 0.667, 0.667]]
-    # tnmt_f1_sp2 = [[0.896 , 0.911 , 0.911 , 0.92] , [0.93 , 0.936 , 0.936 , 0.936] , [0.706 , 0.706 , 0.706 , 0.706]]
-    # tnmt_f1_tat = [[0.556 , 0.714 , 0.794 , 0.857] , [0.2 , 0.5 , 0.8 , 0.8] , [0.435 , 0.435 , 0.435 , 0.435]]
-    # only dec arch
-    tnmt_f1 = [[0.692, 0.737, 0.769, 0.782 ], [0.462, 0.564, 0.59, 0.59 ], [0.526, 0.684, 0.684, 0.684],
-               [0.606, 0.697, 0.667, 0.727]]
-    tnmt_f1_sp2 = [[0.906 , 0.912 , 0.914 ,  0.917] , [0.927 , 0.933 , 0.933 , 0.933] , [0.75 , 0.75 , 0.75 , 0.75]]
-    tnmt_f1_tat = [[0.613 , 0.79 , 0.806 , 0.855] , [0.634 , 0.732 ,  0.829 ,  0.829] , [ 0.3 , 0.5 , 0.7 , 0.7]]
+    # recall and precision results are retrieved from SignalP 6.0 reported results (from the supplementary material)
     sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
                        0.556, 0.583]
     sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
@@ -2589,43 +2540,19 @@ def plot_sp6_vs_tnmt():
     sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
     sp6_f1_sp2 = get_f1_scores(sp6_recalls_sp2, sp6_precs_sp2)
     sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
-    print(sp6_f1_sp1, sp6_f1_sp2, sp6_f1_tat)
-    tnmt_rec = [[0.719, 0.76, 0.788, 0.808], [0.556, 0.635, 0.667, 0.683], [0.6, 0.667, 0.667, 0.667],
-                [0.444, 0.528, 0.556, 0.556]]
-    tnmt_prec = [[0.669, 0.707, 0.732, 0.752], [0.745, 0.851, 0.894, 0.915], [0.818, 0.909, 0.909, 0.909],
-                 [0.727, 0.864, 0.909, 0.909]]
+
 
     all_sptypes_all_mean = [np.mean(arrange_sptype_tol_lg[0],axis=1), np.mean(arrange_sptype_tol_lg[1], axis=1), np.mean(arrange_sptype_tol_lg[2], axis=1)]
     all_sptypes_all_std = [np.std(arrange_sptype_tol_lg[0],axis=1), np.std(arrange_sptype_tol_lg[1], axis=1), np.std(arrange_sptype_tol_lg[2], axis=1)]
-    print("Mean SP1:",all_sptypes_all_mean[0])
-    print("STD SP1:",all_sptypes_all_std[0])
-
-    print("Mean SP2:",all_sptypes_all_mean[1])
-    print("STD SP2:",all_sptypes_all_std[1])
-
-    print("Mean Tat:", all_sptypes_all_mean[2])
-    print("STD Tat:", all_sptypes_all_std[2])
-
-    print(np.mean(np.stack(sp1_recs), axis=0))
-    print(np.mean(np.stack(sp1_precs), axis=0))
-    print_tables(sp1_recs,sp1_precs,sp2_recs,sp2_precs,tat_recs,tat_precs,sp6_recalls_sp1,sp6_precs_sp1, sp6_recalls_sp2, sp6_precs_sp2, sp6_recalls_tat, sp6_precs_tat)
-
-    # print(np.mean(np.stack(tat_recs), axis=0))
-    # print(np.mean(np.stack(tat_precs), axis=0))
-    # print(all_sptypes_all_mean)
-
-    exit(1)
 
     all_f1s_sp1 = [np.array(all_sptypes_all_mean[0]).reshape(-1), np.array([sp6_f1_sp1[i * 4:(i + 1) * 4] for i in range(4)]).reshape(-1)]
     all_f1s_sp2 = [np.array(all_sptypes_all_mean[1]).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
     all_f1s_tat = [np.array(all_sptypes_all_mean[2]).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
     all_sptypes_all_f1s = [all_f1s_sp1, all_f1s_sp2, all_f1s_tat]
-    print(all_sptypes_all_f1s,all_sptypes_all_std)
 
     names = ["TSignal", "SignalP 6.0", "LipoP", "DeepSig", "Phobius"]
     colors = ["mediumblue", "saddlebrown", "green", "black", "purple","red"]
     titles = ["", "", "", ""]
-    x_positions = []
 
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
@@ -2670,7 +2597,6 @@ def plot_sp6_vs_tnmt():
                      "tolerance/life group",fontsize=12.5)
     plt.savefig("some_plot.pdf")
     exit(1)
-    # plt.show()
 
 def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,mcc_deepsig,mcc_predTat,mcc_lipop,mcc_phobius):
     import matplotlib as mpl
@@ -2696,9 +2622,6 @@ def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,
         ax[ind][0].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1.32, box.height * 0.95])
         box = ax[ind][1].get_position()
         ax[ind][1].set_position([box.x0+box.width * 0.42, box.y0 + box.height * 0.35, box.width * 0.8, box.height * 0.95])
-        # if ind == 0:
-        #     ax[ind][0].set_title("MCC1",fontsize=12.5)
-        #     ax[ind][1].set_title("MCC2",fontsize=12.5)
         ax[ind][0].set_ylabel("MCC1\n"+ylabels[ind],fontsize=12.5)
         ax[ind][1].set_ylabel("MCC2\n"+ylabels[ind],fontsize=12.5)
         if ind != 2:
@@ -2729,15 +2652,7 @@ def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,
                     ax[ind][0].plot([ind_+offsets[j], ind_+offsets[j]], [low[index],high[index]],color='black')
             if ind == 0:
                 handles, labels = ax[ind][0].get_legend_handles_labels()
-                                                          # current_sptype_mcc1_deepsig[j - 1],
-                                                          # current_sptype_mcc1_predTat[j - 1],
-                                                          # current_sptype_mcc1_LipoP[j - 1],
-                                                          # current_sptype_mcc1_Phobius[j - 1]], width=line_w)
-            # ax[ind][0].bar([j + of_ for of_ in offsets], [current_sptype_mcc1[j-1],current_sptype_mcc1_sp6[j-1],
-            #                                               current_sptype_mcc1_deepsig[j-1],current_sptype_mcc1_predTat[j-1],
-            #                                               current_sptype_mcc1_LipoP[j-1],current_sptype_mcc1_Phobius[j-1]],width=line_w)
         for j in range(2):
-            print([i + offsets[j] for i in range(1,4)],mcc2_mean_results[j])
             ax[ind][1].bar([i + offsets[j+2] for i in range(1,4)], mcc2_mean_results[j], width=line_w,alpha=0.6,color=colors[j]) #, current_sptype_mcc1_sp6[j - 1],
 
             if j ==0:
@@ -2759,129 +2674,44 @@ def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,
     fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=5, fontsize=12.5)
     plt.savefig("some_plot_mcc.pdf")
 
-    #     exit(1)
-    #     for j in range(2):
-    #         print(colors[j])
-    #         ax[ind].bar([i + offsets[j] for i in range(lower_lim_plots, 17)], all_f1s[j],  label=names[j],
-    #                     width=line_w,alpha=0.6, color=colors[j])
-    #     for i in range(lower_lim_plots, 17):
-    #         print(all_sptypes_all_mean[ind],all_sptypes_all_std[ind])
-    #         print("ind", ind)
-    #
-    #         low,high = all_sptypes_all_mean[ind][i - lower_lim_plots] - 2 * all_sptypes_all_std[ind][i - lower_lim_plots], \
-    #                    all_sptypes_all_mean[ind][i - lower_lim_plots] + 2 *  all_sptypes_all_std[ind][i - lower_lim_plots]
-    #         ax[ind].plot([i+offsets[0],i+offsets[0]],[low,max(high,low+0.001)], color='black')
-    #     box = ax[ind].get_position()
-    #     ax[ind].set_xlim(0.5,16.5)
-    #     ax[ind].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1.1, box.height * 0.95])
-    #     ax[ind].set_yticks([0,0.2,0.4,0.6,0.8,1])
-    #     ax[ind].set_ylim([0, 1.1])
-    #     ax[ind].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
-    #     ax[ind].set_xticks(list(range(lower_lim_plots, 17)))
-    #     if ind == 2:
-    #         handles, labels = ax[ind].get_legend_handles_labels()
-    #     ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=12.5)
-    #     ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=12.5)
-    #     ax[ind].yaxis.set_label_coords(-0.07, 0.42)
-    #     ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=12.5)
-    # fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=12.5)
-    # fig.suppressComposite = False
-    # from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
-    # ax[2].set_xlabel("eukarya                                        gn bacteria                                 gp bacteria                                        archaea\n\n "
-    #                  "tolerance/life group",fontsize=12.5)
-    # plt.savefig("some_plot.pdf")
 
-def plot_sp6_vs_tnmt_mcc():
-    # plt.show()
-    all_mdl_2results = []
+def plot_sp6_vs_tnmt_mcc(result_folders=("only_decoder_tune_bert_extraOhOnOut_swa_run_1",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_2",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_3",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_4",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_5")):
+    """
+    Method for MCC bar plots with mean and variance Sec/SPase I and II and Tat/SPase I compared to SignalP 6.0 and other
+    models. The method computes mean and average across multiple runs, but can be used for a single run also.
 
+    :param list_or_tuple result_folders: contains the folders containing the sequence prediction binaries. Multiple
+    runs are averaged and result variance is also computed, but the method may be used for a single run also (e.g.
+    have result_folders = ["one_single_folder_with_results"]
+    """
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
-    runs = [21]#,22,23,24,25]
-    # runs = list(range(1,29))
-    runs = [31]
-    runs = [33]
-    # pe extra dims; no lipobox training
-    runs = [32,34,37, 39,40, 47]
-    # no pe extra dims; no lipobox training
-    runs = [21, 22, 23, 24, 25]
-    # pe extra dims; lipobox training
-    runs = [43, 44]
-    # no pe extra dims; lipobox training
-    runs = [42, 45]
 
-    runs = [32,34,37, 39,40, 47]
-    # runs = [32]
-    # runs = [51]
-    # runs = [47]
-    # runs = [54]
-    # runs = [56]
-    # runs = [57]
-    # runs = [58]
-    # additional oh on generator (1l gen)
-    runs = [59]
-    runs = [60]
-    # additional oh on generator (1l gen)
-    runs = [61]
-    runs = [62]
-    # additional blosum on generator (2l gen)
-    runs = [63]
-    # additional oh on generator (2l gen)
-    runs = [64]
-    # additional blosum on generator (1l gen)
-    runs = [65,69]
-
-
-
-    # add additional oh 0.8114533887361024
-    runs = [59,60,61,62,71]
-    # do not add additional oh (separate pe) 0.811137870009116
-    runs = [32,34,37, 39,40, 47]
-    # non separate pe; 0.8084162965367755
-    runs = [21, 22, 23, 24, 25]
-
-    runs = [65]
-
-    # blosum on generator (separate pe)
-    runs = [65,66,69, 70]
-
-    # blosum on generator lipobox training
-    runs = [67,68]
-
-    # no extra pe encoding, oh on the generator
-    runs = [72]
-
-    runs = [65,66]
-
-    runs = [69]
-
-    runs = [32,34,37, 39,40, 47]
-    runs = [59,60,61,62,71]
-    # runs = [73]
-
-
+    # result files for each of the other methods
     mcc_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"], return_mcc=True)
     mcc_predTat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP", "TAT"], return_mcc=True)
     mcc_lipop = extract_compatible_binaries_lipop(restrict_types=["SP", "NO_SP", "LIPO"], return_mcc=True)
     mcc_phobius = extract_compatible_phobius_binaries(restrict_types=["SP", "NO_SP"], return_mcc=True)
     mcc_deepsig[-1] = 0
+
     # "padd" with zeroes the SP types which are not predictable by their respective models
     mcc_deepsig = [mcc_deepsig, [0]*3, [0]*3]
     mcc_predTat = [mcc_predTat[0], [0]*3, mcc_predTat[1]]
     mcc_lipop = [mcc_lipop[0], mcc_lipop[1], [0]*3]
     mcc_phobius = [mcc_phobius, [0]*3, [0]*3]
-    for run_no in runs:
-        print("Computing results for run number {}".format(run_no))
-        run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
-        # run_results_folder = "tuning_bert_repeat5NoDrop_only/"
-        # run_results_folder = "tuning_bert_repeat_val_on_f1s/"
-        # run_results_folder = "separate-glbl_trimmed_tuned_bert_embs/".format(run_no)
+
+    for run_folder in result_folders:
+        print("Computing results for number {}".format(run_folder))
         mdl2results = extract_all_param_results(only_cs_position=False,
-                                                result_folder=run_results_folder,
+                                                result_folder=run_folder,
                                                 compare_mdl_plots=False,
                                                 remove_test_seqs=False,
                                                 benchmark=True,
-                                                prints=True)
+                                                prints=False)
         mdl_ind = 0
         sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
         sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
@@ -2898,14 +2728,6 @@ def plot_sp6_vs_tnmt_mcc():
         mcc2_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
         mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
         mcc2_tat.append([mcc for mcc in mdl2results[mdl_ind][5]])
-        if sum(np.array([mcc for mcc in mdl2results[mdl_ind][3]][:2])) > sum([0.841, 0.893]):
-            print("mcc2sp2", run_no,mdl2results[mdl_ind][3],[0.841, 0.893])
-            if sum(np.array([mcc for mcc in mdl2results[mdl_ind][2]][:2])) > sum([0.838, 0.894]):
-                print("mcc1sp2", run_no, mdl2results[mdl_ind][2],[0.838, 0.894])
-        elif sum(np.array([mcc for mcc in mdl2results[mdl_ind][2]][:2])) > sum([0.838, 0.894]):
-            print("mcc1sp2", run_no, mdl2results[mdl_ind][2])
-        else:
-            print("nope sorry...", run_no)
 
     mean_mcc1_sp1, mean_mcc2_sp1 = np.mean(np.stack(mcc1_sp1),axis=0), np.mean(np.stack(mcc2_sp1), axis=0)
     mean_mcc1_sp2, mean_mcc2_sp2 = np.mean(np.stack(mcc1_sp2),axis=0), np.mean(np.stack(mcc2_sp2), axis=0)
@@ -2918,34 +2740,6 @@ def plot_sp6_vs_tnmt_mcc():
     sp6_mcc1_sp1, sp6_mcc2_sp1 = np.array([0.868, 0.811,0.878,0.737]), np.array([0.649, 0.734, 0.728])
     sp6_mcc1_sp2, sp6_mcc2_sp2 = np.array([0.838, 0.894, 0.871]), np.array([0.841, 0.893, 0.719])
     sp6_mcc1_tat, sp6_mcc2_tat = np.array([0.946, 0.788, 0.802]), np.array([0.934, 0.806,0.807])
-    # print(mean_mcc1_sp1)
-    # print(std_mcc1_sp1)
-    # print(sp6_mcc1_sp1)
-    print("\n")
-    print(mean_mcc2_sp1)
-    print(std_mcc2_sp1)
-    print(sp6_mcc2_sp1)
-    print("\n")
-
-    print(mean_mcc1_sp2)
-    print(std_mcc1_sp2)
-    print(sp6_mcc1_sp2)
-    print("\n")
-
-    print(mean_mcc2_sp2)
-    print(std_mcc2_sp2)
-    print(sp6_mcc2_sp2)
-    print("\n")
-
-    print(mean_mcc1_tat)
-    print(std_mcc1_tat)
-    print(sp6_mcc1_tat)
-    print("\n")
-
-    print(mean_mcc2_tat)
-    print(std_mcc2_tat)
-    print(sp6_mcc2_tat)
-
 
     mean_results_TSignal = [[mean_mcc1_sp1, mean_mcc2_sp1], [mean_mcc1_sp2, mean_mcc2_sp2],[mean_mcc1_tat, mean_mcc2_tat]]
     std_results_TSignal = [[std_mcc1_sp1, std_mcc2_sp1], [std_mcc1_sp2, std_mcc2_sp2], [std_mcc1_tat, std_mcc2_tat]]
@@ -2975,162 +2769,8 @@ def plot_sp6_vs_tnmt_mcc():
     print("non-w average tsignal:",(np.mean(mean_mcc1_sp1)+np.mean(mean_mcc2_sp1) + np.mean(mean_mcc1_sp2) + np.mean(mean_mcc2_sp2)+np.mean(mean_mcc1_tat) + np.mean(mean_mcc2_tat))/6)
     print("mcc1 w average sp6/tsignal:",total_mcc1_sp6,total_mcc1,"+/-", total_mcc1_std)
     print("mcc2 w average sp6/tsignal:",total_mcc2_sp6,total_mcc2,"+/-", total_mcc2_std)
-    # print("non-w average tsignal:",(np.mean(mean_mcc1_sp1)+np.mean(mean_mcc2_sp1) + np.mean(mean_mcc1_sp2) + np.mean(mean_mcc2_sp2)+np.mean(mean_mcc1_tat) + np.mean(mean_mcc2_tat))/6)
     bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,mcc_deepsig,mcc_predTat,mcc_lipop,mcc_phobius)
     exit(1)
-    print(total_mcc1,total_mcc1_sp6)
-    print(total_mcc2,total_mcc2_sp6)
-
-    print("\n")
-    print("sp1")
-    print(np.mean(np.stack(mcc1_sp1),axis=0), np.mean(np.stack(mcc2_sp1), axis=0))
-    print(np.std(np.stack(mcc1_sp1),axis=0), np.std(np.stack(mcc2_sp1), axis=1))
-
-    print("\n")
-    print("sp2")
-    print(np.mean(np.stack(mcc1_sp2),axis=0), np.mean(np.stack(mcc2_sp2), axis=0))
-    print(np.std(np.stack(mcc1_sp2),axis=0), np.std(np.stack(mcc2_sp2), axis=1))
-
-
-
-    print("\n")
-    print("tat")
-    print(np.mean(np.stack(mcc1_tat),axis=0), np.mean(np.stack(mcc2_tat), axis=0))
-    print(np.std(np.stack(mcc1_tat),axis=0), np.std(np.stack(mcc2_tat), axis=1))
-
-
-
-    exit(1)
-    tnmt_f1 = [[0.692, 0.737, 0.769, 0.782 ], [0.462, 0.564, 0.59, 0.59 ], [0.526, 0.684, 0.684, 0.684],
-               [0.606, 0.697, 0.667, 0.727]]
-    tnmt_f1_sp2 = [[0.906, 0.912, 0.914, 0.917] , [0.927 , 0.933 , 0.933 , 0.933] , [0.75 , 0.75 , 0.75 , 0.75]]
-    tnmt_f1_tat = [[0.613 , 0.79 , 0.806 , 0.855] , [0.634 , 0.732 ,  0.829 ,  0.829] , [ 0.3 , 0.5 , 0.7 , 0.7]]
-    sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
-                       0.556, 0.583]
-    sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
-    sp6_recalls_tat = [0.706, 0.765, 0.784, 0.804, 0.556, 0.556, 0.667, 0.667, 0.333, 0.444, 0.444, 0.444]
-    sp6_precs_sp1 = [0.661, 0.685, 0.715, 0.733, 0.534, 0.562, 0.575, 0.603, 0.632, 0.632, 0.632, 0.632, 0.643, 0.714,
-                     0.714, 0.75]
-    sp6_precs_sp2 = [0.913, 0.913, 0.917, 0.925, 0.929, 0.938, 0.938, 0.938, 0.583, 0.583, 0.583, 0.583]
-    sp6_precs_tat = [0.679, 0.736, 0.755, 0.774, 0.714, 0.714, 0.857, 0.857, 0.375, 0.5, 0.5, 0.5]
-    sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
-    sp6_f1_sp2 = get_f1_scores(sp6_recalls_sp2, sp6_precs_sp2)
-    sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
-
-
-
-    arrange_tol_lg_sp1 = []
-    for lg_ind in [0, 4, 8, 12]:
-        arrange_tol_lg_ = []
-        for tol in range(4):
-            arrange_tol_lg_ = [sp1_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
-            arrange_tol_lg_sp1.append(arrange_tol_lg_)
-    arrange_tol_lg_sp2 = []
-    for lg_ind in [0, 4, 8]:
-        arrange_tol_lg_ = []
-        for tol in range(4):
-            arrange_tol_lg_ = [sp2_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
-            arrange_tol_lg_sp2.append(arrange_tol_lg_)
-    arrange_tol_lg_tat = []
-    for lg_ind in [0, 4, 8]:
-        arrange_tol_lg_ = []
-        for tol in range(4):
-            arrange_tol_lg_ = [tat_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
-            arrange_tol_lg_tat.append(arrange_tol_lg_)
-    arrange_sptype_tol_lg = [np.array(arrange_tol_lg_sp1), np.array(arrange_tol_lg_sp2), np.array(arrange_tol_lg_tat)]
-    resulted_dict = {}
-    f1s = []
-    names = []
-
-    # enc+dec arch
-    # tnmt_f1 = [[0.693, 0.733, 0.759, 0.779 ], [0.493, 0.563, 0.592, 0.606 ], [0.486, 0.541, 0.541, 0.541],
-    #            [0.533, 0.633, 0.667, 0.667]]
-    # tnmt_f1_sp2 = [[0.896 , 0.911 , 0.911 , 0.92] , [0.93 , 0.936 , 0.936 , 0.936] , [0.706 , 0.706 , 0.706 , 0.706]]
-    # tnmt_f1_tat = [[0.556 , 0.714 , 0.794 , 0.857] , [0.2 , 0.5 , 0.8 , 0.8] , [0.435 , 0.435 , 0.435 , 0.435]]
-    # only dec arch
-    tnmt_f1 = [[0.692, 0.737, 0.769, 0.782 ], [0.462, 0.564, 0.59, 0.59 ], [0.526, 0.684, 0.684, 0.684],
-               [0.606, 0.697, 0.667, 0.727]]
-    tnmt_f1_sp2 = [[0.906 , 0.912 , 0.914 ,  0.917] , [0.927 , 0.933 , 0.933 , 0.933] , [0.75 , 0.75 , 0.75 , 0.75]]
-    tnmt_f1_tat = [[0.613 , 0.79 , 0.806 , 0.855] , [0.634 , 0.732 ,  0.829 ,  0.829] , [ 0.3 , 0.5 , 0.7 , 0.7]]
-    sp6_recalls_sp1 = [0.747, 0.774, 0.808, 0.829, 0.639, 0.672, 0.689, 0.721, 0.800, 0.800, 0.800, 0.800, 0.500, 0.556,
-                       0.556, 0.583]
-    sp6_recalls_sp2 = [0.852, 0.852, 0.856, 0.864, 0.875, 0.883, 0.883, 0.883, 0.778, 0.778, 0.778, 0.778]
-    sp6_recalls_tat = [0.706, 0.765, 0.784, 0.804, 0.556, 0.556, 0.667, 0.667, 0.333, 0.444, 0.444, 0.444]
-    sp6_precs_sp1 = [0.661, 0.685, 0.715, 0.733, 0.534, 0.562, 0.575, 0.603, 0.632, 0.632, 0.632, 0.632, 0.643, 0.714,
-                     0.714, 0.75]
-    sp6_precs_sp2 = [0.913, 0.913, 0.917, 0.925, 0.929, 0.938, 0.938, 0.938, 0.583, 0.583, 0.583, 0.583]
-    sp6_precs_tat = [0.679, 0.736, 0.755, 0.774, 0.714, 0.714, 0.857, 0.857, 0.375, 0.5, 0.5, 0.5]
-    sp6_f1_sp1 = get_f1_scores(sp6_recalls_sp1, sp6_precs_sp1)
-    sp6_f1_sp2 = get_f1_scores(sp6_recalls_sp2, sp6_precs_sp2)
-    sp6_f1_tat = get_f1_scores(sp6_recalls_tat, sp6_precs_tat)
-    print(sp6_f1_sp1, sp6_f1_sp2, sp6_f1_tat)
-    tnmt_rec = [[0.719, 0.76, 0.788, 0.808], [0.556, 0.635, 0.667, 0.683], [0.6, 0.667, 0.667, 0.667],
-                [0.444, 0.528, 0.556, 0.556]]
-    tnmt_prec = [[0.669, 0.707, 0.732, 0.752], [0.745, 0.851, 0.894, 0.915], [0.818, 0.909, 0.909, 0.909],
-                 [0.727, 0.864, 0.909, 0.909]]
-
-    all_sptypes_all_mean = [np.mean(arrange_sptype_tol_lg[0],axis=1), np.mean(arrange_sptype_tol_lg[1], axis=1), np.mean(arrange_sptype_tol_lg[2], axis=1)]
-    all_sptypes_all_std = [np.std(arrange_sptype_tol_lg[0],axis=1), np.std(arrange_sptype_tol_lg[1], axis=1), np.std(arrange_sptype_tol_lg[2], axis=1)]
-    all_f1s_sp1 = [np.array(all_sptypes_all_mean[0]).reshape(-1), np.array([sp6_f1_sp1[i * 4:(i + 1) * 4] for i in range(4)]).reshape(-1)]
-    all_f1s_sp2 = [np.array(all_sptypes_all_mean[1]).reshape(-1), np.array([sp6_f1_sp2[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
-    all_f1s_tat = [np.array(all_sptypes_all_mean[2]).reshape(-1), np.array([sp6_f1_tat[i*4:(i+1)*4] for i in range(3)]).reshape(-1)]
-    all_sptypes_all_f1s = [all_f1s_sp1, all_f1s_sp2, all_f1s_tat]
-    print(all_sptypes_all_f1s)
-
-    names = ["TSignal", "SignalP 6.0", "LipoP", "DeepSig", "Phobius"]
-    colors = ["mediumblue", "saddlebrown", "green", "black", "purple"]
-    titles = ["", "", "", ""]
-    x_positions = []
-
-    import matplotlib as mpl
-    mpl.rcParams['figure.dpi'] = 350
-    mpl.rcParams['font.family'] = "Arial"
-    fig, ax = plt.subplots(3, 1,figsize=(8, 6),dpi=350)
-    line_w = 0.3
-    offsets = [-line_w*0.5, line_w*0.5]
-    sptypes=["Sec/SPI", "Sec/SPII", "Tat/SP1"]
-    for ind in range(3):
-        upper_lim = 17 if ind == 0 else 13
-        lower_lim = 0 if ind == 0 else 1
-        lower_lim_plots = 1 if ind == 0 else 5
-        all_f1s = all_sptypes_all_f1s[ind]
-        ax[ind].plot([4.5,4.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
-        ax[ind].plot([8.5,8.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
-        ax[ind].plot([12.5,12.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
-        for j in range(2):
-            print(colors[j])
-            ax[ind].bar([i + offsets[j] for i in range(lower_lim_plots, 17)], all_f1s[j],  label=names[j],
-                   width=line_w,alpha=0.6, color=colors[j])
-        for i in range(lower_lim_plots, 17):
-            print(all_sptypes_all_mean[ind],all_sptypes_all_std[ind])
-            print("ind", ind)
-
-            low,high = all_sptypes_all_mean[ind][i - lower_lim_plots] - 2 * all_sptypes_all_std[ind][i - lower_lim_plots],\
-                       all_sptypes_all_mean[ind][i - lower_lim_plots] + 2 *  all_sptypes_all_std[ind][i - lower_lim_plots]
-            ax[ind].plot([i+offsets[0],i+offsets[0]],[low,max(high,low+0.001)], color='black')
-        box = ax[ind].get_position()
-        ax[ind].set_xlim(0.5,16.5)
-        ax[ind].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1.1, box.height * 0.95])
-        ax[ind].set_yticks([0,0.2,0.4,0.6,0.8,1])
-        ax[ind].set_ylim([0, 1.1])
-        ax[ind].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
-        ax[ind].set_xticks(list(range(lower_lim_plots, 17)))
-        if ind == 2:
-            handles, labels = ax[ind].get_legend_handles_labels()
-        ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=12.5)
-        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=12.5)
-        ax[ind].yaxis.set_label_coords(-0.07, 0.42)
-        ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=12.5)
-    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.01, 0.05), ncol=2, fontsize=12.5)
-    fig.suppressComposite = False
-    from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
-    ax[2].set_xlabel("eukarya                                        gn bacteria                                 gp bacteria                                        archaea\n\n "
-                     "tolerance/life group",fontsize=12.5)
-    plt.savefig("some_plot.pdf")
-    exit(1)
-    # plt.show()
-
-
 
 def plot_comparative_performance_sp1_mdls():
     # enc-dec model
@@ -3190,22 +2830,22 @@ def plot_comparative_performance_sp1_mdls():
         mcc2_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
         mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
     arrange_tol_lg_sp1 = []
-    for lg_ind in [0, 4, 8, 12]:
+    for og_ind in [0, 4, 8, 12]:
         arrange_tol_lg_ = []
         for tol in range(4):
-            arrange_tol_lg_ = [sp1_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_ = [sp1_f1s[run_no][og_ind + tol] for run_no in range(len(runs))]
             arrange_tol_lg_sp1.append(arrange_tol_lg_)
     arrange_tol_lg_sp2 = []
-    for lg_ind in [0, 4, 8]:
+    for og_ind in [0, 4, 8]:
         arrange_tol_lg_ = []
         for tol in range(4):
-            arrange_tol_lg_ = [sp2_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_ = [sp2_f1s[run_no][og_ind + tol] for run_no in range(len(runs))]
             arrange_tol_lg_sp2.append(arrange_tol_lg_)
     arrange_tol_lg_tat = []
-    for lg_ind in [0, 4, 8]:
+    for og_ind in [0, 4, 8]:
         arrange_tol_lg_ = []
         for tol in range(4):
-            arrange_tol_lg_ = [tat_f1s[run_no][lg_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_ = [tat_f1s[run_no][og_ind + tol] for run_no in range(len(runs))]
             arrange_tol_lg_tat.append(arrange_tol_lg_)
     arrange_sptype_tol_lg = [np.array(arrange_tol_lg_sp1), np.array(arrange_tol_lg_sp2), np.array(arrange_tol_lg_tat)]
 
@@ -3497,26 +3137,16 @@ def rename_files():
             new_name = file[:perc_ind] + perc[0] + "." + perc[1] + file[perc_ind+2]
             os.rename(folder + "/" + file, folder + "/" + new_name)
 
-            # folds_and_filtype = file.split("folds")[1]
-            # subtrain = file.split("subtrain")[1].split("_")[1]
-            # new_name = "data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_4_subset_train_{}_trFlds{}".format(subtrain, folds_and_filtype)
-            # os.rename(folder+"/"+file, folder+"/"+new_name)
-
 def plot_perf_over_data_perc():
+    """
+        Method to compute and plot performance over various amounts of data for Sec/SPase I CS-F1 predictions.
+    """
     subsets = [0.25, 0.5, 0.75, 1]
     subset_2_f1 = {s:[] for s in subsets}
-    subset_2_prec = {s:[] for s in subsets}
-    subset_2_rec = {s:[] for s in subsets}
-    # [0.7568873852102465, 0.8506524891251813, 0.8941517641372644, 0.9139681005316579],
-    # [0.7568873852102465, 0.8506524891251813, 0.8941517641372644, 0.9139681005316579]
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
     mpl.rcParams['font.family'] = "Arial"
     fig, ax = plt.subplots(2, 2,figsize=(8, 6))
-    # print(ax)
-    # print(ax[0])
-    # print(ax[0, 0])
-    # exit(1)
     for subset in subsets:
         for run in range(6):
             print("Computing run {} for subset {}".format(run, subset))
@@ -3535,7 +3165,6 @@ def plot_perf_over_data_perc():
             all_recalls, all_precisions, _, _, _, f1_scores = \
                 get_cs_perf(life_grp, seqs, true_lbls, pred_lbls, v=False, only_cs_position=False, sp_type="SP",
                            sptype_preds=glbl_lbl_dict)
-            # print(f1_scores)
             subset_2_f1[subset].append(f1_scores)
     sp1_plot = True
     all_euk_mean_tol0, all_neg_mean_tol0, all_pos_mean_tol0, all_archaea_mean_tol0 = [], [], [] ,[]
@@ -3562,7 +3191,6 @@ def plot_perf_over_data_perc():
         all_neg_std_tol0.append(np.std([all_neg_[0] for all_neg_ in all_neg]))
         all_neg_mean_tol3.append(np.mean([all_neg_[3] for all_neg_ in all_neg]))
         all_neg_std_tol3.append(np.std([all_neg_[3] for all_neg_ in all_neg]))
-        # print(subset, all_euk_std_tol0)
         all_pos_mean_tol0.append(np.mean([all_pos_[0] for all_pos_ in all_pos]))
         all_pos_std_tol0.append(np.std([all_pos_[0] for all_pos_ in all_pos]))
         all_pos_mean_tol3.append(np.mean([all_pos_[3] for all_pos_ in all_pos]))
@@ -3581,9 +3209,6 @@ def plot_perf_over_data_perc():
         ax[0,0].fill_between(subsets, all_euk_mean_tol0 - 2 * all_euk_std_tol0, all_euk_mean_tol0 + 2 * all_euk_std_tol0, alpha=0.2, color='blue')
         ax[0,0].plot(subsets, all_euk_mean_tol3, '--',label='eukarya tol 3', color='blue')
         ax[0,0].fill_between(subsets, all_euk_mean_tol3 - 2 * all_euk_std_tol3, all_euk_mean_tol3 + 2 * all_euk_std_tol3, alpha=0.2, color='blue')
-        # ax[0,0].title("Performance over data percentage", fontsize=26)
-        # ax[0,0].set_xlabel("Percentage of training data used")
-        # ax[0,0].set_ylabel("F1 score")
         box = ax[0,0].get_position()
         ax[0,0].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.45, box.width, box.height * 0.75])
         ax[0,0].set_ylabel("F1 score", fontsize=12.5)
@@ -3593,15 +3218,10 @@ def plot_perf_over_data_perc():
         ax[0, 0].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=12.5)
         ax[0, 0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
 
-        # ax[0,0].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=12.5)
     all_neg_mean_tol0 = np.array(all_neg_mean_tol0)
     all_neg_mean_tol3 = np.array(all_neg_mean_tol3)
     all_neg_std_tol0 = np.array(all_neg_std_tol0)
     all_neg_std_tol3 = np.array(all_neg_std_tol3)
-    # fig, ax = plt.subplots()
-    # plt.title("Performance over data percentage", fontsize=26)
-    # ax[0,1].set_xlabel("Percentage of training data used")
-    # ax[0,1].set_ylabel("F1 score")
 
     ax[0,1].plot(subsets, all_neg_mean_tol0, '-', label='gn bacteria tol 0', color='orange')
     ax[0,1].fill_between(subsets, all_neg_mean_tol0 - 2 * all_neg_std_tol0, all_neg_mean_tol0 + 2 * all_neg_std_tol0,
@@ -3621,10 +3241,6 @@ def plot_perf_over_data_perc():
     all_pos_mean_tol3 = np.array(all_pos_mean_tol3)
     all_pos_std_tol0 = np.array(all_pos_std_tol0)
     all_pos_std_tol3 = np.array(all_pos_std_tol3)
-    # fig, ax = plt.subplots()
-    # plt.title("Performance over data percentage", fontsize=26)
-    # ax[1,0].set_xlabel("Percentage of training data used")
-    # ax[1,0].set_ylabel("F1 score")
     ax[1,0].plot(subsets, all_pos_mean_tol0, '-', label='gp bacteria tol 0', color='purple')
     ax[1,0].fill_between(subsets, all_pos_mean_tol0 - 2 * all_pos_std_tol0, all_pos_mean_tol0 + 2 * all_pos_std_tol0,
                     alpha=0.2, color='purple')
@@ -3642,15 +3258,10 @@ def plot_perf_over_data_perc():
 
     ax[1,0].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=12.5)
     ax[1,0].set_yticklabels([0, 0.2, 0.4, 0.6, 0.8, 1], fontsize=12.5)
-    # plt.show()
     all_archaea_mean_tol0 = np.array(all_archaea_mean_tol0)
     all_archaea_mean_tol3 = np.array(all_archaea_mean_tol3)
     all_archaea_std_tol0 = np.array(all_archaea_std_tol0)
     all_archaea_std_tol3 = np.array(all_archaea_std_tol3)
-    # fig, ax = plt.subplots()
-    # plt.title("Performance over data percentage", fontsize=26)
-    # ax[1,1].set_xlabel("Percentage of training data used")
-    # ax[1,1].set_ylabel("F1 score")
 
     ax[1,1].plot(subsets, all_archaea_mean_tol0, '-', label='archaea tol 0', color='red')
     ax[1,1].fill_between(subsets, all_archaea_mean_tol0 - 2 * all_archaea_std_tol0, all_archaea_mean_tol0 + 2 * all_archaea_std_tol0,
@@ -3680,11 +3291,7 @@ def plot_perf_over_data_perc():
             all_labels.extend(labels)
 
     fig.legend(all_handles, all_labels, loc='center left', bbox_to_anchor=(0.03, 0.1), ncol=4, fontsize=12.5)
-    # fig.text(0.5, 0.04, 'common X', ha='center')
-    # fig.text(0.04, 0.5, 'common Y', va='center', rotation='vertical')
     plt.savefig("some_plot_perf_over_data_perc.pdf")
-    exit(1)
-    plt.show()
 
 def checkthis_():
     a = pickle.load(open("train_subset_results/data_perc_runs_dos_0.1_lr_1e-05_nlayers_3_nhead_16_run_no_0_subset_train_0.25_trFlds_0_1_best.bin", "rb"))
@@ -4130,217 +3737,47 @@ def sanity_check(a, b):
 def get_hydro_values():
     hydro_vals = {"A":1.8, "C":2.5, "D":-3.5, "E":-3.5, "F":2.8, "G":-0.4, "H":-3.2, "I":4.5, "K":-3.9,"L":3.8, "M":1.9, "N":-3.5, "P":-1.6, "Q":-3.5,"R":-4.5,"S":-0.8,"T":-0.7,"V":4.2,"W":-0.9,"Y":-1.3}
 
-def visualize_inp_gradients():
+def visualize_inp_gradients(files=["added_oh_gen_fold0.bin", "added_oh_gen_fold1.bin", "added_oh_gen_fold2.bin"]):
+    """
+
+    Using files resulted from running python main.py --compute_saliency for some model on some data, create the mean
+    importance scores for sequences aligned to the RR motif (for Tat/SPase I) and Cys residue (for Sec/SPase II) and
+    plot the normalized values over the residues.
+
+    """
+    import matplotlib as mpl
+    from matplotlib.ticker import MultipleLocator
+
     hydro_vals = {"A":1.8, "C":2.5, "D":-3.5, "E":-3.5, "F":2.8, "G":-0.4, "H":-3.2, "I":4.5, "K":-3.9,"L":3.8, "M":1.9,
                   "N":-3.5, "P":-1.6, "Q":-3.5,"R":-4.5,"S":-0.8,"T":-0.7,"V":4.2,"W":-0.9,"Y":-1.3}
 
     folder = get_data_folder()
     seq2lbls = {}
     seq2lg = {}
-    ind2glbl_lbl = {0: 'NO_SP', 1: 'SP', 2: 'TATLIPO', 3: 'LIPO', 4: 'TAT', 5: 'PILIN'}
     for i in [0,1,2]:
         for t in ["train", "test"]:
             a = pickle.load(open(folder+"random_folds_sp6_partitioned_data_{}_{}.bin".format(t,i), "rb"))
             seq2lbls.update({seq:lbls[1] for seq,lbls in a.items()})
             seq2lg.update({seq:lbls[-1] for seq,lbls in a.items()})
-    preds_and_probs_BERT = pickle.load(open("using_bert_grds_input_gradients_for_cs_preds_1.bin", "rb"))
-    preds_and_probs_IEPE = pickle.load(open("using_posEncOut_grds_input_gradients_for_cs_preds_1.bin", "rb"))
-    preds_and_probs_IE = pickle.load(open("input_gradients_for_cs_preds_1.bin", "rb"))
-    preds_and_probs_IE_seetAT = pickle.load(open("see_tat_using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
-    preds_and_probs_IE_seetLOTTASEQS = pickle.load(open("using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
-    preds_and_probs_IE_seetLOTTASEQS_sanityCheck = pickle.load(open("repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds_0.bin", "rb"))
-    preds_and_probs_IE_seetLOTTASEQS_BertOutGrds = pickle.load(open("change_enc_repeat_full_using_posEncOut_grds_input_gradients_for_cs_preds.bin", "rb"))
-    letsee = pickle.load(open("save.bin", "rb"))
-
-
-    bert_embs_test = pickle.load(open("bert_embs_grads_fold_1.bin", "rb"))
-    word_embs_test = pickle.load(open("word_embs_grads_fold_1.bin", "rb"))
-    layer_norm_word_embs_test = pickle.load(open("ie_plus_pe_embs_grads_fold_1.bin", "rb"))
-    simpler_mdl_word_embs = pickle.load(open("word_embs_grads_simpler_model_fold_1.bin", "rb"))
-    simpler_layer_norm_word_embs = pickle.load(open("layer_norm_grads_simpler_model_fold_1.bin", "rb"))
-    inpEncOut_word_embs = pickle.load(open("full_emb_grads_simpler_model_fold_1.bin", "rb"))
-    actualBERToutPUT_2lModel = pickle.load(open("actualBERToutPUT_2lModel.bin", "rb"))
-    actualBERToutPUT_3lModel = pickle.load(open("actualBERToutPUT_3lModel.bin", "rb"))
-    repeat_actualBERToutPUT_2lModel_fold1 = pickle.load(open("repeat_actualBERToutPUT_2lModel.bin", "rb"))
-    repeat_actualBERToutPUT_2lModel_fold2 = pickle.load(open("repeat_actualBERToutPUT_2lModel_fold2.bin", "rb"))
-    repeat_actualBERToutPUT_2lModel_fold0 = pickle.load(open("repeat_actualBERToutPUT_2lModel_fold0.bin", "rb"))
-    repeat_actualBERToutPUT_3lModel_fold1 = pickle.load(open("3l_bert_embs.bin", "rb"))
-    deployment_mdl3l = pickle.load(open("test_depl_mdl.bin", "rb"))
-    actualBERToutPUT_4lModel = pickle.load(open("actualBERToutPUT_4lModel.bin", "rb"))
-    test_depl_mdl_bertEmbs = pickle.load(open("test_depl_mdl_bertEmbs.bin", "rb"))
-    noPosEncmdl = pickle.load(open("noPosEncmdl.bin", "rb"))
-    mdlStillTraining1l = pickle.load(open("1lmdlStillTraining.bin", "rb"))
-    mdlStillTraining2ndsave1l = pickle.load(open("1lmdlStillTraining2ndsave.bin", "rb"))
-    mdlStillTraining3rd1l = pickle.load(open("1lmdlStillTraining3rd.bin", "rb"))
-    mdlStillTraining4th1l = pickle.load(open("1lmdlStillTraining4th.bin", "rb"))
-    only_decFullEmb2l = pickle.load(open("2lonly_decFullEmb.bin", "rb"))
-    repeat_the_good_one_on_full_embs = pickle.load(open("repeat_the_good_one_on_full_embs.bin", "rb"))
-    repeat_the_good_one_on_bert = pickle.load(open("repeat_the_good_one_on_bert.bin", "rb"))
-    trained_grads_on_bert3l = pickle.load(open("3ltrained_grads_on_bert.bin", "rb"))
-
-    trained_grads_on_bert3lfold_1 = pickle.load(open("3ltrained_grads_on_bert.bin", "rb"))
-    trained_grads_on_bert3l_fold0 = pickle.load(open("3ltrained_grads_on_bert_fold0.bin", "rb"))
-    trained_grads_on_bert3l_fold2 = pickle.load(open("3ltrained_grads_on_bert_fold2.bin", "rb"))
-    ongoing3lrunfold1 = pickle.load(open("ongoing3lrunfold1.bin", "rb"))
-    save_hopefullyCorrect_onlyDECmdl_bert_embs_fold1 = pickle.load(open("save_hopefullyCorrect_onlyDECmdl_bert_embs_fold1.bin", "rb"))
-    idkanymore = pickle.load(open("idkanymore.bin", "rb"))
-    ongoing3lrunfold1_2ndsave = pickle.load(open("ongoing3lrunfold1_2ndsave.bin", "rb"))
-    ongoing3lrunfold2 = pickle.load(open("ongoing3lrunfold2_1ndsave.bin", "rb"))
-    ongoing3lrunfold0 = pickle.load(open("ongoing3lrunfold0_1ndsave.bin", "rb"))
-    ayer_bertGrads_fold03l = pickle.load(open("3layer_bertGrads_fold0.bin", "rb"))
-    ayer_bertGrads_fold13l = pickle.load(open("3layer_bertGrads_fold1.bin", "rb"))
-    ayer_bertGrads_fold23l = pickle.load(open("3layer_bertGrads_fold2.bin", "rb"))
-    ayer_IEgrads_fold13l = pickle.load(open("full_word_embs_fold1.bin", "rb"))
-    ayer_IEgrads_fold23l = pickle.load(open("full_word_embs_fold2.bin", "rb"))
-    ayer_IEgrads_fold03l = pickle.load(open("full_word_embs_fold0.bin", "rb"))
-    remake_ayer_bertGrads_fold23l = pickle.load(open("remake_3layer_bertGrads_fold1.bin", "rb"))
-    all_probs = [preds_and_probs_IE, preds_and_probs_IEPE, preds_and_probs_BERT]
-    letter2type = {"S":"Sec/SPI", "L":"Sec/SPII", "T":"Tat/SPI"}
-    labels = ['input embs', 'IE + PE', 'BERT']
-
-    swa_bert_grads_fold_0 = pickle.load(open("swa_trained_bert_grds_fold0.bin", "rb"))
-    swa_bert_grads_fold_1 = pickle.load(open("swa_trained_bert_grds_fold1.bin", "rb"))
-    swa_bert_grads_fold_2 = pickle.load(open("swa_trained_bert_grds_fold2.bin", "rb"))
-
-    swa_IEembs_grads_fold_0 = pickle.load(open("swa_trained_full_emb_grds_fold0.bin", "rb"))
-    swa_IEembs_grads_fold_1 = pickle.load(open("swa_trained_full_emb_grds_fold1.bin", "rb"))
-    swa_IEembs_grads_fold_2 = pickle.load(open("swa_trained_full_emb_grds_fold2.bin", "rb"))
-
-    # sanity_check(preds_and_probs_IE_seetLOTTASEQS,preds_and_probs_IE_seetLOTTASEQS_sanityCheck)
-    # for seq_ind in range(8):
-
-    # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IEPE:
-    # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_BERT:
-    normalized_C_cs_values_pm_5aas = []
-    normalized_secSPI_cs_values_pm_5aas = []
-    normalized_secSPI_sptype_values = []
-    tobetestd = preds_and_probs_IE_seetLOTTASEQS_BertOutGrds
-    tobetestd = letsee
-    tobetestd = word_embs_test
-    tobetestd = layer_norm_word_embs_test
-    tobetestd = simpler_layer_norm_word_embs
-    tobetestd = inpEncOut_word_embs
-    tobetestd = actualBERToutPUT_2lModel
-    tobetestd = actualBERToutPUT_2lModel
-    # tobetestd = actualBERToutPUT_3lModel
-    tobetestd = actualBERToutPUT_4lModel
-    tobetestd = repeat_actualBERToutPUT_2lModel_fold2
-    tobetestd = deployment_mdl3l
-    tobetestd = noPosEncmdl
-    tobetestd = mdlStillTraining1l
-    tobetestd = mdlStillTraining2ndsave1l
-    tobetestd = mdlStillTraining3rd1l
-    tobetestd = mdlStillTraining4th1l
-    tobetestd = only_decFullEmb2l
-    # tobetestd = repeat_actualBERToutPUT_2lModel_fold1
-    # tobetestd = test_depl_mdl_bertEmbs
-    # tobetestd = repeat_actualBERToutPUT_3lModel_fold1
-    # print(len(set([repeat_actualBERToutPUT_2lModel_fold2_[0] for repeat_actualBERToutPUT_2lModel_fold2_ in repeat_actualBERToutPUT_2lModel_fold2])))
-    # print(len(set([repeat_actualBERToutPUT_2lModel_fold1_[0] for repeat_actualBERToutPUT_2lModel_fold1_ in repeat_actualBERToutPUT_2lModel_fold1])))
-    # print(len(set([only_decFullEmb2l_[0] for only_decFullEmb2l_ in only_decFullEmb2l])))
-    # print(len(only_decFullEmb2l), only_decFullEmb2l[0][0], only_decFullEmb2l[1][0])
-    # exit(1)
-    # tobetestd = repeat_actualBERToutPUT_2lModel_fold2
-    # tobetestd.extend(repeat_actualBERToutPUT_2lModel_fold1)
-    # tobetestd = repeat_actualBERToutPUT_2lModel_fold2
-    tobetestd = repeat_actualBERToutPUT_2lModel_fold1.copy()
-    # tobetestd = repeat_actualBERToutPUT_2lModel_fold0.copy()
-    # tobetestd = repeat_actualBERToutPUT_2lModel_fold2.copy()
-    # tobetestd.extend(repeat_actualBERToutPUT_2lModel_fold0)
-    # tobetestd.extend(repeat_actualBERToutPUT_2lModel_fold2)
-    # tobetestd = trained_grads_on_bert3lfold_1.copy()
-    # tobetestd.extend(trained_grads_on_bert3l_fold0)
-    # tobetestd.extend(trained_grads_on_bert3l_fold2)
-    # tobetestd = trained_grads_on_bert3l_fold2
-    # tobetestd = trained_grads_on_bert3l_fold0
-    # tobetestd = trained_grads_on_bert3lfold_1.copy()
-
-
-    # tobetestd = trained_grads_on_bert3l
-    # tobetestd = repeat_actualBERToutPUT_2lModel_fold0
-    # tobetestd = repeat_actualBERToutPUT_2lModel_fold1.copy()
-
-    # tobetestd = repeat_the_good_one_on_full_embs
-    # tobetestd = repeat_the_good_one_on_bert
-    # tobetestd = repeat_actualBERToutPUT_2lModel_fold1
-
-    # tobetestd = repeat_actualBERToutPUT_2lModel_fold0
-    tobetestd = save_hopefullyCorrect_onlyDECmdl_bert_embs_fold1
-    tobetestd = ongoing3lrunfold1
-    tobetestd = ongoing3lrunfold1
-    tobetestd = ongoing3lrunfold2.copy()
-    tobetestd.extend(ongoing3lrunfold1_2ndsave)
-    tobetestd.extend(ongoing3lrunfold2)
-    tobetestd = ayer_bertGrads_fold03l.copy()
-    tobetestd.extend(ayer_bertGrads_fold13l)
-    tobetestd.extend(ayer_bertGrads_fold23l)
-    # tobetestd = swa_bert_grads_fold_0.copy()
-    # tobetestd.extend(swa_bert_grads_fold_1)
-    # tobetestd.extend(swa_bert_grads_fold_2)
-
-
-    # this is for tuning_bert_fixed_high_lr_swa_only_repeat1/fixed_high_lr_swa_only_decoder_0_1_sptype.bin mdl. Load the
-    # glbl labels as well to look at the TatLipo
-    tobetestd = swa_IEembs_grads_fold_0.copy()
-    tobetestd.extend(swa_IEembs_grads_fold_1)
-    tobetestd.extend(swa_IEembs_grads_fold_2)
-
-    swa_sep_pe_0 = pickle.load(open("run_swa_1_2", "rb"))
-    swa_sep_pe_1 = pickle.load(open("run_swa_0_2", "rb"))
-    swa_sep_pe_2 = pickle.load(open("run_swa_0_1", "rb"))
-    tobetestd = swa_sep_pe_0.copy()
-    tobetestd.extend(swa_sep_pe_1)
-    tobetestd.extend(swa_sep_pe_2)
-
-    swa_IEembs_grads_fold_1 = pickle.load(open("swa_trained_full_emb_grds_fold1.bin", "rb"))
-    swa_IEembs_grads_fold_2 = pickle.load(open("swa_trained_full_emb_grds_fold2.bin", "rb"))
-
-    # sp_type_preds = {k: ind2glbl_lbl[v] for k,v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
-    #                                   "fixed_high_lr_swa_only_decoder_0_1_best_sptype.bin", "rb")).items()}
-    # sp_type_preds.update({k: ind2glbl_lbl[v] for k, v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
-    #                                                                  "fixed_high_lr_swa_only_decoder_0_2_best_sptype.bin",
-    #                                                                  "rb")).items()})
-    #
-    # sp_type_preds.update({k: ind2glbl_lbl[v] for k, v in pickle.load(open("tuning_bert_fixed_high_lr_swa_only_repeat1/"
-    #                                                                  "fixed_high_lr_swa_only_decoder_1_2_best_sptype.bin",
-    #                                                                  "rb")).items()})
-
-    # print(len(tobetestd))
-
-    # tobetestd = ayer_IEgrads_fold13l.copy()
-    # tobetestd.extend(ayer_IEgrads_fold23l)
-    # tobetestd.extend(ayer_IEgrads_fold03l)
-    # print(len(tobetestd))
-
-
-    # tobetestd = swa_IEembs_grads_fold_1.copy()
-    # tobetestd.extend(swa_IEembs_grads_fold_1)
-    # tobetestd.extend(swa_IEembs_grads_fold_2)
-
-    # tobetestd = remake_ayer_bertGrads_fold23l
-    # tobetestd = ongoing3lrunfold0
-    # tobetestd = idkanymore
-    swa_sep_pe_added_oh_on_gen_0 = pickle.load(open("added_oh_gen_fold0.bin", "rb"))
-    swa_sep_pe_added_oh_on_gen_1 = pickle.load(open("added_oh_gen_fold1.bin", "rb"))
-    swa_sep_pe_added_oh_on_gen_2 = pickle.load(open("added_oh_gen_fold2.bin", "rb"))
-    tobetestd = swa_sep_pe_added_oh_on_gen_0.copy()
-    tobetestd.extend(swa_sep_pe_added_oh_on_gen_1)
-    tobetestd.extend(swa_sep_pe_added_oh_on_gen_2)
+    sequences_and_grad_values = []
+    for f in files:
+        if len(sequences_and_grad_values) == 0:
+            sequences_and_grad_values = pickle.load(open(f, "rb"))
+        else:
+            sequences_and_grad_values.extend(pickle.load(open(f, "rb")))
     ss = set()
     tbt = []
-    for s, a1,a2,a3 in tobetestd:
+    for s, a1,a2,a3 in sequences_and_grad_values:
         if s not in ss:
             tbt.append((s,a1,a2,a3))
             ss.add(s)
-    tobetestd = tbt
-    # tobetestd = simpler_layer_norm_word_embs
+    sequences_and_grad_values = tbt
     norm_values = np.zeros(150)
     counts = np.zeros(150)
     norm_values_sp1 = np.zeros(60)
     counts_sp1 = 0
     norm_values_sp2 = np.zeros(60)
     counts_sp2 = 0
-    normalized_Tat_values = []
     motif_test = "FLK"
     seqs2glbl_lbl = {}
     for t in ['train', 'test']:
@@ -4353,15 +3790,13 @@ def visualize_inp_gradients():
     all_norm_values = []
     all_cs_positions = []
     all_tat_seqs = []
-    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
-        if lbls[0] == "T" and seqs2glbl_lbl[seq] == "TAT":# and seq2lbls[seq][0] == "T":
+    for seq, lbls, spTypeGrds, spCSgrds in sequences_and_grad_values:
+        if lbls[0] == "T" and seqs2glbl_lbl[seq] == "TAT":
             if motif_test in seq[:lbls.rfind("T")] and seq[-3+seq.find(motif_test):+seq.find(motif_test)-1] == "RR":
                 rr_seq = seq.find(motif_test)
                 right5_hydro_vals.append([hydro_vals[s_] for s_ in seq[rr_seq:rr_seq+15]])
                 right5_hydro_aas.append(seq[rr_seq:rr_seq+5])
                 normalized_C_cs_values = np.array(spTypeGrds) / np.sum(spTypeGrds)
-                # if 5<rr_seq <10:
-                #     normalized_Tat_values.append(normalized_C_cs_values[rr_seq-5:rr_seq+27])
                 norm_values[75-rr_seq:75+len(seq)-rr_seq]+=normalized_C_cs_values
                 counts[75-rr_seq:75+len(seq)-rr_seq]+= np.ones(len(seq))
                 current_norm_val = np.zeros(150)
@@ -4370,7 +3805,6 @@ def visualize_inp_gradients():
                 all_cs_positions.append(lbls.rfind("T"))
                 avg_cs_pos.append(lbls.rfind("T")-rr_seq)
                 all_tat_seqs.append(seq)
-                print(lbls.rfind("T"), rr_seq, seq[-3+seq.find(motif_test):+seq.find(motif_test)+3])
         if lbls[0] == "S" and seq2lbls[seq][0] == "S" and len(seq) >= 60:
             norm_values_sp1 += np.array(spTypeGrds[:60]) / np.sum(spTypeGrds[:60])
             counts_sp1 += 1
@@ -4383,100 +3817,18 @@ def visualize_inp_gradients():
             start_ind = i
         elif counts[i] in [0, 1] and start_ind != 0 and end_ind == 0:
             end_ind = i-1
-    print(max(counts), np.argmax(norm_values) - start_ind, counts[np.argmax(norm_values)])
     normalized_Tat_values = norm_values[start_ind:end_ind]/counts[start_ind:end_ind]
     xticks_str = " "*(75-start_ind - 3) + "RRXFLK" + " "* (len(normalized_Tat_values)- 75 + start_ind - 3)
-    xticks = [s for s in xticks_str]
     motif_pos = xticks_str.find("RRXFLK")
-    import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
     mpl.rcParams['font.family'] = "Arial"
-    from matplotlib.ticker import MultipleLocator, AutoMinorLocator
     fig, axs = plt.subplots(2, 1,figsize=(8, 6))
-    # plt.bar(range(len(normalized_Tat_values))[:motif_pos], normalized_Tat_values[:motif_pos], color='#1f77b4')
-    # plt.bar(range(len(normalized_Tat_values))[motif_pos:motif_pos+6], normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
-    # plt.bar(range(len(normalized_Tat_values))[motif_pos+6:], normalized_Tat_values[motif_pos+6:], color='#1f77b4')
-    left_segment, motif_segment, right_segment = [(x,y) for x,y in zip(range(motif_pos), normalized_Tat_values[:motif_pos])],\
-                                                 [(x, y) for x, y in zip(range(motif_pos-1, motif_pos + 7), normalized_Tat_values[motif_pos-1:motif_pos+7])],\
-                                                 [(x, y) for x, y in zip(range(motif_pos+6, len(normalized_Tat_values)), normalized_Tat_values[motif_pos + 6:])]
     inbetween_residues_mean_1 = (normalized_Tat_values[motif_pos] + normalized_Tat_values[motif_pos-1])/2
     inbetween_residues_mean_2 = (normalized_Tat_values[motif_pos+5] + normalized_Tat_values[motif_pos+6])/2
 
     box = axs[0].get_position()
     axs[0].set_position([box.x0 + box.width * 0.1, box.y0 + box.height * 0.3, box.width * 0.95, box.height * 0.85])
-    # print(all_norm_values)
-    # exit(1)
-    def norm_seq(vals):
-        s_ind = 0
-        e_ind = 0
-        for index_, v in enumerate(vals):
-            if v != 0 and s_ind == 0:
-                s_ind = index_
-            if s_ind != 0 and v == 0 and e_ind == 0:
-                e_ind = index_
 
-        norm_val = 0.02
-        max_, min_ = np.max(vals), np.min(vals[s_ind:e_ind])
-        new_vals = [0 for _ in range(s_ind)]
-        new_vals.extend([norm_val*(nv_-min_)/(max_-min_) for nv_ in vals[s_ind:e_ind]])
-        left_inds = 150-len(new_vals)
-        new_vals.extend([0 for _ in range(left_inds)])
-        return new_vals
-
-    # for ajk, n_v in enumerate(all_norm_values):
-    #     no = random.random()
-    #     if 0.4 <= no <= 1:
-    #         continue
-    #     strt_ind_indiv, end_ind_indiv = 0, 0
-    #     for ind_, n_v_ in enumerate(n_v):
-    #         if n_v_ != 0 and strt_ind_indiv == 0:
-    #             strt_ind_indiv = ind_
-    #         if n_v_ == 0 and strt_ind_indiv != 0 and  end_ind_indiv == 0:
-    #             end_ind_indiv = ind_
-    #     if strt_ind_indiv >= start_ind and end_ind_indiv <= end_ind:
-    #         # print(len(n_v),n_v)
-    #         # n_v = norm_seq(n_v)
-    #         # print(len(n_v),n_v)
-    #         plt_start = strt_ind_indiv - start_ind
-    #         motif_start = motif_pos-3
-    #
-    #         # axs[0].scatter(range(motif_pos, motif_pos+6),n_v[72:78], color=plt_[0].get_color(), alpha=0.3,s=1)
-    #         plt_ = axs[0].plot(range(plt_start,plt_start+(end_ind_indiv-strt_ind_indiv)), n_v[strt_ind_indiv:end_ind_indiv],linewidth=0.3,alpha=0.5)
-    #         plt_ = axs[0].plot(range(plt_start, motif_pos), n_v[strt_ind_indiv:75-3], alpha=0.5, linewidth=0.15,color=plt_[0].get_color())
-    #
-    #         axs[0].plot([motif_pos-0.5, motif_pos], [(n_v[71]+n_v[72])/2,n_v[72]], color=plt_[0].get_color(), alpha=0.7, linewidth=0.5)
-    #         axs[0].plot(range(motif_pos, motif_pos+6), n_v[72:78], color=plt_[0].get_color(), alpha=0.5, linewidth=0.7)
-    #         axs[0].plot([motif_pos+5, motif_pos+5.5], [n_v[77],(n_v[77]+n_v[78])/2], color=plt_[0].get_color(), alpha=0.7, linewidth=0.5)
-    #         axs[0].scatter([plt_start+all_cs_positions[ajk]], [n_v[strt_ind_indiv+all_cs_positions[ajk]]],s=2,color=plt_[0].get_color())
-    #         residues = all_tat_seqs[ajk][all_tat_seqs[ajk].find("FLK")+3:all_tat_seqs[ajk].find("FLK")+15]
-    #         hydros = [hydro_vals[r_] for r_ in residues]
-    #         print(hydros,residues)
-    #         if hydros[0] >= 2.5:
-    #             axs[0].scatter([motif_pos+6], [n_v[78]],
-    #                         color=plt_[0].get_color(), alpha=0.7, s=0.2)
-    #         elif hydros[1] >=2.5 and hydros[1] > hydros[0]:
-    #             axs[0].scatter([motif_pos+7], [n_v[79]],
-    #                         color=plt_[0].get_color(), alpha=0.7, s=0.2)
-    #         elif hydros[2]  >= 2.5 and hydros[2] > hydros[1] > hydros[0]:
-    #             axs[0].scatter([motif_pos + 8], [n_v[80]],
-    #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
-    #         elif hydros[3]  >= 2.5 and hydros[3] > hydros[2] > hydros[1]> hydros[0]:
-    #             axs[0].scatter([motif_pos + 9], [n_v[81]],
-    #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
-    #         elif hydros[4]  >= 2.5 and hydros[4] > hydros[3] > hydros[2]> hydros[1]> hydros[0]:
-    #             axs[0].scatter([motif_pos + 10], [n_v[82]],
-    #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
-    #         elif hydros[5]  >= 2.5 and hydros[5] > hydros[4] > hydros[3]> hydros[2]> hydros[1]> hydros[0]:
-    #             axs[0].scatter([motif_pos + 11], [n_v[83]],
-    #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
-    #         elif hydros[6]  >= 2.5 and  hydros[6] > hydros[5] > hydros[4] > hydros[3]> hydros[2]> hydros[1]> hydros[0]:
-    #             axs[0].scatter([motif_pos + 12], [n_v[83]],
-    #                            color=plt_[0].get_color(), alpha=0.7, s=0.2)
-    #         else:
-    #             print(hydros[1])
-
-            # axs[0].plot(range(plt_end-motif_pos-6, end_ind_indiv), n_v[78:end_ind_indiv], color=plt_[0].get_color(), alpha=0.3)
-    # axs[0].set_xlim(15,30)
     axs[0].plot(range(motif_pos), normalized_Tat_values[:motif_pos], color='#1f77b4', label='Other Tat SP residues')
     axs[0].plot([motif_pos-1, motif_pos-0.5], [normalized_Tat_values[motif_pos-1], inbetween_residues_mean_1], color='#1f77b4')
     axs[0].plot([motif_pos-0.5, motif_pos], [inbetween_residues_mean_1, normalized_Tat_values[motif_pos]], color='#ff7f0e')
@@ -4486,28 +3838,18 @@ def visualize_inp_gradients():
     axs[0].plot([motif_pos+5.5, motif_pos+6], [inbetween_residues_mean_2, normalized_Tat_values[motif_pos+6]], color='#1f77b4')#'#1f77b4')
 
     axs[0].plot(range(motif_pos+6, len(normalized_Tat_values)), normalized_Tat_values[motif_pos + 6:], color='#1f77b4')
-    # axs[0].plot([motif_pos-0.5, motif_pos-0.5], [0,1.1*max(normalized_Tat_values)], color='black', linestyle='dashed',linewidth=0.5)
-    # axs[0].plot([motif_pos+5.5, motif_pos+5.5], [0,1.1*max(normalized_Tat_values)], color='black',linestyle='dashed',linewidth=0.5)
-    xtics = " _"*(motif_pos+2) + "RRXFLK_"+ " _"*(len(normalized_Tat_values)-motif_pos-4)
-    # axs[0].set_xticks(list(range(len(normalized_Tat_values))))
-    # axs[0].set_xticks(list(range(len(normalized_Tat_values))))
     axs[0].set_ylabel('SP type residue scores',  fontsize=12.5)
     axs[0].xaxis.set_major_locator(MultipleLocator(11))
     axs[0].xaxis.set_major_formatter('{x:.0f}')
     axs[0].xaxis.set_minor_locator(MultipleLocator(1))
     axs[0].set_yticks([0, 0.01,0.02,0.03,0.04,0.05])
     axs[0].set_yticklabels([0, 0.01,0.02,0.03,0.04,0.05], fontsize=12.5)
-    lbls =np.array(list(range(len(normalized_Tat_values)))) - motif_pos
     lbls = [5, -11, -0, 11 ,22, 33]
     axs[0].set_xticklabels([str(n) for n in lbls ],fontsize=12.5)
     axs[0].set_xlim(-2, 89)
-    # axs[0].arrow(0,0,10,0.03, width=0.001)
-    # axs[0].arrow(42,0.03,-20,0, width=0.0001)
     for ind_ in range(0,50):
         top_val = (normalized_Tat_values[ind_]+normalized_Tat_values[ind_+1])/2
         axs[0].plot([ind_+0.5, ind_+0.5],[-0.02,top_val], linestyle='--', color='black', linewidth=0.3,alpha=0.3)
-    text = "RRXFLK"
-    max_motif,min_motif = 0, 0
     motif_positions = []
     seqs = ["MQRRHFLKNAAAALAALGLPTLPQWALAAKAVGLRRLGQPQPFDYAWLKGQARELANAPYKSHKQLLPGP",
             "MPNRRDFLKTAAFATLGSGIAVSQVLAGECMPSAIHINKYGIGGKMKMTFFPYELKLRHVFTVATYSRTT",
@@ -4517,14 +3859,11 @@ def visualize_inp_gradients():
             ]
     for s in all_tat_seqs:
         motif_positions.append(s.find("FLK"))
-    for i_ in np.argsort(motif_pos):
-        print(all_tat_seqs[i_])
     for seq_ind, s in enumerate(seqs):
         start = motif_pos - s.find("FLK")+2 if "FLK" in s else -1
         dotdotdot = type(s) == list
         for ind_, s_ in enumerate(s[:60]):
             if dotdotdot:
-                print(start + ind_)
                 if 17 < start+ind_ < 24:
                     axs[0].annotate(".", xy=(13, normalized_Tat_values[13]),
                                     xytext=(start + ind_ + 0.80, 0.0035 * (1 - seq_ind)), fontsize=4,color='#ff7f0e')
@@ -4533,7 +3872,6 @@ def visualize_inp_gradients():
                     axs[0].annotate(".", xy=(13, normalized_Tat_values[13]),
                                     xytext=(start + ind_ + 0.80, 0.0035 * (1 - seq_ind) - 0.002), fontsize=4,color='#ff7f0e')
                 elif 6<start+ind_ < 39:
-                    # axs[0].annotate(s_, xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, 0.0035*(1-seq_ind)), fontsize=4)
                     axs[0].annotate(".", xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80 + 0.1, 0.0035*(1-seq_ind) -0.000), fontsize=4)
                     axs[0].annotate(".", xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80 + 0.1, 0.0035*(1-seq_ind) - 0.001), fontsize=4)
                     axs[0].annotate(".", xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80 + 0.1, 0.0035*(1-seq_ind) - 0.002), fontsize=4)
@@ -4551,104 +3889,16 @@ def visualize_inp_gradients():
                     axs[0].annotate("...", xy=(13, normalized_Tat_values[13]), xytext=(start+ind_+0.80, 0.0035*(1-seq_ind)+y_offset), fontsize=4)
 
 
-    # for ind_ in range(18,18+len(text)):
-    #     axs[0].annotate(text[ind_-18], xy=(13, normalized_Tat_values[13]), xytext=(ind_+0.6, 0.005), fontsize=5)
-    #     axs[0].annotate(r'$\sigma$', xy=(13, normalized_Tat_values[13]), xytext=(ind_+0.6, 0), fontsize=5)
-    # print(all_tat_seqs)
-    # for i in range(6):
-    #     axs[0].annotate("RRXFLK", xy=(22.8, normalized_Tat_values[75 - start_ind + 1]), xytext=(1, 0.025),
-    #                     arrowprops=dict(arrowstyle="->", linewidth=0.5), fontsize=12.5, color='#ff7f0e')
-    #
-    # axs[0].annotate("RRXFLK", xy=(22.8, normalized_Tat_values[75-start_ind+1]), xytext=(1, 0.025),
-    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=12.5, color='#ff7f0e')
-    # axs[0].annotate("", xy=(13, normalized_Tat_values[13]), xytext=(23, 0.005),
-    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=12.5)
-    # axs[0].annotate("Other residues", xy=(34, normalized_Tat_values[34]), xytext=(21, 0.001),
-    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=12.5, color='#1f77b4')
-    # axs[0].annotate("Hydrophobic residue (KD=2.09)", xy=(26, normalized_Tat_values[26]), xytext=(29, 0.025),
-    #             arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=5, color='#1f77b4')
-    # # axs[0].arrow(-100,0,100,100, width=1)
-    # # axs[0].arrow(-100,-100,100,100, width=1)
-    # # axs[0].arrow(5,5,100,100, width=1)
-    # # axs[0].arrow(5,5,100,100, width=1)
-    # # axs[0].arrow(5,5,100,100, width=1)
-    # # axs[0].text(14,14, "ASD")
-    # axs[0].annotate("", xy=(0.5, 0.5), xytext=(0, 0),
-    #             arrowprops=dict(arrowstyle="->"))
-    # axs[0].set_ylim(0, 1.1 * max(normalized_Tat_values))
     axs[0].set_ylim(-0.02,0.03)
-    # axs[0].set_ylim(-0.02,0.1)
-
     axs[0].set_xlim(7,40)
     axs[0].set_xlabel("Residue position (relative to RRXFLK motif of Tat/SPase I)", fontsize=12.5)
-    # plt.show()
-    # lc = LineCollection([left_segment, motif_segment, right_segment])
-    # axs.add_collection(lc)
-    # axs.set_xlim(0,40)
-    # plt.show()
-    # plt.plot(range(len(normalized_Tat_values))[:motif_pos], normalized_Tat_values[:motif_pos], color='#1f77b4')
-    # plt.plot(range(len(normalized_Tat_values))[motif_pos:motif_pos+6], normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
-    # plt.plot(range(len(normalized_Tat_values))[motif_pos+6:], normalized_Tat_values[motif_pos+6:], color='#1f77b4')
-    #
-    # for i in range(60):
-    #     if i == 0:
-    #         val = norm_values_sp1[i]/ counts_sp1
-    #         plt.plot([i-0.5,i+0.5], [val, val], color='green',
-    #                 label='sp1 comparison')
-    #     else:
-    #         val = norm_values_sp1[i]/ counts_sp1
-    #         plt.plot([i - 0.5, i + 0.5], [val, val] ,color='green')
-    # for i in range(60):
-    #     if i == 0:
-    #         val = norm_values_sp2[i]/ counts_sp2
-    #         plt.plot([i-0.5,i+0.5], [val, val], color='black',
-    #                 label='sp2 comparison')
-    #     else:
-    #         val = norm_values_sp2[i]/ counts_sp2
-    #         plt.plot([i - 0.5, i + 0.5],[val, val], color='black')
-    # # plt.bar(range(len(norm_values_sp2)), norm_values_sp2/counts_sp2, alpha=0.3, color='red', label='sp2 comparison')
-    # plt.xticks(list(range(len(normalized_Tat_values))), xticks)
-    # plt.show()
-    # tobetestd = simpler_mdl_word_embs
-    # tobetestd = bert_embs_test
-    # tobetestd = preds_and_probs_IE_seetLOTTASEQS_sanityCheck
-    tobetestd = ayer_IEgrads_fold13l.copy()
-    tobetestd.extend(ayer_IEgrads_fold23l)
-    tobetestd.extend(ayer_IEgrads_fold03l)
-
-    tobetestd = swa_IEembs_grads_fold_0.copy()
-    tobetestd.extend(swa_IEembs_grads_fold_1)
-    tobetestd.extend(swa_IEembs_grads_fold_2)
-
-    tobetestd = swa_sep_pe_0.copy()
-    tobetestd.extend(swa_sep_pe_1)
-    tobetestd.extend(swa_sep_pe_2)
-
-    swa_sep_pe_added_oh_on_gen_0 = pickle.load(open("added_oh_gen_fold0.bin", "rb"))
-    swa_sep_pe_added_oh_on_gen_1 = pickle.load(open("added_oh_gen_fold1.bin", "rb"))
-    swa_sep_pe_added_oh_on_gen_2 = pickle.load(open("added_oh_gen_fold2.bin", "rb"))
-    tobetestd = swa_sep_pe_added_oh_on_gen_0.copy()
-    tobetestd.extend(swa_sep_pe_added_oh_on_gen_1)
-    tobetestd.extend(swa_sep_pe_added_oh_on_gen_2)
 
     normalized_sp1_cs_values_pm_5aas = np.zeros(150)
     normalized_sp1_cs_values_pm_5aas_counts = np.zeros(150)
-    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
-        # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
-        # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
-        #     true_lbl = seq2lbls[seq]
-        #     print(lbls[lbls.rfind("L") + 1])
-        #     print(seq)
-        #     print(lbls)
-        #     print(true_lbl)
-
-        # if seq2lg[seq] == "TATLIPO" and sp_type_preds[seq] == "TATLIPO":
-        #     print(lbls, seq2lbls[seq][0])
-        #     exit(1)
+    for seq, lbls, spTypeGrds, spCSgrds in sequences_and_grad_values:
         if lbls[0] == "S" and seq2lbls[seq][0] == "S":
             normalized_C_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
             normalized_C_cs_values = normalized_C_cs_values[:len(seq)]
-            # normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spCSgrds)
             cs_pred = lbls[:-1].rfind("S") + 1
             if cs_pred < 60:
                 normalized_sp1_cs_values_pm_5aas[75-cs_pred:75+len(seq)-cs_pred] += normalized_C_cs_values
@@ -4659,24 +3909,12 @@ def visualize_inp_gradients():
             start_ind_sp1 = i
         elif normalized_sp1_cs_values_pm_5aas_counts[i] in [0] and start_ind_sp1 != 0 and end_ind_sp1 == 0:
             end_ind_sp1 = i-1
-    # print(start_ind_sp1, end_ind_sp1)
-    # exit(1)
-    #
     normalized_C_cs_values_pm_5aas = np.zeros(150)
     normalized_C_cs_values_pm_5aas_counts = np.zeros(150)
-    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
-        # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
-        # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
-        #     true_lbl = seq2lbls[seq]
-        #     print(lbls[lbls.rfind("L") + 1])
-        #     print(seq)
-        #     print(lbls)
-        #     print(true_lbl)
+    for seq, lbls, spTypeGrds, spCSgrds in sequences_and_grad_values:
         if lbls[0] == "L" and seq2lbls[seq][0] == "L" and lbls.rfind("L")+1 < len(seq) and seq[lbls.rfind("L")+1] == "C":
             normalized_C_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
             normalized_C_cs_values = normalized_C_cs_values[:len(seq)]
-            # print(len(normalized_C_cs_values), len(seq))
-            # normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spCSgrds)
             cs_pred = lbls[:-1].rfind("L") + 1
             normalized_C_cs_values_pm_5aas[75-cs_pred:75+len(seq)-cs_pred] += normalized_C_cs_values
             normalized_C_cs_values_pm_5aas_counts[75-cs_pred:75+len(seq)-cs_pred] += 1
@@ -4686,7 +3924,6 @@ def visualize_inp_gradients():
             start_ind = i
         elif normalized_C_cs_values_pm_5aas[i] in [0, 1] and start_ind != 0 and end_ind == 0:
             end_ind = i-1
-    print(max(normalized_C_cs_values_pm_5aas_counts))
     normalized_C_cs_values_pm_5aas = normalized_C_cs_values_pm_5aas[start_ind:end_ind] / normalized_C_cs_values_pm_5aas_counts[start_ind:end_ind]
     inbetween_cysteine1 = (normalized_C_cs_values_pm_5aas[75-start_ind-1]+normalized_C_cs_values_pm_5aas[75-start_ind])/2
     inbetween_cysteine2 = (normalized_C_cs_values_pm_5aas[75-start_ind] + normalized_C_cs_values_pm_5aas[75-start_ind+1])/2
@@ -4695,7 +3932,6 @@ def visualize_inp_gradients():
     axs[1].set_position([box.x0 + box.width * 0.1, box.y0+box.height*0.1, box.width * 0.95, box.height * 0.85])
 
     axs[1].set_ylabel('CS residue scores', fontsize=12.5)
-    print(start_ind)
     axs[1].xaxis.set_major_locator(MultipleLocator(18))
     axs[1].xaxis.set_major_formatter('{x:.0f}')
     axs[1].xaxis.set_minor_locator(MultipleLocator(1))
@@ -4719,9 +3955,6 @@ def visualize_inp_gradients():
     normalized_sp1_cs_values_pm_5aas = normalized_sp1_cs_values_pm_5aas[start_ind_sp1:end_ind_sp1]/ normalized_sp1_cs_values_pm_5aas_counts[start_ind_sp1:end_ind_sp1]
     align_sp1sp2 = start_ind-start_ind_sp1
     start_ind_sp1 = start_ind_sp1 + align_sp1sp2
-    print(start_ind_sp1,start_ind,len(normalized_sp1_cs_values_pm_5aas))
-    print(normalized_C_cs_values_pm_5aas, len(normalized_C_cs_values_pm_5aas))
-
     normalized_sp1_cs_values_pm_5aas = normalized_sp1_cs_values_pm_5aas[align_sp1sp2:]
 
     inbetween_sp1cs_1 = (normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1-1]+normalized_sp1_cs_values_pm_5aas[75-start_ind_sp1])/2
@@ -4743,106 +3976,7 @@ def visualize_inp_gradients():
                 arrowprops=dict(arrowstyle="->",linewidth=0.5), fontsize=11.5, color='red')
     axs[1].set_xlim(0,50)
     plt.savefig("some_plot_imp_grads.pdf")
-    exit(1)
-    plt.show()
 
-
-
-
-    plt.plot(range(motif_pos, motif_pos + 6), normalized_Tat_values[motif_pos:motif_pos+6], color='#ff7f0e')
-
-    plt.plot([motif_pos+5, motif_pos+5.5], [normalized_Tat_values[motif_pos+5], inbetween_residues_mean_2], color='#ff7f0e', label='Twin arginine motif')
-    plt.plot([motif_pos+5.5, motif_pos+6], [inbetween_residues_mean_2, normalized_Tat_values[motif_pos+6]], color='#1f77b4')#'#1f77b4')
-
-    plt.plot(range(motif_pos+6, len(normalized_Tat_values)), normalized_Tat_values[motif_pos + 6:], color='#1f77b4')
-    plt.plot([motif_pos-0.5, motif_pos-0.5], [0,1.1*max(normalized_Tat_values)], color='black', linestyle='dashed',linewidth=0.5)
-    plt.plot([motif_pos+5.5, motif_pos+5.5], [0,1.1*max(normalized_Tat_values)], color='black',linestyle='dashed',linewidth=0.5)
-    plt.xticks([motif_pos+3], ["RRXFLK"])
-    plt.ylim(0, 1.1 * max(normalized_Tat_values))
-
-    plt.bar(list(range(end_ind-start_ind)),(normalized_C_cs_values_pm_5aas[start_ind:end_ind]/normalized_C_cs_values_pm_5aas_counts[start_ind:end_ind]))
-    plt.xticks([75-start_ind], ["Cysteine (+1 CS)"])
-    plt.show()
-    # normalized_C_cs_values_pm_5aas = []
-    # for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
-    #     # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
-    #     # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
-    #     #     true_lbl = seq2lbls[seq]
-    #     #     print(lbls[lbls.rfind("L") + 1])
-    #     #     print(seq)
-    #     #     print(lbls)
-    #     #     print(true_lbl)
-    #     if lbls[0] == "S" and seq2lbls[seq][0] == "S":
-    #         normalized_C_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
-    #         # normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spCSgrds)
-    #         cs_pred = lbls[:-1].rfind("S") + 1
-    #         if 5 < cs_pred < len(lbls) - 7:
-    #             normalized_C_cs_values_pm_5aas.append(normalized_C_cs_values[cs_pred-5:cs_pred+7])
-    plt.bar(list(range(12)), np.mean(np.stack(normalized_C_cs_values_pm_5aas), axis=0))
-    plt.title("sec/SPII cleavage site")
-    plt.show()
-    exit(1)
-
-    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
-        # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
-        # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
-        #     true_lbl = seq2lbls[seq]
-        #     print(lbls[lbls.rfind("L") + 1])
-        #     print(seq)
-        #     print(lbls)
-        #     print(true_lbl)
-        if lbls[0] == "S" and seq2lbls[seq][0] == "S":
-            normalized_secSPI_cs_values = np.array(spCSgrds)/np.sum(spCSgrds)
-            # normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spCSgrds)
-            cs_pred = lbls[:lbls.find("ES")].rfind("S") + 1
-            if 10 < cs_pred < len(lbls) - 5:
-                if len(normalized_secSPI_cs_values[cs_pred-10:cs_pred+7]) != 12:
-                    print(cs_pred, lbls)
-                normalized_secSPI_cs_values_pm_5aas.append(normalized_secSPI_cs_values[cs_pred-10:cs_pred+7])
-    print(len(normalized_secSPI_cs_values_pm_5aas))
-    plt.bar(list(range(17)), np.mean(np.stack(normalized_secSPI_cs_values_pm_5aas), axis=0))
-    plt.title("sec/SPI comparison CS comparison")
-    plt.show()
-
-    for seq, lbls, spTypeGrds, spCSgrds in tobetestd:
-        # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
-        # if seq[lbls.rfind("L") + 1] != "C" and lbls[0] == "L":
-        #     true_lbl = seq2lbls[seq]
-        #     print(lbls[lbls.rfind("L") + 1])
-        #     print(seq)
-        #     print(lbls)
-        #     print(true_lbl)
-        if lbls[0] == "S" and seq2lbls[seq][0] == "S":
-            normalized_C_cs_values = np.array(spTypeGrds)/np.sum(spTypeGrds)
-            cs_pred = lbls[:lbls.find("ES")].rfind("S") + 1
-            normalized_secSPI_sptype_values.append(normalized_C_cs_values[:20])
-    plt.bar(list(range(20)), np.mean(np.stack(normalized_secSPI_sptype_values), axis=0))
-    plt.title("sec/SPI comparison SPtype comparison")
-    plt.show()
-
-
-
-
-
-    plt.bar(list(range(len(seq))), spCSgrds,)
-    plt.xticks(list(range(len(seq))), ["{}\n{}\n{}".format(s,l,tl) for s,l,tl in zip(seq, l_, true_lbl)])
-    plt.title(letter2type[l_[0]] + " cleavage site")
-    plt.show()
-    for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs_IE_seetLOTTASEQS:
-        # for seq, lbls, spTypeGrds, spCSgrds in preds_and_probs:
-        if lbls[0] in ["L", "T"]:#letter2type.keys():
-            l_ = lbls[:len(seq)]
-            spCSgrds = spCSgrds[:len(seq)]
-            spTypeGrds = spTypeGrds[:len(seq)]
-            true_lbl = seq2lbls[seq]
-            plt.bar(list(range(len(seq))), spCSgrds,)
-            plt.xticks(list(range(len(seq))), ["{}\n{}\n{}".format(s,l,tl) for s,l,tl in zip(seq, l_, true_lbl)])
-            plt.title(letter2type[l_[0]] + " cleavage site")
-            plt.show()
-            plt.bar(list(range(len(seq))), spTypeGrds)
-            plt.xticks(list(range(len(seq))), ["{}\n{}\n{}".format(s,l,tl) for s,l,tl in zip(seq, l_, true_lbl)])
-            plt.title(letter2type[l_[0]] + " SP type")
-            plt.show()
 
 def rename():
     names = os.listdir("tuning_bert_fixed_high_lr_swa_only_repeat2")
@@ -4862,7 +3996,6 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
         len_ = len(sequence) // 2
         sequence = sequence[:len_]
         seq2id[sequence] = id.split("|")[-1]
-    all_ids = []
     for fold in folds:
         test_fold = list({0,1,2}-set(fold))[0]
         file = folder+mdl_name+"_{}_{}_sp_type_test.bin".format(*fold)
@@ -4871,8 +4004,6 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
             if int(seq2id[res[0]]) == int(test_fold):
                 res_dict[res[0]] = res[1]
     id2seq, id2lg, id2type, id2truelbls = extract_id2seq_dict()
-    seq2id = {v: k for k, v in id2seq.items()}
-    unique_bench_seqs = set(id2seq.values())
     life_grps, seqs, true_lbls,pred_lbls = [], [],[],[]
     for id_ in id2lg.keys():
         life_grps.append(id2lg[id_]+"|"+id2type[id_])
@@ -4905,1474 +4036,37 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
-    # extract_performance_over_tolerance()
+    plot_perf_over_data_perc()
+    exit(1)
+    plot_sp6_vs_tnmt_mcc()
+    exit(1)
+
+    visualize_inp_gradients(files=["added_oh_gen_fold0.bin", "added_oh_gen_fold1.bin", "added_oh_gen_fold2.bin"])
+    plot_sp6_vs_tnmt()
+
+
+    compute_mcc_sp_only_mdls()
+
+    plot_comparative_performance_sp1_mdls()
     mdl2results = extract_all_param_results(only_cs_position=False,
                                             result_folder="tuning_bert_fixed_high_lr_swa_only_repeat74/",
                                             compare_mdl_plots=False,
                                             remove_test_seqs=False,
                                             benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat75/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat71/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
 
 
-    plot_comparative_performance_sp1_mdls()
-    visualize_inp_gradients()
-    plot_sp6_vs_tnmt()
-    plot_sp6_vs_tnmt_mcc()
-    plot_perf_over_data_perc()
-    # compute_mcc_sp_only_mdls()
-    # exit(1)
-    #
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat13/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat12/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat6/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # visualize_inp_gradients()
-    #
-    # plot_comparative_performance_sp1_mdls()
-    # plot_sp6_vs_tnmt_violin()
-
-    # exit(1)
-    # plot_compare_pos_nopos()
-    # extract_performance_over_tolerance()
-    # compare_experiment_results()
-    # rename()
-    # exit(1)
-    # --anneal_epochs 20 --anneal_start 20, train for longer. Still not good, will try without fine-tuning
-    # PE at all
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_repeat_val_on_f1s/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=False)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat29/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat28/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat27/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    #
-    # save here the rest of current run
-    # extra oh on generator
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat59/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat56/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat55/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat54/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat53/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat52/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-
-    # 128 pe extra dims; 32 additional emb dims; anneal_start anneal_eps 20/20
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat51/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # 128 pe extra dims; 32 additional emb dims; anneal_start anneal_eps 20/20
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat50/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat49/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # pe extra dims heads=32 0.819; higher non-w average mcc than anything else maybe
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat48/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # additional pe extra dims 0.818; no lipobox training
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat47/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # lipobox labels extra dims, 32 heads dims 0.8102435301349253
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat46/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # lipoboc labels (repeat) train w/o extra dims 0.81605
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat45/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # lipobox labels (repeat) train, with pe extra dims 0.7999
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat44/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # lipobox labels train, no pe extra dims; 0.819
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat42/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # lipobox labels train, with pe extra dims; 0.8154
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat43/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-
-
-
-    # 64 pe extra dims 0.788 quite bad
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat41/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # 128/anneal etc extra pe f1 0.821 or so
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat40/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # 0.81697; repeat pe extra dims 128, annealed
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat39/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat38/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # 0.8119 (128 extra dims 3 laters x4 exp dim)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat37/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # 128 extra dims, annealed, 5 layers x2 exp dim; 0.812
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat36/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # both larger model (5 layers, ffx 2x) and pe_extra dims; 0.77848
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat35/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # repeat adding 128 dims anneal 20/20 0.8166; mcc2/mcc1 (sp6/tsi) 0.836/0.842 mcc1 0.8578/0.851
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat34/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    #  lucky run again... 5 layers, ffd 2x (deeper, less wide); 0.8161024130466082; non-w F1 0.7056/0.74575
-    # non - w average sp6: 0.8178055555555556
-    # non - waverage tsignal: 0.8265448697886194
-    # mcc1  w  average   sp6 / tsignal: 0.8578189390618148 0.8607205519062273
-    # mcc2  w  average  sp6 / tsignal: 0.8365590800951624 0.8354707070968285
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat33/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # 3 layers, ffd 4x 128 pe extra dims (sp6/tsignal) 0.836 vs 0.848; mcc2 0.857 vs 0.855; non-w average mcc (sp6/tsignal): 0.817/0.835;
-    # non-w f1 scores 0.736/0.705; w f1 0.0.822882594764844
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat32/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # 5 layers, ffd 2x (deeper, less wide); 0.8235659065834398... OK?... mcc2 ( 0.857/0.860) mcc1 (0.836/0.835) and
-    # non-w average mcc (sp6/tsignal) 0.817/0.826
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat31/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    #  sine-based extra pos enc, f1 result 0.811 (256 extra dims for pos enc); 0.0001 constant lr. Non-weighted summary 0.7056906719071813 0.7088847209792207 (sp6/tsignal)
-    # worse weighted/non-weighted (ts/sp6) MCC1: 0.836/0.813   (ts/sp6) MCC2: 0.857/0.838
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat30/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat26/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat25/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat24/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat23/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat22/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # reinit adam w lr =0.0001 on swa with fixed; 0.81426163971178
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat21/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat20/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat19/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat18/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-
-    # no lg 0.818 very nice; reinit swa decoder
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat17/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # 0.799; lr sched eps. Lr start 0.0002, end on /20 smaller; eps anneal 10-20
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat16/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # reinit optimizer for swa training 0.815 ID  ONT KNOW
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat15/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat14/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # repeat8_wValData_swa_onl reeat 0.0001 constant lr, adding val data  to training; pretty bad result
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat11/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # 0.8079
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat10/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # 0.7979 same, need to rerun.. ( these 2 below are probably with change-OPT as SGD)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat9/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat8/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-
-
-    # repeat7_swa_onlyDec_1_2 w dropout, but quite random; stopped early etc 0.8066
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat7/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # wo dropout 0.8133
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat6/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # wo dropout 0.8139
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat5/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # w dropout 8.128
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat4/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    #
-    # w dropout 8.13
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat3/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # w dropout 8.2 but different (more random) approach I think. had the number of epochs_swa=0.5 * epochs_best_mdl;
-    # possibly also had lr = 0.0002
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_fixed_high_lr_swa_only_repeat1/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # no dropout 8.18
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat2/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    visualize_validation(run="cycle_lr_swa_only_decoder_", folds=[1, 2],
-                         folder="tuning_bert_cycle_lr_swa_only_decoder/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat1/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_cycle_lr_swa_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    visualize_inp_gradients()
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat1/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # ,restrict_types=["SP", "NO_SP"])
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_actual_swa/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    # ,restrict_types=["SP", "NO_SP"])
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_high_lr_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    # ,restrict_types=["SP", "NO_SP"])
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder_swa_ctLR/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    # ,restrict_types=["SP", "NO_SP"])
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat5NoDrop_only/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    # ,restrict_types=["SP", "NO_SP"])
-
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat4_only_3l_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    # ,restrict_types=["SP", "NO_SP"])
-
-    exit(1)
-    visualize_inp_gradients()
-    exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_repeat2_only_decoder/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    #                                         # ,restrict_types=["SP", "NO_SP"])
-    #
-    # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat3_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat3_only_3l_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat2_onlyDec/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    visualize_inp_gradients()
-    exit(1)
-    #
-    # visualize_validation(run="repeat_only_decoder_", folds=[0, 1],
-    #                      folder="tuning_bert_repeat_only_decoder_/")
-    #tuning_bert_repeat_only_decoder_
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_repeat2l_only_decoder/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_only_decoder_1l/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder_2l/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat_only_decoder_/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_augment_CutSeq_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder_4l/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_linear_pos_enc_only/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    #                                         # ,restrict_types=["SP", "NO_SP"])
-    # exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_repeat2_only_decoder/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=False)
-    #                                         # ,restrict_types=["SP", "NO_SP"])
-    #
-    # exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_remove_bertL_only_decoder/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=False)
-    # exit(1)
-    # compare_experiment_results()
-    # plot_sp6_vs_tnmt()
-    # plot_perf_over_data_perc
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder_2l/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat_best_RMV1L_experiment/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
     plot_compare_pos_nopos()
-    # plot_comparative_performance_sp1_mdls()
-    # extract_performance_over_tolerance()
     lg_and_tol2_lg = extract_calibration_probs_for_mdl(model="repeat2_only_decoder_",
                                                        folder='tuning_bert_repeat2_only_decoder/',
                                                        plot=True)
 
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="one_hot_new/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="oh_training/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
 
-    # SEPARATE BERT TUNING
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat_tuningBertSeparately/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    # ,restrict_types=["SP", "NO_SP"])
-    # BERT TUNING + TSIGNAL TUNING; PRIOR BEST MODEL
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat_val_on_f1s/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    # ,restrict_types=["SP", "NO_SP"])
-    # NO BERT TUNING
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat_notuningBert/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    # ,restrict_types=["SP", "NO_SP"])
-    # BEST MODEL W BEST RESULTS <- ADD ONLY AN ENCODER ON TOP
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat2_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    # ,restrict_types=["SP", "NO_SP"])
-
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder_no_pos_enc/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat2_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder_no_pos_enc/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
-    exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_one_random_fold_run_only_dec/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True,
-    #                                         restrict_types=["SP", "NO_SP"])
-    # exit(1)
-    plot_perf_over_data_perc()
-    exit(1)
-
-
-    exit(1)
-    # plot_comparative_performance_sp1_mdls()
-    # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_random_folds_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True,
-                                            restrict_types=["SP", "NO_SP"])
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat2_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    # ,restrict_types=["SP", "NO_SP"])
-    exit(1)
-    lg_and_tol2_lg = extract_calibration_probs_for_mdl(model="repeat2_only_decoder_",
-                                                       folder='tuning_bert_repeat2_only_decoder/',
-                                                       plot=True)
-
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat2_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    # ,restrict_types=["SP", "NO_SP"])
-    exit(1)
-    #BEST MODEL YET
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_repeat2_only_decoder/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    plot_sp6_vs_tnmt()
-    exit(1)
-    plot_comparative_performance_sp1_mdls()
-    exit(1)
-    lg_and_tol2_lg = extract_calibration_probs_for_mdl(model="repeat2_only_decoder_",
-                                                       folder='tuning_bert_repeat2_only_decoder/',
-                                                       plot=True)
-    # plot_sp6_vs_tnmt()
-    exit(1)
-    plot_perf_over_data_perc()
-    exit(1)
-
-    plot_ece_over_tolerance(lg_and_tol2_lg)
-    exit(1)
-
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat2_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat_val_on_f1s/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat2_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat3_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat4_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat3_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_repeat2_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder_repeat/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
 
     visualize_validation(run="repeat_only_decoder_", folds=[0, 2],
                          folder="tuning_bert_only_decoder_repeat/")
-    visualize_validation(run="only_decoder_", folds=[0, 2],
-                         folder="tuning_bert_only_decoder/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="merge_tuning_bert_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder_repeat/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_only_decoder_15_epchs/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    plot_sp6_vs_tnmt()
-    exit(1)
-    # BEST MODEL
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # SEPARATE GLBL NO TUNED
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_non_tuned_trimmed_d/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # SEPARATE BERT-TUNING
-    # mdl2results = extract_all_param_results(only_fcs_position=False,
-    #                                         result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    lg_and_tol2_lg = extract_calibration_probs_for_mdl(model="repeat_best_experiment_highBertLr_",
-                                                       folder='tuning_bert_tune_bert_repeat_best_experiment_highBertLr/',
-                                                       plot=True)
-    plot_perf_over_data_perc()
-    exit(1)
-    plot_sp6_vs_tnmt()
-    exit(1)
-    plot_comparative_performance_sp1_mdls()
-    exit(1)
+
     plot_ece_over_tolerance(lg_and_tol2_lg)
-    exit(1)
-
-    plot_sp6_vs_tnmt()
-    exit(1)
-    # plot_comparative_performance_sp1_mdls()
-    # exit(1)
-
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-
-
-    plot_comparative_performance_sp1_mdls()
-    exit(1)
-
-    plot_perf_over_data_perc()
-    exit(1)
-    exit(1)
-
-    # checkthis_()
-    # exit(1)
-
-    rename_files()
-    exit(1)
 
 
 
     compute_diversity_within_partition()
-    # prep_sp1_sp2()
-    # exit(1)
-    # extract_compatible_phobius_binaries()
-    # exit(1)
-
-    # exit(1)
-    # create_random_split_fold_data()
-    # exit(1)
-    plot_comparative_performance_sp1_mdls()
-    exit(1)
-    # exit(1)
-    extract_compatible_binaries_predtat()
-    # exit(1)
-    extract_compatible_binaries_lipop()
-    # exit(1)
-    extract_compatible_binaries_deepsig()
-    # exit(1)
-    # Compare results only on SP/NO_SP
-    visualize_data_amount2_results()
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True,
-                                            restrict_types=None)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True,
-                                            restrict_types=["SP", "NO_SP", "TAT"])
-    exit(1)
-    # plot_performance()
-    # visualize_validation(run="non_tuned_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 1],
-    #                      folder="separate-glbl_non_tuned_trimmed_d/")
-    # visualize_validation(run="trimmed_tuned_bert_embs_", folds=[0, 1],
-    #                      folder="separate-glbl_trimmed_tuned_bert_embs/")
-    # visualize_validation(run="repeat_best_experiment_highBertLr_", folds=[0, 1],
-    #                      folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/")
-    # SEPARATE GLBL NO TUNED
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="separate-glbl_non_tuned_trimmed_d/acc_lipos/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # SEPARATE BERT-TUNING
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    # BEST MODEL
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # visualize_validation(run="tune_bert_and_tnmnt_noglobal_extendedsublbls_highBertLr_folds_", folds=[0, 1],
-    #                      folder="tuning_bert_tune_bert_tune_bert_and_tnmnt_noglobal_extendedsublbls_highBertLr/")
-
-    visualize_validation(run="trimmed_tuned_bert_embs_", folds=[0, 1],
-                         folder="separate-glbl_trimmed_tuned_bert_embs/")
-    visualize_validation(run="tune_bert_and_tnmnt_folds_", folds=[0, 1],
-                         folder="tuning_bert_tune_bert_and_tnmnt_folds/")
-    visualize_validation(run="repeat_best_experiment_highBertLr_", folds=[0, 1],
-                         folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_tune_bert_and_tnmnt_noglobal_extendedsublbls_highBertLr/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_repeat_best_experiment_highBertLr/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_and_tnmnt_noglobal_extendedsublbls_nodrop_folds/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_and_tnmnt_repeat_best_experiment/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="tuning_bert_tune_bert_noglobal_extendedsublbls_folds/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_and_tnmnt_folds/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    visualize_validation(run="tune_bert_and_tnmnt_folds_", folds=[0, 1],
-                         folder="tuning_bert_tune_bert_and_tnmnt_folds/")
-    visualize_validation(run="repeat_best_experiment_", folds=[0, 1],
-                         folder="tuning_bert_tune_bert_and_tnmnt_repeat_best_experiment/")
-    visualize_validation(run="tune_bert_and_tnmnt_noglobal_extendedsublbls_folds_", folds=[0, 1],
-                         folder="tuning_bert_tune_bert_noglobal_extendedsublbls_folds/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_noglobal_extendedsublbls_folds/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_and_tnmnt_repeat_best_experiment/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    # visualize_validation(run="tune_bert_and_tnmnt_noglobal_folds_", folds=[0, 1],
-    #                      folder="tuning_bert_tune_bert_and_tnmnt_nogl/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_and_tnmnt_nodrop_changeBetas/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_and_tnmnt_different_initialization/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_and_tnmnt_nogl_beam_test/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_and_tnmnt_nogl/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False,
-    #                                         benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_tune_bert_and_tnmnt_folds/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    visualize_validation(run="tune_bert_and_tnmnt_folds_", folds=[1, 2],
-                         folder="tuning_bert_tune_bert_and_tnmnt_folds/")
-    visualize_validation(run="sanity_check_scale_input_linear_pos_enc_separate_saves_", folds=[0, 1],
-                         folder="separate-glbl_sanity_check_scale_input_linear_pos_enc_separate_saves_0_1/")
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_trimmed_tuned_bert_embs/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
-    visualize_validation(run="tuned_bert_correct_test_embs_", folds=[0, 2],
-                         folder="separate-glbl_tuned_bert_correct/")
-    visualize_validation(run="tuned_bert_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 1],
-                         folder="separate-glbl_tuned_bert_trimmed_d/")
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
-    visualize_validation(run="tuned_bert_correct_test_embs_", folds=[0, 2],
-                         folder="separate-glbl_tuned_bert_correct/")
-    visualize_validation(run="cnn3_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1],
-                         folder="separate-glbl_cnn3/")
-    visualize_validation(run="v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1],
-                         folder="detailed_v2_glbl_max/")
-    visualize_validation(run="tnmt_train_folds_", folds=[0, 1],
-                         folder="folds_0_1_tnmnt_train/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
-
-    #
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_trimmed_d/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_non_tuned_trimmed_d/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-
-    visualize_validation(run="tuned_bert_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 2],
-                         folder="separate-glbl_tuned_bert_trimmed_d/")
-
-    visualize_validation(run="non_tuned_trimmed_d_correct_test_embs_inpdrop_", folds=[0, 2],
-                         folder="separate-glbl_non_tuned_trimmed_d/")
-
-    exit(1)
-
-    correct_duplicates_training_data()
-    exit(1)
-    # pred_lipos()
-    # exit(1)
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    exit(1)
-    correct_duplicates_training_data()
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_lrgdrp/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_val_on_loss/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_nodrop_val_on_loss/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-
-    extract_compatible_binaries_deepsig()
-    exit(1)
-    extract_compatible_binaries_deepsig()
-    exit(1)
-    extract_compatible_binaries_deepsig()
-    exit(1)
-    extract_id2seq_dict()
-    remove_non_unique()
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_val_on_loss/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
-    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
-    exit(1)
-    extract_compatible_binaries_deepsig()
-    extract_compatible_binaries_deepsig()
-    exit(1)
-    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[0, 2], folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
-
-
-    exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    prep_sp1_sp2()
-    exit(1)
-    # visualize_validation(run="tuned_bert_correct_test_embs_", folds=[1, 2], folder="separate-glbl_tuned_bert_correct/")
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    extract_compatible_binaries_deepsig()
-    exit(1)
-    # extract_compatible_binaries_deepsig()
-    # exit(1)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
-    exit(1)
-    extract_compatible_binaries_deepsig()
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=False)
-    exit(1)
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/only_cs/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    exit(1)
-    exit(1)
-    extract_compatible_binaries_deepsig()
-    exit(1)
-    prep_sp1_sp2()
-    exit(1)
-    # extract_phobius_trained_data()
-    # exit(1)
-    extract_compatible_phobius_binaries()
-    exit(1)
-    # extract_phobius_test_data()
-    # exit(1)
-
-
-    # exit(1)
-    extract_compatible_binaries_lipop()
-    # exit(1)
-
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_correct_inp_drop/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    prep_sp1_sp2()
-    # exit(1)
-    exit(1)
-    prep_sp1_sp2()
-    exit(1)
-    # extract_calibration_probs_for_mdl()
-    # duplicate_Some_logs()
-    # exit(1)
-    # tuned_bert_correct_test_embs_0_1.bin
-    sanity_checks(run="tuned_bert_correct_test_embs_", folder="separate-glbl_tuned_bert_correct/")
-    exit(1)
-    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[0, 2], folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
-    visualize_validation(run="tuned_bert_correct_test_embs_", folds=[0, 2], folder="separate-glbl_tuned_bert_correct/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_correct/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_correct/only_cs/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_correct/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    # visualize_validation(run="tuned_bert_embs_", folds=[0, 1], folder="separate-glbl_tunedbert2/")
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/lipo_acc/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/lipo_acc/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tunedbert2/only_cs/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_large/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_large/only_cs/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_large/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tunedbert2/acc_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tunedbert2/only_cs/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tunedbert2/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/lipo_acc/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_embs/account_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    visualize_validation(run="tuned_bert_embs_", folds=[1, 2],
-                         folder="separate-glbl_tuned_bert_embs/")
-    visualize_validation(run="account_lipos_rerun_separate_save_long_run_", folds=[1, 2],
-                         folder="separate-glbl_account_lipos_rerun_separate_save_long_run/")
-
-    # mdl2results = extract_all_param_results(only_cs_position=False,
-    #                                         result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_embs/account_lipos/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_embs/only_cs/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_tuned_bert_embs/only_cs/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_account_lipos_rerun_separate_save_long_run/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_rerun_separate_save_long_run/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-
-
-
-    visualize_validation(run="re_rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_re_rerun_separate_save_long_run/")
-    visualize_validation(run="weighted_loss_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_weighted_loss_separat/")
-    visualize_validation(run="rerun_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_rerun_separate_save_long_run/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_rerun_separate_save_long_run/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_re_rerun_separate_save_long_run/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_weight_lbl_loss_separ/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_weighted_loss_separat/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_re_rerun_separate_save_long_run/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    visualize_validation(run="weight_lbl_loss_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_weight_lbl_loss_separ/")
-    visualize_validation(run="rerun_separate_save_long_run_", folds=[0, 2], folder="separate-glbl_rerun_separate_save_long_run/")
-    visualize_validation(run="large_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_large_separate_save_long/")
-    visualize_validation(run="weighted_loss_separate_save_long_run_", folds=[0, 1], folder="separate-glbl_weighted_loss_separat/")
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_rerun_separate_save_long_run/only_cs/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_save_long_run/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    visualize_validation(run="rerun_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2], folder="separate-glbl_rerun_best/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_large_separate_save_long/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    visualize_validation(run="large_separate_save_long_run_", folds=[1, 2], folder="separate-glbl_large_separate_save_long/")
-    visualize_validation(run="scale_input_linear_pos_enc_separate_saves_", folds=[1, 2], folder="separate-glbl_scale_input_linear/")
-    visualize_validation(run="cnn3_3_32_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_3_32_mdl/")
-    visualize_validation(run="linear_pos_enc_separate_saves_", folds=[0, 1], folder="separate-glbl_linear_pos_enc/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_linear_pos_enc/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_no_pos_enc/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    visualize_validation(run="cnn3_3_16_validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2], folder="separate-glbl_cnn3/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_patience_swa/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    visualize_validation(run="large3_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_large3/")
-    visualize_validation(run="patience_swa_model_", folds=[0, 1], folder="separate-glbl_patience_swa/")
-    visualize_validation(run="large3_validate_on_mcc2_drop_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl_large3/")
-
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_large2_01drop_mdl/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-    visualize_validation(run="input_drop_validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2],
-                         folder="separate-glbl_input_drop/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl_input_drop/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-
-    visualize_validation(run="tune_cs_fromstart_v2_folds_", folds=[0, 1], folder="tune_cs_from_start/")
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tune_cs_from_start/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-
-    visualize_validation(run="validate_on_mcc2_drop_separate_glbl_cs_", folds=[1, 2], folder="separate-glbl-mcc2-drop/")
-    visualize_validation(run="tune_cs_run_", folds=[0, 1], folder="tune_cs_test/")
-
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="separate-glbl-mcc2/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False)
-
-    # visualize_validation(run="separate_glbl_cs_", folds=[0, 1],folder="separate-glbl/")
-    visualize_validation(run="validate_on_mcc_separate_glbl_cs_", folds=[0, 1], folder="separate-glbl-mcc/")
-
-    # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="drop_large_crct_v2_max_glbl_lg_deailed_sp_v1/",
-    #                                         compare_mdl_plots=False,
-    #                                         remove_test_seqs=False)
-
-    visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1], folder="crct_simplified_glblv2_max/")
-    visualize_validation(run="parameter_search_patience_30lr_1e-05_nlayers_3_nhead_16_lrsched_step_trFlds_",
-                         folds=[0, 1], folder="huge_param_search/")
-    visualize_validation(run="crct_v2_max_glbl_lg_deailed_sp_v1_", folds=[0, 1], folder="crct_simplified_glblv2_max/")
-    visualize_validation(run="glbl_lg_deailed_sp_v1_", folds=[0, 1], folder="glbl_deailed_sp_v1/")
-
-    visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[1, 2], folder="wlg10morepatience/")
-    visualize_validation(run="wdrop_noglbl_val_on_test_", folds=[0, 2], folder="wlg10morepatience/")
-    # print("huh?")
-    # mdl2results = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
-    # mdl2results_hps = extract_all_param_results(only_cs_position=False, result_folder="results_param_s_2/")
-    # visualize_training_variance(mdl2results)#, mdl2results_hps)
-    # extract_mean_test_results(run="param_search_0_2048_1e-05")
-    # sanity_checks()
-    # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[0,2])
-    # visualize_validation(run="param_search_0.2_4096_1e-05_", folds=[1,2])
-    # life_grp, seqs, true_lbls, pred_lbls = extract_seq_group_for_predicted_aa_lbls(filename="w_lg_w_glbl_lbl_100ep.bin")
-    # sp_pred_accs = get_pred_perf_sptype(life_grp, seqs, true_lbls, pred_lbls,v=True)
-    # all_recalls, all_precisions, total_positives, false_positives, predictions = get_cs_perf(life_grp, seqs, true_lbls, pred_lbls)

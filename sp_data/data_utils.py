@@ -8,7 +8,7 @@ import pickle
 import pandas as pd
 import os
 from Bio import SeqIO
-from sp_data.bert_tuning_tnmt import ProtBertClassifier, parse_arguments_and_retrieve_logger
+from sp_data.bert_tuning import ProtBertClassifier, parse_arguments_and_retrieve_logger
 from sp_data.sp6_data.read_extract_sp6_data import extract_raw_data
 
 def check_compatibility(tune_bert=True):

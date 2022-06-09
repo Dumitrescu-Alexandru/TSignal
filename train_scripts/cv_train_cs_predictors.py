@@ -7,7 +7,7 @@ import logging
 import sys
 
 logging.getLogger('some_logger')
-from sp_data.bert_tuning_tnmt import ProtBertClassifier, parse_arguments_and_retrieve_logger
+from sp_data.bert_tuning import ProtBertClassifier, parse_arguments_and_retrieve_logger
 import os
 import numpy as np
 import random
@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch
 sys.path.append(os.path.abspath(".."))
-from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc, get_pred_accs_sp_vs_nosp, get_cs_acc
+from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc, get_pred_perf_sptype, get_cs_perf
 from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights
 from models.transformer_nmt import TransformerModel
 from models.binary_sp_classifier import BinarySPClassifier, CNN3, CNN4
@@ -355,7 +355,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                         prob = prob[-1]
                         all_seq_label_probs.append(prob)
                     else:
-                        out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
+                        out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device),
+                                                               padding_mask_src=padding_mask_src)
                         out = out.transpose(0, 1)
                         prob = model.classification_head.generator(out[:, -1])
                         all_outs.append(out[:, -1])
@@ -1017,9 +1018,9 @@ def test_mcc_sptype_clasifier(args, model, val_or_test="validate", epoch=-1):
             for l in lbl_seqs:
                 true_lbls.append("".join([ind2lbl[l_] for l_ in l]))
                 pred_lbls.append("J" * len(lbl_seqs))
-    mcc_sp1, mcc2_sp1 = get_pred_accs_sp_vs_nosp(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
-    mcc_sp2, mcc2_sp2 = get_pred_accs_sp_vs_nosp(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="LIPO", sptype_preds=seq2sptype)
-    mcc_tat, mcc2_tat = get_pred_accs_sp_vs_nosp(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="TAT", sptype_preds=seq2sptype)
+    mcc_sp1, mcc2_sp1 = get_pred_perf_sptype(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="SP", sptype_preds=seq2sptype)
+    mcc_sp2, mcc2_sp2 = get_pred_perf_sptype(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="LIPO", sptype_preds=seq2sptype)
+    mcc_tat, mcc2_tat = get_pred_perf_sptype(life_grp, all_seqs, true_lbls, pred_lbls, v=False, return_mcc2=True, sp_type="TAT", sptype_preds=seq2sptype)
     pickle.dump(seq2sptype, open(args.run_name+"_sp_type_eval.bin" if val_or_test=="validate" else args.run_name+"_sp_type_test.bin","wb"))
     model.train()
     return np.array(mcc_sp1), np.array(mcc2_sp1), np.array(mcc_sp2), np.array(mcc2_sp2), np.array(mcc_tat), np.array(mcc2_tat)
