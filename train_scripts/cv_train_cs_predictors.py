@@ -307,10 +307,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 else:
                     out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device))
                     out = out.transpose(0, 1)
-                    # TODO what if for TAT I use something like p(TAT)/(p(SP)+p(LIPO)+p(PILIN)+p(TAT/SPII))
                     prob = model.classification_head.generator(out[:, -1])
                     all_outs.append(out[:, -1])
-                # print("doing the backward pass...")
                 for batch_ind in range(prob.shape[0]):
                     max_ind = torch.argmax(prob[batch_ind]).item()
                     if ind2lbl[max_ind] in ["S", "T", "L"] :
@@ -355,6 +353,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                         prob = prob[-1]
                         all_seq_label_probs.append(prob)
                     else:
+                        # def decode(self, tgt, memory, tgt_mask, padding_mask_src):
+
                         out = model.classification_head.decode(ys, memory.to(device), tgt_mask.to(device),
                                                                padding_mask_src=padding_mask_src)
                         out = out.transpose(0, 1)
@@ -1271,6 +1271,7 @@ def train_cs_predictors(args):
     sp_data.lbl2ind = {'P': 0, 'S': 1, 'O': 2, 'M': 3, 'L': 4, 'I': 5, 'T': 6, 'PD': 7, 'BS': 8, 'ES': 9} if args.lipbobox_predictions else sp_data.lbl2ind
     train_sets = ['test', 'train'] if args.validate_on_test or args.validate_partition is not None else ['train']
     if len(args.train_folds) == 3:
+        # for deployment model, train on all folds (all data)
         tuned_bert_embs_prefix = "bert_tuned_{}_{}_{}_".format(*args.train_folds) if args.tuned_bert_embs else ""
     else:
         tuned_bert_embs_prefix = "bert_tuned_{}_{}_".format(*args.train_folds) if args.tuned_bert_embs else ""
