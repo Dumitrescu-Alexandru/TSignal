@@ -92,9 +92,18 @@ def generate_square_subsequent_mask(sz):
 
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
                   test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False,
-                  hook_layer="bert", sptype_preds=None,glbl_lbl_2ind=None):
+                  hook_layer="bert", sptype_preds=None,glbl_lbl_2ind=None, remove_eos_from_inference=True):
+    """
+        the simplest and fastest way of predicting labels for sequences; alternatively, use beam_decode.
+        **NOTE** here, we set the probability of the eos index to 0 (through softmax, -inf will be 0), s.t. it is impossible
+        to output EOS before the sequence ends. On the flip side, the labels that are outputed after the sequence
+        has eneded (e.g. in the case where varying sequence length batches exist in test), are irrelevant anyways
+    """
+
+
     # model.ProtBertBFD.requires_grad=True
     # onelasttime
+    eos_index = lbl2ind['ES']
     if saliency_map:
         model.requires_grad=True
         model.unfreeze_encoder()
@@ -107,7 +116,6 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     sp_logits = []
     all_seq_sp_probs = []
     all_seq_sp_logits = []
-    # used for glbl label version 2
     all_outs = []
     all_outs_2nd_mdl = []
     glbl_labels = None
@@ -117,7 +125,10 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     sp_pred_inds_CS_spType = []
     padding_mask_src = None
     all_seq_label_probs = []
+
     if saliency_map:
+        # compute the encoder embeddings before hand and retain gradients wrt. input_embeddings+pos_enc
+        # (this is done separately as the encoded embeddings only need to be computed once)
         def hook_(self, grad_inp, grad_out):
             retain_grads.append((grad_out[0].cpu()))
         # for n, p in model.ProtBertBFD.named_parameters():
@@ -155,10 +166,8 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
             if not model.classification_head.train_only_decoder:
                 memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
             else:
-                _, _, padding_mask_src, _, memory = model.classification_head.input_encoder(memory_bfd,
-                                                                                            inp_seqs=[s.replace(" ", "")
-                                                                                                      for s in
-                                                                                                      seqs])
+                _, _, padding_mask_src, _, memory = model.classification_head.input_encoder(memory_bfd,inp_seqs=[s.replace(" ", "")
+                                                                                        for s in seqs])
                 memory = torch.nn.utils.rnn.pad_sequence(memory, batch_first=True)
         else:
             memory = model.encode(src)
@@ -183,15 +192,14 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     glbl_labels = model.get_v3_glbl_lbls(src)
                     _, glbl_preds = torch.max(glbl_labels, dim=1)
     else:
+        # compute the encoder embeddings before hand __without__ retaining gradients wrt. input_embeddings+pos_enc
+        # (this is done separately as the encoded embeddings only need to be computed once)
         with torch.no_grad():
             if tune_bert:
                 seq_lengths = [len(s) for s in src]
                 seqs = [" ".join(r_ for r_ in s) for s in src]
-                inputs = model.tokenizer.batch_encode_plus(seqs,
-                                                           add_special_tokens=model.hparams.special_tokens,
-                                                           padding=True,
-                                                           truncation=True,
-                                                           max_length=model.hparams.max_length)
+                inputs = model.tokenizer.batch_encode_plus(seqs,add_special_tokens=model.hparams.special_tokens,
+                                                           padding=True,truncation=True,max_length=model.hparams.max_length)
                 input_ids = torch.tensor(inputs['input_ids'], device=model.device)
                 attention_mask = torch.tensor(inputs['attention_mask'], device=model.device)
                 memory_bfd = model.ProtBertBFD(input_ids=input_ids, attention_mask=attention_mask)[0]
@@ -201,9 +209,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 if not model.classification_head.train_only_decoder:
                     memory = model.classification_head.encode(memory_bfd, inp_seqs=src)
                 else:
-                    _, _, padding_mask_src, _, memory = model.classification_head.input_encoder(memory_bfd,
-                                                                                                inp_seqs=[s.replace(" ", "") for s in
-                                                                                                          seqs])
+                    _, _, padding_mask_src, _, memory = model.classification_head.input_encoder(memory_bfd,inp_seqs=[s.replace(" ", "") for s in seqs])
                     memory = torch.nn.utils.rnn.pad_sequence(memory, batch_first=True)
             else:
                 memory = model.encode(src)
@@ -229,22 +235,26 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                         _, glbl_preds = torch.max(glbl_labels, dim=1)
 
     # ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
+    # initialize empty prediction lists
     ys = []
     if not ys:
         for _ in range(len(src)):
             ys.append([])
+
+    # when using a separate SP type classifier (not the default/model in the paper), extract the sp types with
+    # that classifier first and continue predicting from there
+
+    # if below condition, then global labels are computed with a separate model. This also affects the first label pred
+    # of the model predicting the sequence label. Because of this, compute the first predictions first, and take care
+    # of the glbl label model and sequence-model consistency (e.g. one predicts SP other NO-SP - take care of that)
+
     if sptype_preds is None:
         start_ind = 0
     else:
-        # sp_type classifier now saves sp types, so I need to conver them back to "start y_1".
-        # this is not perfect as all NO-SP are "I's"
         glbl_lbl_2_start_letter = {0: 'I', 1: 'S', 2: 'W', 3: 'L', 4: 'T', 5: 'P'}
         for ind, seq_ in enumerate(src):
             ys[ind].append(lbl2ind[glbl_lbl_2_start_letter[sptype_preds[seq_]]])
         start_ind = 1
-    # if below condition, then global labels are computed with a separate model. This also affects the first label pred
-    # of the model predicting the sequence label. Because of this, compute the first predictions first, and take care
-    # of the glbl label model and sequence-model consistency (e.g. one predicts SP other NO-SP - take care of that)
     if glbl_labels is not None:
         tgt_mask = (generate_square_subsequent_mask(1))
         if tune_bert:
@@ -264,6 +274,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
         else:
             out = out.transpose(0, 1)
             prob = model.generator(out[:, -1])
+        prob[:, eos_index] += float('-inf')
         _, next_words = torch.max(prob, dim=1)
         next_word = [nw.item() for nw in next_words]
         current_ys = []
@@ -286,6 +297,10 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
     if not tune_bert and not train_oh:
         model.glbl_generator.eval()
     all_probs = []
+
+    # NOTE: ys are missing <BOS> token because that is added in the model's pipeline (see e.g.  TokenEmbedding inside
+    # TransformerModel)
+
     for i in range(start_ind, max(seq_lens) + 1):
         if saliency_map:
             tgt_mask = (generate_square_subsequent_mask(len(ys[0]) + 1))
@@ -310,6 +325,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                     prob = model.classification_head.generator(out[:, -1])
                     all_outs.append(out[:, -1])
                 for batch_ind in range(prob.shape[0]):
+                    prob[:, eos_index] += float('-inf')
                     max_ind = torch.argmax(prob[batch_ind]).item()
                     if ind2lbl[max_ind] in ["S", "T", "L"] :
                         if i == start_ind:
@@ -335,8 +351,12 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                         sp_predicted_batch_elements_extracated_cs.append(batch_ind)
                 # print("did the backward pass")
             else:
+                if i == start_ind:
+                    print("!!WARNING!! You have tried to compute saliency maps for a model that does not tune bert. This"
+                          " will most likely give a desired result.")
                 out = model.decode(ys, memory.to(device), tgt_mask.to(device))
                 out = out.transpose(0, 1)
+                prob[:, eos_index] += float('-inf') if i != max(seq_lens) else prob[:, eos_index]
                 prob = model.generator(out[:, -1])
                 all_outs.append(out[:, -1])
         else:
@@ -382,6 +402,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 all_seq_sp_logits[seq_prb_ind].append(next_sp_logits[seq_prb_ind].item())
         all_probs.append(prob)
         if second_model is not None:
+            prob[:, eos_index] += float('-inf') if i != max(seq_lens) else prob[:, eos_index]
             probs_fm, next_words_fm = torch.max(torch.nn.functional.softmax(prob, dim=-1), dim=1)
             probs_sm, next_words_sm = torch.max(torch.nn.functional.softmax(prob_2nd_mdl, dim=-1), dim=1)
             all_probs_mdls = torch.stack([probs_fm, probs_sm])
@@ -390,6 +411,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
                 _, inds = torch.max(all_probs_mdls, dim=0)
             next_words = all_next_w_mdls[inds, torch.tensor(list(range(inds.shape[0])))]
         else:
+            prob[:, eos_index] += float('-inf') if i != max(seq_lens) else prob[:, eos_index]
             _, next_words = torch.max(prob, dim=1)
         next_word = [nw.item() for nw in next_words]
         current_ys = []
@@ -1830,7 +1852,7 @@ def train_cs_predictors(args):
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert",
                                lipbobox_predictions=False, compute_saliency=False):
     folder = get_data_folder()
-    sp_data = SPCSpredictionData(form_sp_reg_data=False, tune_bert=False)
+    sp_data = SPCSpredictionData(form_sp_reg_data=False, tune_bert=tune_bert)
     # hard-code this for now to check some sequences
     # test_file = "sp6_partitioned_data_train_1.bin"
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
