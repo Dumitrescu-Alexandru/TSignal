@@ -4036,6 +4036,8 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
     exit(1)
 
 if __name__ == "__main__":
+    plot_sp6_vs_tnmt()
+
     plot_perf_over_data_perc()
     exit(1)
     plot_sp6_vs_tnmt_mcc()

@@ -36,7 +36,7 @@ def create_parameter_set():
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--lr", default=0.00001, type=float, help="Learning rate for TSignal (not ProtBERT).")
+    parser.add_argument("--lr", default=0.0001, type=float, help="Learning rate for TSignal (not ProtBERT).")
     parser.add_argument("--anneal_start", default=-1, type=int, help="Epoch where learning rate starts to be lowered.")
     parser.add_argument("--anneal_epochs", default=-1, type=int, help="Number of epochs in which to reach the desired annealed_lr")
     parser.add_argument("--annealed_lr", default=0.00002, type=float, help="Desired annealed_lr")
@@ -45,7 +45,7 @@ def parse_arguments():
                 "run, load the param set specified by this argument (useful with e.g. slurm parallel runs)")
     parser.add_argument("--train_cs_predictor", default=False, action="store_true", help="Train a CS predictor like TSignal"
                          " (alternatively, can also train a binary SP type classifier)")
-    parser.add_argument("--batch_size", default=16, type=int, help="Training batch size")
+    parser.add_argument("--batch_size", default=32, type=int, help="Training batch size")
     parser.add_argument("--run_name", default="some_run", type=str, help="Name your run. This will be used as a prefix for all saved files: logs, models, etc.")
     parser.add_argument("--epochs", default=-1, type=int, help="By default, model uses tolerence based stopping criteria. "
                            "Set this for a fixed number of epochs training.")
