@@ -1309,7 +1309,7 @@ def train_cs_predictors(args):
     swa_start = args.swa_start
     if len(sp_data.og2ind.keys()) <= 1 or not args.add_og_info:
         og2ind = None
-    elif len(sp_data.og2ind.keys()) > 1 and args.add_og_infotest_freq:
+    elif len(sp_data.og2ind.keys()) > 1 and args.add_og_info:
         og2ind = sp_data.og2ind
     aa2ind = sp_data.aa2ind if args.train_oh else None
     if args.tune_bert:

@@ -629,8 +629,14 @@ class PositionalEncoding(nn.Module):
         else:
             if add_lg_info:
                 pe_ = self.pe[:x.size(0)-1]
-                pe_ = torch.cat([pe_, torch.zeros(1,1,x.shape[-1]).to(self.device)],dim=0)
-                x = self.dropout(x + pe_)
+                # organism group information shouldn't be "anywhere specifically" in the sequences, so add a "custom
+                # positional encoding" (e.g. a vector of zeros) for it
+                pe_ = torch.cat([pe_, torch.zeros(1,1,pe_.shape[-1]).to(self.device)],dim=0)
+                if self.concat_pos_enc:
+                    x = torch.cat([x, pe_.repeat(1,x.size(1),1)],dim=-1)
+                else:
+                    x = self.dropout(x + pe_)
+
             else:
                 if self.concat_pos_enc:
                     pe_ = self.pe[:x.size(0)] #* 0.1
