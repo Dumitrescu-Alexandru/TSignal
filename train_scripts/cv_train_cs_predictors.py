@@ -1306,7 +1306,6 @@ def train_cs_predictors(args):
     dataset_loader = torch.utils.data.DataLoader(sp_dataset,
                                                  batch_size=args.batch_size, shuffle=True,
                                                  num_workers=4, collate_fn=collate_fn)
-    swa_start = 60
     if len(sp_data.og2ind.keys()) <= 1 or not args.add_og_info:
         og2ind = None
     elif len(sp_data.og2ind.keys()) > 1 and args.add_og_infotest_freq:

@@ -2592,11 +2592,24 @@ def plot_sp6_vs_tnmt(result_folders=("only_decoder_tune_bert_extraOhOnOut_swa_ru
         ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=12.5)
     fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.0, 0.05), ncol=2, fontsize=12.5)
     fig.suppressComposite = False
-    from matplotlib.patches import RegularPolygon, Rectangle, Patch, Arrow
     ax[2].set_xlabel("eukarya                 gn bacteria                  gp bacteria                 archaea\n\n "
                      "tolerance/life group",fontsize=12.5)
     plt.savefig("some_plot.pdf")
-    exit(1)
+
+    # repeat 4 times for each tolerance level
+    no_of_seqs_sp1 = np.array([146, 61, 15, 36]).repeat(4)
+    no_of_seqs_sp2 = np.array([257, 120, 9]).repeat(4)
+    no_of_seqs_tat = np.array([51, 18, 9]).repeat(4)
+    no_of_tested_sp_seqs = sum([146, 61, 15, 36]) + sum([257, 120, 9]) + sum([51, 18, 9])
+
+    print("Mean weighted F1 score across all SP types, organism groups and tolerance levels TSignal: ", (  np.sum(all_sptypes_all_mean[0]*no_of_seqs_sp1) +
+                                         np.sum(all_sptypes_all_mean[1]*no_of_seqs_sp2) +
+                                         np.sum(all_sptypes_all_mean[2]*no_of_seqs_tat) ) / np.sum(no_of_tested_sp_seqs*4))
+    print("Mean weighted F1 score across all SP types, organism groups and tolerance levels SP6: ", (np.sum(sp6_f1_sp1 * no_of_seqs_sp1) +
+                                                           np.sum(sp6_f1_sp2 * no_of_seqs_sp2) +
+                                                           np.sum(sp6_f1_tat * no_of_seqs_tat)) / np.sum(no_of_tested_sp_seqs * 4))
+
+
 
 def bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,mcc_deepsig,mcc_predTat,mcc_lipop,mcc_phobius):
     import matplotlib as mpl
@@ -2748,22 +2761,29 @@ def plot_sp6_vs_tnmt_mcc(result_folders=("only_decoder_tune_bert_extraOhOnOut_sw
 
 
 
-    no_of_seqs_sp1 = np.array([2040, 44, 142, 356])
-    no_of_seqs_sp2 = np.array([1087, 516, 12])
-    no_of_seqs_tat = np.array([313, 39, 13])
-    no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
+    # no_of_seqs_sp1 = np.array([2040, 44, 142, 356])
+    # no_of_seqs_sp2 = np.array([1087, 516, 12])
+    # no_of_seqs_tat = np.array([313, 39, 13])
+    # no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
+
+    # no_of_seqs_sp1 = np.arraZ
+    no_of_seqs_sp1 = np.array([146, 61, 15, 36])
+    no_of_seqs_sp2 = np.array([257, 120, 9])
+    no_of_seqs_tat = np.array([51, 18, 9])
+    no_of_tested_sp_seqs = sum([146, 61, 15, 36]) + sum([257, 120, 9]) + sum([51, 18, 9])
+
     print("mcc1- (sp1,sp2,tat). Tsi", [round(mc, 3)  for mc in mean_mcc1_sp1], [round(mc, 3) for mc in mean_mcc1_sp2], [round(mc,3) for mc in mean_mcc1_tat])
     print("mcc1- (sp1,sp2,tat). SP6", list(sp6_mcc1_sp1), list(sp6_mcc1_sp2), list(sp6_mcc1_tat))
     print("mcc2- (sp1,sp2,tat). TSi", [round(mc,3) for mc in mean_mcc2_sp1], [round(mc,3) for mc in mean_mcc2_sp2], [round(mc,3) for mc in mean_mcc2_tat])
     print("mcc2- (sp1,sp2,tat). SP6", list(sp6_mcc2_sp1), list(sp6_mcc2_sp2), list(sp6_mcc2_tat))
     total_mcc1 = (sum(mean_mcc1_sp1 * no_of_seqs_sp1) + sum(mean_mcc1_sp2 * no_of_seqs_sp2) + sum(mean_mcc1_tat * no_of_seqs_tat))/no_of_tested_sp_seqs
     total_mcc1_sp6 = (sum(sp6_mcc1_sp1 * no_of_seqs_sp1) + sum(sp6_mcc1_sp2 * no_of_seqs_sp2) + sum(sp6_mcc1_tat * no_of_seqs_tat))/no_of_tested_sp_seqs
-    total_mcc2 = (sum(mean_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(mean_mcc2_sp2 * no_of_seqs_sp2) + sum(mean_mcc2_tat * no_of_seqs_tat))/(no_of_tested_sp_seqs-2040)
-    total_mcc2_sp6 =  (sum(sp6_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(sp6_mcc2_sp2 * no_of_seqs_sp2) + sum(sp6_mcc2_tat * no_of_seqs_tat))/(no_of_tested_sp_seqs-2040)
+    total_mcc2 = (sum(mean_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(mean_mcc2_sp2 * no_of_seqs_sp2) + sum(mean_mcc2_tat * no_of_seqs_tat))/(no_of_tested_sp_seqs-146)
+    total_mcc2_sp6 =  (sum(sp6_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(sp6_mcc2_sp2 * no_of_seqs_sp2) + sum(sp6_mcc2_tat * no_of_seqs_tat))/(no_of_tested_sp_seqs-146)
     total_mcc1_std = (sum(std_mcc1_sp1 * no_of_seqs_sp1) + sum(std_mcc1_sp2 * no_of_seqs_sp2) + sum(
-        std_mcc1_tat * no_of_seqs_tat)) / (no_of_tested_sp_seqs-2040)
+        std_mcc1_tat * no_of_seqs_tat)) / (no_of_tested_sp_seqs-146)
     total_mcc2_std = (sum(std_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(std_mcc2_sp2 * no_of_seqs_sp2) + sum(
-        std_mcc2_tat * no_of_seqs_tat)) / (no_of_tested_sp_seqs-2040)
+        std_mcc2_tat * no_of_seqs_tat)) / (no_of_tested_sp_seqs-146)
 
     print("non-w average sp6:",(np.mean(sp6_mcc1_sp1)+np.mean(sp6_mcc1_sp2) + np.mean(sp6_mcc1_tat) + np.mean(sp6_mcc2_sp1)+np.mean(sp6_mcc2_sp2) + np.mean(sp6_mcc2_tat))/6)
     print("non-w average tsignal:",(np.mean(mean_mcc1_sp1)+np.mean(mean_mcc2_sp1) + np.mean(mean_mcc1_sp2) + np.mean(mean_mcc2_sp2)+np.mean(mean_mcc1_tat) + np.mean(mean_mcc2_tat))/6)
@@ -4035,8 +4055,45 @@ def compute_mcc_sp_only_mdls(mdl_name="cnn2_4resnets_tune_bert", folder="./"):
     print("mcc2:", (np.sum(mcc2_sp1[1:]*no_of_seqs_sp1[1:]) + np.sum(mcc2_sp2*no_of_seqs_sp2) + np.sum(mcc2_tat * no_of_seqs_tat) )/(no_of_tested_sp_seqs-2040))
     exit(1)
 
+def visualize_dot_products():
+    import math
+    max_len = 201
+    d_model = 128
+    pe = np.zeros((max_len, 1, d_model))
+    position = np.arange(max_len).reshape(-1, 1)
+    div_term = np.exp(np.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+    pe[:, 0, 0::2] = np.sin(position * div_term)
+    pe[:, 0, 1::2] = np.cos(position * div_term)
+    pe = pe.reshape(max_len, d_model)
+    pos_i = 30
+    dot_prod = pe @ pe[pos_i].T
+    plt.plot(dot_prod)
+    colors = ['black', 'red','blue','purple']
+    for i in range(4):
+        plt.plot([pos_i+i,pos_i+i], [min(dot_prod[pos_i-7:pos_i+7])*0.9, 1.1*max(dot_prod[pos_i-7:pos_i+7])], linewidth=0.8, alpha=1, label='pos i+/-{}'.format(i) if i != 0 else "pos i", color=colors[i-1])
+        plt.plot([pos_i-i,pos_i-i], [min(dot_prod[pos_i-7:pos_i+7])*0.9, 1.1*max(dot_prod[pos_i-7:pos_i+7])], linewidth=0.8, alpha=1, color=colors[i-1])
+    plt.legend()
+    plt.xlim([pos_i-7,pos_i+7])
+    plt.ylim([min(dot_prod[pos_i-7:pos_i+7])*0.9, 1.1*max(dot_prod[pos_i-7:pos_i+7])])
+    plt.ylabel("Sine-based PE dot product")
+    plt.xticks([])
+    # plt.show()
+
+    plt.savefig("dot_prod.pdf")
+    exit(1)
+
+
 if __name__ == "__main__":
+    # result_folders=(test_again, test_again2); newly recomputed runs to make sure results are reproducible
+
+
+    plot_sp6_vs_tnmt_mcc()
+    visualize_dot_products()
     plot_sp6_vs_tnmt()
+    exit(1)
+
+
+
 
     plot_perf_over_data_perc()
     exit(1)

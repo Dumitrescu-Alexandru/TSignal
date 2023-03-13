@@ -127,7 +127,7 @@ def parse_arguments():
     parser.add_argument("--no_of_layers_conv_resnets", default=4, type=int, help="No. of additional (conv) layers sp classifier.")
     parser.add_argument("--is_cnn4", default=False, action="store_true", help="Use new cnn4 architecture")
     parser.add_argument("--use_sgd_on_swa", default=False, action="store_true", help="Use sgd on swa for sp type classifier")
-    parser.add_argument("--swa_start", default=30,type=int, help="Epoch at wich you load best mdl and start swa")
+    parser.add_argument("--swa_start", default=60,type=int, help="Epoch at wich you load best mdl and start swa")
     parser.add_argument("--og_emb_dim", default=32,type=int, help="Epoch at wich you load best mdl and start swa")
     parser.add_argument("--residue_emb_extra_dims", default=0,type=int, help="Epoch at wich you load best mdl and start swa")
     parser.add_argument("--add_extra_embs2_decoder", default=False,action="store_true", help="Add the extra decoder inputs to the Transformer Decoder (this way, the final layer W_O still won't have access to non-contextualized residue representations")
