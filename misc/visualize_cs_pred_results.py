@@ -2572,6 +2572,7 @@ def plot_sp6_vs_tnmt(result_folders=("only_decoder_tune_bert_extraOhOnOut_swa_ru
         for j in range(2):
             ax[ind].bar([i + offsets[j] for i in range(lower_lim_plots, 17)], all_f1s[j],  label=names[j],
                         width=line_w,alpha=0.6, color=colors[j])
+        # error plots (below, if std is zero - e.g. when having a single run - plot a "dot" from low-low+0.001)
         for i in range(lower_lim_plots, 17):
 
             low,high = all_sptypes_all_mean[ind][i - lower_lim_plots] - 2 * all_sptypes_all_std[ind][i - lower_lim_plots], \
@@ -4083,7 +4084,199 @@ def visualize_dot_products():
     exit(1)
 
 
+def plot_og_vs_no_og(result_folders_no_og=("only_decoder_tune_bert_extraOhOnOut_swa_run_1",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_2",),
+                     result_folders_og=("run_w_og",)):
+    sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
+        tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
+    sp1_f1s_og, sp1_recs_og, sp1_precs_og, sp2_f1s_og, sp2_recs_og, sp2_precs_og, tat_f1s_og, \
+        tat_recs_og, tat_precs_og, mcc1_sp1_og, mcc2_sp1_og, mcc1_sp2_og, mcc2_sp2_og, mcc1_tat_og, mcc2_tat_og = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
+
+    for run_foldername in result_folders_no_og:
+        print("Computing results for run {}".format(run_foldername))
+        mdl2results = extract_all_param_results(only_cs_position=False,
+                                                result_folder=run_foldername,
+                                                compare_mdl_plots=False,
+                                                remove_test_seqs=False,
+                                                benchmark=True,
+                                                prints=False)
+        mdl_ind = 0
+        sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
+        sp1_recs.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
+        sp1_precs.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        sp2_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-6])]))
+        sp2_recs.append(np.array([rec for rec in mdl2results[mdl_ind][12]]))
+        sp2_precs.append(np.array([rec for rec in mdl2results[mdl_ind][13]]))
+        tat_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
+        tat_recs.append(np.array([rec for rec in mdl2results[mdl_ind][14]]))
+        tat_precs.append(np.array([rec for rec in mdl2results[mdl_ind][15]]))
+        mcc1_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][0]]))
+        mcc2_sp1.append(np.array([mcc for mcc in mdl2results[mdl_ind][1][1:]]))
+        mcc1_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][2]]))
+        mcc2_sp2.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
+        mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
+        mcc2_tat.append([mcc for mcc in mdl2results[mdl_ind][5]])
+    arrange_tol_lg_sp1 = []
+    # rearrange the results
+    for og_ind in [0, 4, 8, 12]:
+        for tol in range(4):
+            arrange_tol_lg_ = [sp1_f1s[run_no][og_ind + tol] for run_no in range(len(result_folders_no_og))]
+            arrange_tol_lg_sp1.append(arrange_tol_lg_)
+    arrange_tol_lg_sp2 = []
+    for og_ind in [0, 4, 8]:
+        for tol in range(4):
+            arrange_tol_lg_ = [sp2_f1s[run_no][og_ind + tol] for run_no in range(len(result_folders_no_og))]
+            arrange_tol_lg_sp2.append(arrange_tol_lg_)
+    arrange_tol_lg_tat = []
+    for og_ind in [0, 4, 8]:
+        for tol in range(4):
+            arrange_tol_lg_ = [tat_f1s[run_no][og_ind + tol] for run_no in range(len(result_folders_no_og))]
+            arrange_tol_lg_tat.append(arrange_tol_lg_)
+    arrange_sptype_tol_lg = [np.array(arrange_tol_lg_sp1), np.array(arrange_tol_lg_sp2), np.array(arrange_tol_lg_tat)]
+    all_sptypes_all_mean = [np.mean(arrange_sptype_tol_lg[0], axis=1), np.mean(arrange_sptype_tol_lg[1], axis=1),
+                            np.mean(arrange_sptype_tol_lg[2], axis=1)]
+    all_sptypes_all_std = [np.std(arrange_sptype_tol_lg[0], axis=1), np.std(arrange_sptype_tol_lg[1], axis=1),
+                           np.std(arrange_sptype_tol_lg[2], axis=1)]
+
+    for run_foldername in result_folders_og:
+        print("Computing results for run {}".format(run_foldername))
+        mdl2results = extract_all_param_results(only_cs_position=False,
+                                                result_folder=run_foldername,
+                                                compare_mdl_plots=False,
+                                                remove_test_seqs=False,
+                                                benchmark=True,
+                                                prints=False)
+        mdl_ind = 0
+        sp1_f1s_og.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
+        sp1_recs_og.append(np.array([rec for rec in mdl2results[mdl_ind][10]]))
+        sp1_precs_og.append(np.array([rec for rec in mdl2results[mdl_ind][11]]))
+        sp2_f1s_og.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-6])]))
+        sp2_recs_og.append(np.array([rec for rec in mdl2results[mdl_ind][12]]))
+        sp2_precs_og.append(np.array([rec for rec in mdl2results[mdl_ind][13]]))
+        tat_f1s_og.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-5])]))
+        tat_recs_og.append(np.array([rec for rec in mdl2results[mdl_ind][14]]))
+        tat_precs_og.append(np.array([rec for rec in mdl2results[mdl_ind][15]]))
+        mcc1_sp1_og.append(np.array([mcc for mcc in mdl2results[mdl_ind][0]]))
+        mcc2_sp1_og.append(np.array([mcc for mcc in mdl2results[mdl_ind][1][1:]]))
+        mcc1_sp2_og.append(np.array([mcc for mcc in mdl2results[mdl_ind][2]]))
+        mcc2_sp2_og.append(np.array([mcc for mcc in mdl2results[mdl_ind][3]]))
+        mcc1_tat_og.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
+        mcc2_tat_og.append([mcc for mcc in mdl2results[mdl_ind][5]])
+    arrange_tol_lg_sp1_wog = []
+    # rearrange the results
+    for og_ind in [0, 4, 8, 12]:
+        for tol in range(4):
+            arrange_tol_lg_og = [sp1_f1s_og[run_no][og_ind + tol] for run_no in range(len(result_folders_og))]
+            arrange_tol_lg_sp1_wog.append(arrange_tol_lg_og)
+
+    arrange_tol_lg_sp2_wog = []
+    for og_ind in [0, 4, 8]:
+        for tol in range(4):
+            arrange_tol_lg_og = [sp2_f1s_og[run_no][og_ind + tol] for run_no in range(len(result_folders_og))]
+            arrange_tol_lg_sp2_wog.append(arrange_tol_lg_og)
+
+
+    arrange_tol_lg_tat_wog = []
+    for og_ind in [0, 4, 8]:
+        for tol in range(4):
+            arrange_tol_lg_og = [tat_f1s_og[run_no][og_ind + tol] for run_no in range(len(result_folders_og))]
+            arrange_tol_lg_tat_wog.append(arrange_tol_lg_og)
+
+    arrange_sptype_tol_lg_wog = [np.array(arrange_tol_lg_sp1_wog), np.array(arrange_tol_lg_sp2_wog), np.array(arrange_tol_lg_tat_wog)]
+    all_sptypes_all_mean_wog = [np.mean(arrange_sptype_tol_lg_wog[0], axis=1), np.mean(arrange_sptype_tol_lg_wog[1], axis=1),
+                            np.mean(arrange_sptype_tol_lg_wog[2], axis=1)]
+    all_sptypes_all_std_wog = [np.std(arrange_sptype_tol_lg_wog[0], axis=1), np.std(arrange_sptype_tol_lg_wog[1], axis=1),
+                            np.std(arrange_sptype_tol_lg_wog[2], axis=1)]
+    all_f1s_sp1 = [np.array(all_sptypes_all_mean[0]).reshape(-1),
+                   np.array(all_sptypes_all_mean_wog[0]).reshape(-1)]
+    all_f1s_sp2 = [np.array(all_sptypes_all_mean[1]).reshape(-1),
+                   np.array(all_sptypes_all_mean_wog[1]).reshape(-1),]
+    all_f1s_tat = [np.array(all_sptypes_all_mean[2]).reshape(-1),
+                   np.array(all_sptypes_all_mean_wog[2]).reshape(-1)]
+    all_sptypes_all_f1s = [all_f1s_sp1, all_f1s_sp2, all_f1s_tat]
+
+    import matplotlib as mpl
+    mpl.rcParams['figure.dpi'] = 350
+    mpl.rcParams['font.family'] = "Arial"
+    fig, ax = plt.subplots(3, 1,figsize=(8, 6),dpi=350)
+    line_w = 0.3
+    offsets = [-line_w*0.5, line_w*0.5]
+    sptypes=["Sec/SPase I", "Sec/SPase II", "Tat/SPase I"]
+    names = ["TSignal", "TSignal_wog", "LipoP", "DeepSig", "Phobius"]
+    colors = ["mediumblue", "green", "green", "black", "purple","red"]
+    titles = ["", "", "", ""]
+
+
+    for ind in range(3):
+        upper_lim = 17 if ind == 0 else 13
+        lower_lim = 0 if ind == 0 else 1
+        lower_lim_plots = 1 if ind == 0 else 5
+        all_f1s = all_sptypes_all_f1s[ind]
+        ax[ind].plot([4.5,4.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        ax[ind].plot([8.5,8.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        ax[ind].plot([12.5,12.5], [0,1.5], linestyle='--',dashes=(1, 1), color='black')
+        for j in range(2):
+            ax[ind].bar([i + offsets[j] for i in range(lower_lim_plots, 17)], all_f1s[j],  label=names[j],
+                        width=line_w,alpha=0.6, color=colors[j])
+        # error plots (below, if std is zero - e.g. when having a single run - plot a "dot" from low-low+0.001)
+        for i in range(lower_lim_plots, 17):
+
+            low,high = all_sptypes_all_mean[ind][i - lower_lim_plots] - 2 * all_sptypes_all_std[ind][i - lower_lim_plots], \
+                       all_sptypes_all_mean[ind][i - lower_lim_plots] + 2 *  all_sptypes_all_std[ind][i - lower_lim_plots]
+            ax[ind].plot([i+offsets[0],i+offsets[0]],[low,max(high,low+0.001)], color='black')
+
+            low, high = all_sptypes_all_mean_wog[ind][i - lower_lim_plots] - 2 * all_sptypes_all_std_wog[ind][i - lower_lim_plots], \
+                        all_sptypes_all_mean_wog[ind][i - lower_lim_plots] + 2 * all_sptypes_all_std_wog[ind][i - lower_lim_plots]
+            ax[ind].plot([i + offsets[1], i + offsets[1]], [low, max(high, low + 0.001)], color='black')
+
+        box = ax[ind].get_position()
+        ax[ind].set_xlim(0.5,16.5)
+        ax[ind].set_position([box.x0, box.y0 + box.height * 0.35, box.width * 1, box.height * 0.95])
+        ax[ind].set_yticks([0,0.2,0.4,0.6,0.8,1])
+        ax[ind].set_ylim([0, 1.1])
+        ax[ind].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
+        ax[ind].set_xticks(list(range(lower_lim_plots, 17)))
+        if ind == 2:
+            handles, labels = ax[ind].get_legend_handles_labels()
+        ax[ind].set_xticklabels(['{}{}'.format(titles[lower_lim + i//4], i%4) for i in range(upper_lim-1)], fontsize=12.5)
+        ax[ind].set_ylabel("F1 score\n{}".format(sptypes[ind]), fontsize=12.5)
+        ax[ind].yaxis.set_label_coords(-0.07, 0.42)
+        ax[ind].set_yticklabels([0,0.2,0.4,0.6,0.8,1],fontsize=12.5)
+    fig.legend(handles, labels, loc='center left', bbox_to_anchor=(0.0, 0.05), ncol=2, fontsize=12.5)
+    fig.suppressComposite = False
+    ax[2].set_xlabel("eukarya                 gn bacteria                  gp bacteria                 archaea\n\n "
+                     "tolerance/life group",fontsize=12.5)
+
+    plt.savefig("og_no_og_comparison.pdf")
+
+    # repeat 4 times for each tolerance level
+    no_of_seqs_sp1 = np.array([146, 61, 15, 36]).repeat(4)
+    no_of_seqs_sp2 = np.array([257, 120, 9]).repeat(4)
+    no_of_seqs_tat = np.array([51, 18, 9]).repeat(4)
+    no_of_tested_sp_seqs = sum([146, 61, 15, 36]) + sum([257, 120, 9]) + sum([51, 18, 9])
+
+    print("Mean weighted F1 score across all SP types, organism groups and tolerance levels TSignal: ",
+          (np.sum(all_sptypes_all_mean[0] * no_of_seqs_sp1) +
+           np.sum(all_sptypes_all_mean[1] * no_of_seqs_sp2) +
+           np.sum(all_sptypes_all_mean[2] * no_of_seqs_tat)) / np.sum(no_of_tested_sp_seqs * 4))
+    print("Mean weighted F1 score across all SP types, organism groups and tolerance levels TSignal w_og: ",
+          (np.sum(all_sptypes_all_mean_wog[0] * no_of_seqs_sp1) +
+           np.sum(all_sptypes_all_mean_wog[1] * no_of_seqs_sp2) +
+           np.sum(all_sptypes_all_mean_wog[2] * no_of_seqs_tat)) / np.sum(no_of_tested_sp_seqs * 4))
+
+    exit(1)
+
+
 if __name__ == "__main__":
+    plot_sp6_vs_tnmt_mcc()
+    exit(1)
+
+
+    plot_og_vs_no_og(result_folders_no_og=("only_decoder_tune_bert_extraOhOnOut_swa_run_1",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_2",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_3",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_4",
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_5"),result_folders_og=("run_w_og", "only_decoder_tune_bert_extraOhOnOut_swa_run_1"))
     # result_folders=(test_again, test_again2); newly recomputed runs to make sure results are reproducible
 
 
