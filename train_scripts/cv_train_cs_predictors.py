@@ -1919,6 +1919,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
                                                  glbl_lbls=None, tune_bert=tune_bert,
                                                  saliency_map=False,
                                                  hook_layer=hook_layer)
+            # ys, torch.stack(all_probs).transpose(0,1), sp_probs, all_seq_sp_probs, all_seq_sp_logits, all_seq_label_probs
             all_outs.extend(some_output[1])
             all_seqs.extend(seqs)
             all_lbls.extend(lbl_seqs)
@@ -1930,11 +1931,21 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     for seq, pred, lbl in zip(all_seqs, all_outs,all_lbls):
         true_lbls.append("".join([ind2lbl[i] for i in lbl])[:70])
         pred_lbls.append("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
-        print()
-        print(seq)
-        print("TRUE:",true_lbls[-1])
-        print("PRED:",pred_lbls[-1])
+        pred_probs = torch.softmax(pred, dim=-1)
+        pred_probs = torch.max(pred_probs, dim=-1)[0].detach().cpu().numpy()
+        # W = Tat/SPase II, T= Tat/SPase I, P=Sec/SPase IV, L=Sec/SPase II, S = Sec/SPase I
+        if pred_lbls[-1][0] in ['S', 'T', 'L', 'W', 'P']: # if SP is predicted
+            # get first non-SP index (cleavage site)
+            sp_type_ = pred_lbls[-1][0]
+            cs_index = pred_lbls[-1].replace("ES","").rfind(sp_type_)
+            cs_prob = pred_probs[cs_index+1]
+        else:
+            cs_prob = "N/A (no SP predicted)"
 
+        print("TRUE:", true_lbls[-1])
+        print("PRED:", pred_lbls[-1])
+        print("TYPE PROB:{}; CS PROB:{}".format(pred_probs[0], cs_prob))
+        print()
 
 def test_w_precomputed_sptypes(args):
     partitions = [int(f) for f in args.train_folds]

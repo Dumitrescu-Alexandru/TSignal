@@ -14,10 +14,12 @@ Use pip install -r requirements.txt
 
 ## 2 Data
 
-We use data from [3]. In order to train the model, download from [SignalP 6.0](https://services.healthtech.dtu.dk/service.php?SignalP-6.0) 
-the fasta file the training set "SignalP 6.0 Training set" and add it to sp_data/ folder. The benchmark data on which we
-report the results is found in "SignalP 5.0 Benchmark set". Note that the latter is not used during training, 
-but in the functions of misc/visualization.py, it will be used to report performance on this data if specified so.
+**Necessary for reproducing the main results:** We use data from [3]. Add the necessary training
+binaries directly from [Link to CV files](https://www.dropbox.com/scl/fo/h3dyfr358optb7to5n9ma/h?dl=0&rlkey=iwvnr6bcklhtogiz9t3pterir) or download from [SignalP 6.0](https://services.healthtech.dtu.dk/service.php?SignalP-6.0) 
+the train_set.fasta file "SignalP 6.0 Training set" and add it to sp_data/ folder (in the latter case, the cross-validation binaries should automatically be created). In either case, please properly cite the authors of the homology-split data. The benchmark data on which we
+report the results is found in "SignalP 5.0 Benchmark set", which can be found in the data section at the same link [SignalP 6.0](https://services.healthtech.dtu.dk/service.php?SignalP-6.0) (also add it to sp_data/). Note that results will be predicted for the whole homology-partitioned data, and the benchmark SignalP 5.0 data 
+will just specify which of those sequences to be accounted for in the final resultsbut in the functions of misc/visualization.py, it will be used to report performance on this data if specified so (to compare
+against SignalP 6.0 results reported in their manuscript for instance, do set benchmark=True).
 
 The model should automatically set up binaries "sp6_partitioned_data_<test/train>_<fold_no>.bin" in sp_data folder based 
 on the downloaded fasta file (which should also be in sp_data folder) the first time a model is trained.
@@ -29,7 +31,22 @@ ProtBERT will automatically be downloaded to sp_data/models folder when training
 
 The base fasta file needs to be in the correct folder for training (refer to Section 2).
 
-### 3.1 Using our deployment model
+### 3.1  Test the performance of the model
+
+- **Necessary for reproducing the main results:**: To re-create a similar experiment on SignalP 6.0 data, 3 different runs are needed (refer to example 2 from
+example_runs.txt and its comments). At the end, plot_sp6_vs_tnmt and plot_sp6_vs_tnmt_mcc methods from misc/visualize_cs_pred_results.py 
+may be used for CS-F1 and MCC1/2. Note that all predictions from all runs have to be in a folder <fld_name> containing <run_name>\_<fold_i>_<fold_j> files, followed by various exntesions
+  (including but not limited to):
+  -  _best_sptype.bin 
+  - _best.bin
+  - .log 
+<br/> In general, it should be enough to do cp run_name* /\<path>/\<to>/misc/<fld_name>, after running for each fold pair 0,1/0,2/1,2
+
+- If a different dataset needs to be tested, refer to the 3.4 to create your own sequence file. After predicting the 
+sequences, use the correct and true predictions with misc/visualize_cs_pred_results.py methods get_pred_perf_sptype and get_cs_perf
+to get the SP type/CS performance on your predictions.
+
+### 3.2 Using our deployment model
 
 Download our pre-trained model from [here](https://www.dropbox.com/s/lfuleg9470s7nqx/deployment_sep_pe_swa_extra_inpemb_on_gen_best_eval_only_dec.pth?dl=0) and add it in sp_data folder.
 
@@ -43,33 +60,26 @@ To extract saliency maps of some sequences:
 
 - Follow the same procedures as in extracting predictions, and simply add "--compute_saliency" argument to your call.
 
-### 3.2  Train a new model while tuning bert
-First, follow the instructions on Section 2. If you wish to replicate the experiment results, refer to arguments --train_folds 
-from main.py. If you wish to create another deployment model (trained on D<sub>1,train</sub>, D<sub>2,train</sub>, 
-D<sub>3,train</sub>; validated on D<sub>1,test</sub>, D<sub>2,test</sub>, D<sub>3,test</sub>) refer to --deployment_model 
+### 3.3  Train a new model while tuning bert
+Recreating a deployment model: First, follow the instructions on Section 2. If you wish to replicate the experiment results, refer to arguments --train_folds 
+from main.py. If you wish to create another deployment model, trained on (D<sub>1,train</sub>, D<sub>2,train</sub>, 
+D<sub>3,train</sub>; validated on (D<sub>1,test</sub>, D<sub>2,test</sub>, D<sub>3,test</sub>) refer to --deployment_model 
 argument in main.py.
 
-### 3.3  Train a new model while not tuning bert
+### 3.4  Train a new model <u>while not tuning bert</u>
 
 Currently, a non-tuning-ProtBERT model only works with global label predictions. Therefore, use_glbl_lbls needs to be 
 true and glbl_lbl_version to the desired SP type prediction approach. Additionally, for efficiency reasons, when not 
 tuning the ProtBERT model, the embeddings for a dataset are pre-computed. When not calling main.py with --tune_bert, 
 these will be automatically computed for SignaP 6.0 data and the load will starts from there.
 
-### 3.4  Test on your own sequences
+### 3.5  Test on your own sequences
 
 If you want to test the model on your own sequences, please refer to create_test_files.py script, method for the method
 create_test_file(). If you want to use our pre-trained model, refer to Example 1 in example_runs.txt. To also create a 
 saliency map for the predictions, add --compute_saliency to the example 1.
 
-### 3.5  Test the performance of the model
 
-- To re-create a similar experiment on SignalP 6.0 data, 3 different runs are needed (refer to example 2 from
-example_runs.txt and its comments). At the end, extract_all_param_results method from misc/visualize_cs_pred_results.py 
-may be used.
-- If a different dataset needs to be tested, refer to the 3.4 to create your own sequence file. After predicting the 
-sequences, use the correct and true predictions with misc/visualize_cs_pred_results.py methods get_pred_perf_sptype and get_cs_perf
-to get the SP type/CS performance on your predictions.
 
 
 ## References 

@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 Example 1. Test sequences:
-    python main.py --test_seqs some_test_seqs.bin  --test_mdl deployment_sep_pe_swa_extra_inpemb_on_gen_best_eval_only_dec.pth --tune_bert --train_only_decoder
+    python main.py --test_seqs test_seqs.bin  --test_mdl deployment_sep_pe_swa_extra_inpemb_on_gen_best_eval_only_dec.pth --tune_bert --train_only_decoder
 
 The corresponding parameters (tune_bert, train_only_decoder) are required when testing (if the model being tested was
 not trained using those, don't add them). Here we show a use case of our deployment model (see section 3.1 from README

@@ -391,8 +391,11 @@ class SPCSpredictionData:
                 return "sp_data/"
             else:
                 return "./"
-        else:
+        elif os.path.exists("/scratch/project2003818/"):
             return "/scratch/project2003818/dumitra1/sp_data/"
+        else:
+            print("Machine not recognized. Will assume your data is inside sp_data/ relative to the main project folder")
+            return "sp_data/"
 
 
 class CSPredsDataset(Dataset):

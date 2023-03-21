@@ -1761,17 +1761,21 @@ def count_seqs_lgs(seqs):
     print(count_seqs)
 
 def extract_id2seq_dict(file="train_set.fasta"):
+    """
+        function that retrieves id dictionaries with only the benchmark ids
+    """
 
     # for seq_record in SeqIO.parse(file_new, "fasta"):
     # id2seq[seq_record.id.split("|")[0]] = str(seq_record.seq[:len(seq_record.seq) // 2])
     # id2truelbls[seq_record.id.split("|")[0]] = str(seq_record.seq[len(seq_record.seq) // 2:])
     # id2lg[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[1])
     # id2type[seq_record.id.split("|")[0]] = str(seq_record.id.split("|")[2])
-    decided_ids = ['B3GZ85', 'B0R5Y3', 'Q0T616', 'Q7CI09', 'P33937', 'P63883', 'P33937', 'Q9P121', 'C1CTN0', 'Q8FAX0',
-                   'P9WK51', 'Q5GZP1', 'P0AD45', 'P0DC88', 'Q8E6W4', 'Q5HMD1', 'Q2FWG4', 'Q5HLG6', 'Q8Y7A9', 'P65631',
-                   'B1AIC4', 'Q2FZJ9', ' P0ABJ2', 'P0AD46', 'P0ABJ2', 'Q99V36', 'Q7A698', 'Q5HH23', 'Q6GI23', 'Q7A181',
-                   'Q2YX14', 'Q6GAF2', 'P65628', 'P65629', 'P65630', 'Q5HEA9', 'P0DC86', 'Q2YUI9', 'Q5XDY9', 'Q2FF36',
-                   'Q1R3H8', 'P0DC87', 'A5IUN6', 'A6QIT4', 'A7X4S6', 'Q6G7M0', 'Q1CHD5']
+    # decided_ids = ['B3GZ85', 'B0R5Y3', 'Q0T616', 'Q7CI09', 'P33937', 'P63883', 'P33937', 'Q9P121', 'C1CTN0', 'Q8FAX0',
+    #                'P9WK51', 'Q5GZP1', 'P0AD45', 'P0DC88', 'Q8E6W4', 'Q5HMD1', 'Q2FWG4', 'Q5HLG6', 'Q8Y7A9', 'P65631',
+    #                'B1AIC4', 'Q2FZJ9', ' P0ABJ2', 'P0AD46', 'P0ABJ2', 'Q99V36', 'Q7A698', 'Q5HH23', 'Q6GI23', 'Q7A181',
+    #                'Q2YX14', 'Q6GAF2', 'P65628', 'P65629', 'P65630', 'Q5HEA9', 'P0DC86', 'Q2YUI9', 'Q5XDY9', 'Q2FF36',
+    #                'Q1R3H8', 'P0DC87', 'A5IUN
+    #                6', 'A6QIT4', 'A7X4S6', 'Q6G7M0', 'Q1CHD5']
     file = "../sp_data/benchmark_set_sp5.fasta"
     file_new = "../sp_data/train_set.fasta"
     id2seq = {}
@@ -2693,7 +2697,8 @@ def plot_sp6_vs_tnmt_mcc(result_folders=("only_decoder_tune_bert_extraOhOnOut_sw
                                      "only_decoder_tune_bert_extraOhOnOut_swa_run_2",
                                      "only_decoder_tune_bert_extraOhOnOut_swa_run_3",
                                      "only_decoder_tune_bert_extraOhOnOut_swa_run_4",
-                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_5")):
+                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_5"),
+                         benchmark=True):
     """
     Method for MCC bar plots with mean and variance Sec/SPase I and II and Tat/SPase I compared to SignalP 6.0 and other
     models. The method computes mean and average across multiple runs, but can be used for a single run also.
@@ -2724,7 +2729,7 @@ def plot_sp6_vs_tnmt_mcc(result_folders=("only_decoder_tune_bert_extraOhOnOut_sw
                                                 result_folder=run_folder,
                                                 compare_mdl_plots=False,
                                                 remove_test_seqs=False,
-                                                benchmark=True,
+                                                benchmark=benchmark,
                                                 prints=False)
         mdl_ind = 0
         sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
@@ -2761,17 +2766,18 @@ def plot_sp6_vs_tnmt_mcc(result_folders=("only_decoder_tune_bert_extraOhOnOut_sw
 
 
 
-
-    # no_of_seqs_sp1 = np.array([2040, 44, 142, 356])
-    # no_of_seqs_sp2 = np.array([1087, 516, 12])
-    # no_of_seqs_tat = np.array([313, 39, 13])
-    # no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
+    if benchmark:
+        no_of_seqs_sp1 = np.array([146, 61, 15, 36])
+        no_of_seqs_sp2 = np.array([257, 120, 9])
+        no_of_seqs_tat = np.array([51, 18, 9])
+        no_of_tested_sp_seqs = sum([146, 61, 15, 36]) + sum([257, 120, 9]) + sum([51, 18, 9])
+    else:
+        no_of_seqs_sp1 = np.array([2040, 44, 142, 356])
+        no_of_seqs_sp2 = np.array([1087, 516, 12])
+        no_of_seqs_tat = np.array([313, 39, 13])
+        no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
 
     # no_of_seqs_sp1 = np.arraZ
-    no_of_seqs_sp1 = np.array([146, 61, 15, 36])
-    no_of_seqs_sp2 = np.array([257, 120, 9])
-    no_of_seqs_tat = np.array([51, 18, 9])
-    no_of_tested_sp_seqs = sum([146, 61, 15, 36]) + sum([257, 120, 9]) + sum([51, 18, 9])
 
     print("mcc1- (sp1,sp2,tat). Tsi", [round(mc, 3)  for mc in mean_mcc1_sp1], [round(mc, 3) for mc in mean_mcc1_sp2], [round(mc,3) for mc in mean_mcc1_tat])
     print("mcc1- (sp1,sp2,tat). SP6", list(sp6_mcc1_sp1), list(sp6_mcc1_sp2), list(sp6_mcc1_tat))
@@ -2779,12 +2785,12 @@ def plot_sp6_vs_tnmt_mcc(result_folders=("only_decoder_tune_bert_extraOhOnOut_sw
     print("mcc2- (sp1,sp2,tat). SP6", list(sp6_mcc2_sp1), list(sp6_mcc2_sp2), list(sp6_mcc2_tat))
     total_mcc1 = (sum(mean_mcc1_sp1 * no_of_seqs_sp1) + sum(mean_mcc1_sp2 * no_of_seqs_sp2) + sum(mean_mcc1_tat * no_of_seqs_tat))/no_of_tested_sp_seqs
     total_mcc1_sp6 = (sum(sp6_mcc1_sp1 * no_of_seqs_sp1) + sum(sp6_mcc1_sp2 * no_of_seqs_sp2) + sum(sp6_mcc1_tat * no_of_seqs_tat))/no_of_tested_sp_seqs
-    total_mcc2 = (sum(mean_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(mean_mcc2_sp2 * no_of_seqs_sp2) + sum(mean_mcc2_tat * no_of_seqs_tat))/(no_of_tested_sp_seqs-146)
-    total_mcc2_sp6 =  (sum(sp6_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(sp6_mcc2_sp2 * no_of_seqs_sp2) + sum(sp6_mcc2_tat * no_of_seqs_tat))/(no_of_tested_sp_seqs-146)
+    total_mcc2 = (sum(mean_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(mean_mcc2_sp2 * no_of_seqs_sp2) + sum(mean_mcc2_tat * no_of_seqs_tat))/(no_of_tested_sp_seqs-146 if benchmark else no_of_tested_sp_seqs-2040)
+    total_mcc2_sp6 =  (sum(sp6_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(sp6_mcc2_sp2 * no_of_seqs_sp2) + sum(sp6_mcc2_tat * no_of_seqs_tat))/(no_of_tested_sp_seqs-146 if benchmark else no_of_tested_sp_seqs-2040)
     total_mcc1_std = (sum(std_mcc1_sp1 * no_of_seqs_sp1) + sum(std_mcc1_sp2 * no_of_seqs_sp2) + sum(
-        std_mcc1_tat * no_of_seqs_tat)) / (no_of_tested_sp_seqs-146)
+        std_mcc1_tat * no_of_seqs_tat)) / (no_of_tested_sp_seqs-146 if benchmark else no_of_tested_sp_seqs-2040)
     total_mcc2_std = (sum(std_mcc2_sp1 * no_of_seqs_sp1[1:]) + sum(std_mcc2_sp2 * no_of_seqs_sp2) + sum(
-        std_mcc2_tat * no_of_seqs_tat)) / (no_of_tested_sp_seqs-146)
+        std_mcc2_tat * no_of_seqs_tat)) / (no_of_tested_sp_seqs-146 if benchmark else no_of_tested_sp_seqs-2040)
 
     print("non-w average sp6:",(np.mean(sp6_mcc1_sp1)+np.mean(sp6_mcc1_sp2) + np.mean(sp6_mcc1_tat) + np.mean(sp6_mcc2_sp1)+np.mean(sp6_mcc2_sp2) + np.mean(sp6_mcc2_tat))/6)
     print("non-w average tsignal:",(np.mean(mean_mcc1_sp1)+np.mean(mean_mcc2_sp1) + np.mean(mean_mcc1_sp2) + np.mean(mean_mcc2_sp2)+np.mean(mean_mcc1_tat) + np.mean(mean_mcc2_tat))/6)
@@ -2793,15 +2799,11 @@ def plot_sp6_vs_tnmt_mcc(result_folders=("only_decoder_tune_bert_extraOhOnOut_sw
     bar_plot_all_mccs(mean_results_TSignal,std_results_TSignal,mean_results_SP6,mcc_deepsig,mcc_predTat,mcc_lipop,mcc_phobius)
     exit(1)
 
-def plot_comparative_performance_sp1_mdls():
-    # enc-dec model
-    tnmt_f1 = [[0.693,0.733,0.759,0.779],[0.636,0.727,0.764,0.782],[0.692,0.769,0.769,0.769],[0.552,0.655,0.69,0.69]]
-    tnmt_f1 = [[0.631, 0.731, 0.756, 0.769], [0.65, 0.833, 0.883, 0.883], [0.867, 0.933, 0.933, 0.933],[0.551, 0.667, 0.696, 0.754]]
-    # i still didnt train on random data < - < this is not the correct analysis, i need to redo the random folds
-    # the ones below are the correct values
-    tnmt_f1 = [[0.677, 0.748, 0.773, 0.799],[0.689, 0.84, 0.891, 0.908], [0.759, 0.897, 0.897, 0.897], [0.554, 0.677, 0.738, 0.769]]
-    tnmt_rec = [[0.719,0.76,0.788,0.808],[0.556,0.635,0.667,0.683],[0.6,0.667,0.667,0.667],[0.444,0.528,0.556,0.556]]
-    tnmt_prec = [[0.669,0.707,0.732,0.752],[0.745,0.851,0.894,0.915],[0.818,0.909,0.909,0.909],[0.727,0.864,0.909,0.909]]
+def plot_comparative_performance_sp1_mdls(result_folders=("previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_1",
+                                                         "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_2",
+                                                         "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_3",
+                                                         "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_4",
+                                                         "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_5")):
 
     all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=["SP", "NO_SP"])
     all_recalls, all_precisions, f1_predtat = extract_compatible_binaries_predtat(restrict_types=["SP", "NO_SP"])
@@ -2810,23 +2812,19 @@ def plot_comparative_performance_sp1_mdls():
 
 
     # all_f1s = [tnmt_f1, f1_predtat, f1_lipop, f1_deepsig, f1_phobius]
-    all_f1s = [tnmt_f1, f1_deepsig, f1_phobius, f1_lipop, f1_predtat]
+    all_f1s = [f1_deepsig, f1_phobius, f1_lipop, f1_predtat]
 
     # names = ["TSignal", "PredTAT", "LipoP", "DeepSig", "Phobius"]
     names = ["TSignal", "DeepSig", "Phobius", "LipoP", "PredTAT"]
     colors = ["navy", "red", "green", "black", "purple"]
     titles = ["eukarya", "gn bacteria", "gp bacteria", "archaea"]
-    x_positions = []
 
     sp1_f1s, sp1_recs, sp1_precs, sp2_f1s, sp2_recs, sp2_precs, tat_f1s, \
     tat_recs, tat_precs, mcc1_sp1, mcc2_sp1, mcc1_sp2, mcc2_sp2, mcc1_tat, mcc2_tat = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
-    runs = [1,2,3,4,5]
-    runs = [32,34,37, 39,40, 47]
-    runs = [59,60,61,62,71]
 
-    for run_no in runs:
-        print("Computing results for run number {}".format(run_no))
-        run_results_folder = "tuning_bert_fixed_high_lr_swa_only_repeat{}/".format(run_no)
+    for run in result_folders:
+        print("Computing results for run {}".format(run))
+        run_results_folder = run
 
         mdl2results = extract_all_param_results(only_cs_position=False,
                                                 result_folder=run_results_folder,
@@ -2852,49 +2850,24 @@ def plot_comparative_performance_sp1_mdls():
         mcc1_tat.append(np.array([mcc for mcc in mdl2results[mdl_ind][4]]))
     arrange_tol_lg_sp1 = []
     for og_ind in [0, 4, 8, 12]:
-        arrange_tol_lg_ = []
         for tol in range(4):
-            arrange_tol_lg_ = [sp1_f1s[run_no][og_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_ = [sp1_f1s[run_no][og_ind + tol] for run_no in range(len(result_folders))]
             arrange_tol_lg_sp1.append(arrange_tol_lg_)
     arrange_tol_lg_sp2 = []
     for og_ind in [0, 4, 8]:
-        arrange_tol_lg_ = []
         for tol in range(4):
-            arrange_tol_lg_ = [sp2_f1s[run_no][og_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_ = [sp2_f1s[run_no][og_ind + tol] for run_no in range(len(result_folders))]
             arrange_tol_lg_sp2.append(arrange_tol_lg_)
     arrange_tol_lg_tat = []
     for og_ind in [0, 4, 8]:
-        arrange_tol_lg_ = []
         for tol in range(4):
-            arrange_tol_lg_ = [tat_f1s[run_no][og_ind + tol] for run_no in range(len(runs))]
+            arrange_tol_lg_ = [tat_f1s[run_no][og_ind + tol] for run_no in range(len(result_folders))]
             arrange_tol_lg_tat.append(arrange_tol_lg_)
     arrange_sptype_tol_lg = [np.array(arrange_tol_lg_sp1), np.array(arrange_tol_lg_sp2), np.array(arrange_tol_lg_tat)]
 
     all_sptypes_all_mean = [np.mean(arrange_sptype_tol_lg[0],axis=1), np.mean(arrange_sptype_tol_lg[1], axis=1), np.mean(arrange_sptype_tol_lg[2], axis=1)]
     all_sptypes_all_std = [np.std(arrange_sptype_tol_lg[0],axis=1), np.std(arrange_sptype_tol_lg[1], axis=1), np.std(arrange_sptype_tol_lg[2], axis=1)]
-    # print(all_sptypes_all_mean)
-    # exit(1)
-    # non_restricted deepsig/TNMT comparison
-    # all_recalls, all_precisions, f1_deepsig = extract_compatible_binaries_deepsig(restrict_types=None)
-    # tnmt_f1 = [[0.693, 0.733, 0.759, 0.779], [0.493, 0.563, 0.592, 0.606], [0.486, 0.541, 0.541, 0.541], [0.533, 0.633, 0.667, 0.667]]
-    # line_w = 0.15
-    # offsets = [-1.5 * line_w, - 0.5 * line_w, + 0.5 * line_w, line_w * 1.5]
-    # colors = ['blue', 'black']
-    # all_f1s = [tnmt_f1, f1_deepsig]
-    # names = ["TNMT", "DeepSig"]
-    #
-    # for ind in range(4):
-    #     ax = plt.subplot(111)
-    #     for j in range(2,4):
-    #         ax.bar([i + offsets[j] for i in range(1,5)], all_f1s[j-2][ind], color=colors[j-2], label=names[j-2], width=line_w)
-    #     box = ax.get_position()
-    #     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    #     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    #     ax.set_xticks(list(range(1,5)))
-    #     ax.set_xticklabels(['tolerance {}'.format(i) for i in range(4)])
-    #     ax.set_title(titles[ind])
-    #     ax.set_ylabel("F1 score")
-    #     plt.show()
+
     import matplotlib as mpl
     mpl.rcParams['figure.dpi'] = 350
     mpl.rcParams['font.family'] = "Arial"
@@ -2903,9 +2876,6 @@ def plot_comparative_performance_sp1_mdls():
 
     line_w = 0.15
     offsets = [-2 * line_w, - 1 * line_w,0, 1 * line_w, line_w * 2]
-    # ax = plt.subplot(111)
-    # fig, ax = plt.subplots(4, 1)
-    # fig.set_size_inches(18.5, 5, forward=True)
     fig, ax = plt.subplots(4, 1,figsize=(8, 6),dpi=350)
 
     for ind in range(4):
@@ -2919,24 +2889,18 @@ def plot_comparative_performance_sp1_mdls():
 
 
             else:
-                ax[ind].bar([i + offsets[j] for i in range(1,5)], all_f1s[j][ind], color=colors[j], label=names[j], width=line_w, alpha=0.6)
+                ax[ind].bar([i + offsets[j] for i in range(1,5)], all_f1s[j-1][ind], color=colors[j], label=names[j], width=line_w, alpha=0.6)
         box = ax[ind].get_position()
         ax[ind].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.35, box.width * 1, box.height*0.85])
         if ind == 3:
-            # ax[ind].legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=12.5)
             handles, labels = ax[ind].get_legend_handles_labels()
 
-        # if ind != 3:
-        #     ax[ind].set_xticks([])
-        # else:
         ax[ind].set_xticks(list(range(1,5)))
         ax[ind].set_xticklabels(['{}'.format(i) for i in range(4)], fontsize=12.5)
         ax[ind].set_yticks([0, 0.2,0.4,0.6,0.8, 1])
         ax[ind].grid(axis='y',color='black', linestyle='-', linewidth=0.5,alpha=0.4)
         ax[ind].set_yticklabels(labels=[0, 0.2,0.4,0.6,0.8, 1],fontsize=12.5)
-        # plt.yticks(fontsize=10)
-        # if ind == 0:
-        #     ax[ind].set_title("F1 score", fontsize=12.5)
+
         ax[ind].set_ylabel("F1 score\n"+titles[ind], fontsize=12.5)
         ax[ind].yaxis.set_label_coords(-0.08, 0.5)
         ax[ind].set_xlim(0.6, 4.4)
@@ -3775,9 +3739,10 @@ def visualize_inp_gradients(files=["added_oh_gen_fold0.bin", "added_oh_gen_fold1
     folder = get_data_folder()
     seq2lbls = {}
     seq2lg = {}
+    # gather sequence info from data
     for i in [0,1,2]:
         for t in ["train", "test"]:
-            a = pickle.load(open(folder+"random_folds_sp6_partitioned_data_{}_{}.bin".format(t,i), "rb"))
+            a = pickle.load(open(folder+"sp6_partitioned_data_{}_{}.bin".format(t,i), "rb"))
             seq2lbls.update({seq:lbls[1] for seq,lbls in a.items()})
             seq2lg.update({seq:lbls[-1] for seq,lbls in a.items()})
     sequences_and_grad_values = []
@@ -3801,9 +3766,10 @@ def visualize_inp_gradients(files=["added_oh_gen_fold0.bin", "added_oh_gen_fold1
     counts_sp2 = 0
     motif_test = "FLK"
     seqs2glbl_lbl = {}
+    # gather sequence info from data
     for t in ['train', 'test']:
         for fold in [0,1,2]:
-            dict_ = pickle.load(open("../sp_data/random_folds_sp6_partitioned_data_{}_{}.bin".format(t,fold), "rb"))
+            dict_ = pickle.load(open("../sp_data/sp6_partitioned_data_{}_{}.bin".format(t,fold), "rb"))
             seqs2glbl_lbl.update({k:v[-1] for k,v in dict_.items()})
     avg_cs_pos = []
     right5_hydro_vals = []
@@ -4098,7 +4064,7 @@ def plot_og_vs_no_og(result_folders_no_og=("only_decoder_tune_bert_extraOhOnOut_
                                                 result_folder=run_foldername,
                                                 compare_mdl_plots=False,
                                                 remove_test_seqs=False,
-                                                benchmark=True,
+                                                benchmark=False,
                                                 prints=False)
         mdl_ind = 0
         sp1_f1s.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
@@ -4144,7 +4110,7 @@ def plot_og_vs_no_og(result_folders_no_og=("only_decoder_tune_bert_extraOhOnOut_
                                                 result_folder=run_foldername,
                                                 compare_mdl_plots=False,
                                                 remove_test_seqs=False,
-                                                benchmark=True,
+                                                benchmark=False,
                                                 prints=False)
         mdl_ind = 0
         sp1_f1s_og.append(np.array([rec for rec in np.concatenate(mdl2results[mdl_ind][-7])]))
@@ -4250,10 +4216,15 @@ def plot_og_vs_no_og(result_folders_no_og=("only_decoder_tune_bert_extraOhOnOut_
     plt.savefig("og_no_og_comparison.pdf")
 
     # repeat 4 times for each tolerance level
-    no_of_seqs_sp1 = np.array([146, 61, 15, 36]).repeat(4)
-    no_of_seqs_sp2 = np.array([257, 120, 9]).repeat(4)
-    no_of_seqs_tat = np.array([51, 18, 9]).repeat(4)
-    no_of_tested_sp_seqs = sum([146, 61, 15, 36]) + sum([257, 120, 9]) + sum([51, 18, 9])
+    # no_of_seqs_sp1 = np.array([146, 61, 15, 36]).repeat(4)
+    # no_of_seqs_sp2 = np.array([257, 120, 9]).repeat(4)
+    # no_of_seqs_tat = np.array([51, 18, 9]).repeat(4)
+    # no_of_tested_sp_seqs = sum([146, 61, 15, 36]) + sum([257, 120, 9]) + sum([51, 18, 9])
+
+    no_of_seqs_sp1 = np.array([2040, 44, 142, 356]).repeat(4)
+    no_of_seqs_sp2 = np.array([1087, 516, 12]).repeat(4)
+    no_of_seqs_tat = np.array([313, 39, 13]).repeat(4)
+    no_of_tested_sp_seqs = sum([2040, 44, 142, 356]) + sum([1087, 516, 12]) + sum([313, 39, 13])
 
     print("Mean weighted F1 score across all SP types, organism groups and tolerance levels TSignal: ",
           (np.sum(all_sptypes_all_mean[0] * no_of_seqs_sp1) +
@@ -4264,47 +4235,62 @@ def plot_og_vs_no_og(result_folders_no_og=("only_decoder_tune_bert_extraOhOnOut_
            np.sum(all_sptypes_all_mean_wog[1] * no_of_seqs_sp2) +
            np.sum(all_sptypes_all_mean_wog[2] * no_of_seqs_tat)) / np.sum(no_of_tested_sp_seqs * 4))
 
-    exit(1)
 
 
 if __name__ == "__main__":
-    plot_sp6_vs_tnmt_mcc()
-    exit(1)
 
 
-    plot_og_vs_no_og(result_folders_no_og=("only_decoder_tune_bert_extraOhOnOut_swa_run_1",
-                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_2",
-                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_3",
-                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_4",
-                                     "only_decoder_tune_bert_extraOhOnOut_swa_run_5"),result_folders_og=("run_w_og", "only_decoder_tune_bert_extraOhOnOut_swa_run_1"))
-    # result_folders=(test_again, test_again2); newly recomputed runs to make sure results are reproducible
+    # test F1 TSignal vs other models (Fig. 4 main text)
+    plot_sp6_vs_tnmt(result_folders=("previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_1",
+                                     "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_2",
+                                     "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_3",
+                                     "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_4",
+                                     "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_5"))
 
+    # test mcc TSignal vs other models (Fig. 3 main text)
+    plot_sp6_vs_tnmt_mcc(result_folders=("previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_1",
+                                     "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_2",
+                                     "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_3",
+                                     "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_4",
+                                     "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_5"),benchmark=True)
 
-    plot_sp6_vs_tnmt_mcc()
+    # plot F1-CS performance for TSignal vs all other models (Figure 5 main manuscript)
+    plot_comparative_performance_sp1_mdls(result_folders=("previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_1",
+                        "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_2",
+                        "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_3",
+                        "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_4",
+                        "previous_results/only_decoder_tune_bert_extraOhOnOut_swa_run_5"))
+
+    # input gradient visualization (Fig 6 main manuscript. Note: this uses sp6_partitioned_data_<fold1>_<fold2>_<train/test>.bin
+    # files) - so first you need to follow README section 2.
+    visualize_inp_gradients(files=["previous_results/added_oh_gen_fold0.bin", "added_oh_gen_fold1.bin", "added_oh_gen_fold2.bin"])
+
+    # simple visualization for the sine-based dot products on various relative positions (Fig. 3 supplement)
     visualize_dot_products()
-    plot_sp6_vs_tnmt()
-    exit(1)
 
 
+    # MCC performance on the whol data (since benchmark is set to False)
+    plot_sp6_vs_tnmt_mcc(benchmark=False)
+
+
+    # reproduce the ablation study between using and not using organism group information
+    plot_og_vs_no_og(result_folders_no_og=("only_decoder_tune_bert_extraOhOnOut_swa_run_1",
+                                           "only_decoder_tune_bert_extraOhOnOut_swa_run_2",
+                                           "only_decoder_tune_bert_extraOhOnOut_swa_run_3",
+                                           "only_decoder_tune_bert_extraOhOnOut_swa_run_4",
+                                           "only_decoder_tune_bert_extraOhOnOut_swa_run_5"),
+                     result_folders_og=("run_w_og", "run_w_og_run2", "run_w_og_run3", "run_w_og_run4", "run_w_og_run5"))
+    # get whole data MCC scores for with-organism-group method
+    plot_sp6_vs_tnmt_mcc(result_folders=("previous_results/run_w_og", "previous_results/run_w_og_run2", "previous_results/run_w_og_run3",
+                        "previous_results/run_w_og_run4", "previous_results/run_w_og_run5"), benchmark=False)
 
 
     plot_perf_over_data_perc()
-    exit(1)
-    plot_sp6_vs_tnmt_mcc()
-    exit(1)
-
-    visualize_inp_gradients(files=["added_oh_gen_fold0.bin", "added_oh_gen_fold1.bin", "added_oh_gen_fold2.bin"])
-    plot_sp6_vs_tnmt()
 
 
+    # when training separately the SP identification task (this is not the final model variation presented in the manuscript)
     compute_mcc_sp_only_mdls()
 
-    plot_comparative_performance_sp1_mdls()
-    mdl2results = extract_all_param_results(only_cs_position=False,
-                                            result_folder="tuning_bert_fixed_high_lr_swa_only_repeat74/",
-                                            compare_mdl_plots=False,
-                                            remove_test_seqs=False,
-                                            benchmark=True)
 
 
     plot_compare_pos_nopos()
