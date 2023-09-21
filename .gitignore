@@ -13,3 +13,6 @@ sp_data/results/*
 *.pth
 sp_data/*.pth
 sp_data/experiments_sp6tuning/
+sp6_data/__pycache__/
+__pycache__/
+

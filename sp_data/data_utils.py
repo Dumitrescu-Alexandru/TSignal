@@ -384,18 +384,7 @@ class SPCSpredictionData:
         pickle.dump([self.lbl2ind, self.og2ind, self.glbl_lbl_2ind, self.aa2ind], open("sp6_dicts.bin", "wb"))
 
     def get_data_folder(self):
-        if os.path.exists("/scratch/work/dumitra1"):
-            return "/scratch/work/dumitra1/sp_data/"
-        elif os.path.exists("/home/alex"):
-            if os.path.exists("sp_data"):
-                return "sp_data/"
-            else:
-                return "./"
-        elif os.path.exists("/scratch/project2003818/"):
-            return "/scratch/project2003818/dumitra1/sp_data/"
-        else:
-            print("Machine not recognized. Will assume your data is inside sp_data/ relative to the main project folder")
-            return "sp_data/"
+        return "sp_data/"
 
 
 class CSPredsDataset(Dataset):

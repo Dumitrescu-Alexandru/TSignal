@@ -163,7 +163,13 @@ def extract_raw_data(folder):
                    'Q1R3H8', 'P0DC87', 'A5IUN6', 'A6QIT4', 'A7X4S6', 'Q6G7M0', 'Q1CHD5']
     seq2all_info = {}
     added_seqs = set()
-    for seq_record in SeqIO.parse(folder+"train_set.fasta", "fasta"):
+    try:
+        parse_items = SeqIO.parse(folder+"train_set.fasta", "fasta")
+    except:
+        print("!!!ERROR!!! from extract_raw_data function in sp_data/sp6_data/read_extract_sp6_data.py: Please add the train_set.fasta file from SignalP 6.0 website or retrieve our pre-computed "
+              "folds from the dropbox link (refer to README, Section 2 Data)")
+        exit(1)
+    for seq_record in parse_items:
         current_seq = seq_record.seq[:len(seq_record) // 2]
         if check_already_added(seq_record, added_seqs):
             # if the already added sequence has an id in the set of ids decided to be added, continue to next iteration

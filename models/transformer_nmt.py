@@ -692,10 +692,4 @@ def create_mask(src, tgt):
 # print(a[-1], b[-1])
 # print(src_mask, tgt_mask)
 def get_data_folder():
-    import os
-    if os.path.exists("/scratch/work/dumitra1"):
-        return "/scratch/work/dumitra1/sp_data/"
-    elif os.path.exists("/home/alex"):
-        return "sp_data/"
-    else:
-        return "/scratch/project2003818/dumitra1/sp_data/"
+    return "sp_data/"

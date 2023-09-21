@@ -6,12 +6,7 @@ import torch.nn as nn
 
 
 def get_data_folder():
-    if os.path.exists("/scratch/work/dumitra1"):
-        return "/scratch/work/dumitra1/sp_data/"
-    elif os.path.exists("/home/alex"):
-        return "sp_data/"
-    else:
-        return "/scratch/project2003818/dumitra1/sp_data/"
+    return "sp_data/"
 
 
 class BinarySPClassifier(nn.Module):

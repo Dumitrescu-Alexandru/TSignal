@@ -557,16 +557,7 @@ def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_
 
 
 def get_data_folder():
-    if os.path.exists("sp6_data/"):
-        return "./"
-    elif os.path.exists("/scratch/work/dumitra1"):
-        return "/scratch/work/dumitra1/sp_data/"
-    elif os.path.exists("results"):
-        return "../sp_data/"
-    elif os.path.exists("/home/alex"):
-        return "sp_data/"
-    else:
-        return "/scratch/project2003818/dumitra1/sp_data/"
+    return "sp_data/"
 
 
 def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabilities_file=None, return_everything=False,
@@ -3238,7 +3229,7 @@ def plot_perf_over_data_perc():
 
     box = ax[1,0].get_position()
     ax[1,0].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.6, box.width, box.height * 0.75])
-    ax[1,0].set_xlabel("data percentage", fontsize=12.5)
+    ax[1,0].set_xlabel("fraction of data", fontsize=12.5)
     ax[1,0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1])
 
     ax[1,0].set_xticklabels([0.25, 0.5, 0.75, 1], fontsize=12.5)
@@ -3257,7 +3248,8 @@ def plot_perf_over_data_perc():
                     alpha=0.2, color='red')
     box = ax[1,1].get_position()
     ax[1,1].set_position([box.x0 + box.width * 0.05, box.y0 + box.height * 0.6, box.width, box.height * 0.75])
-    ax[1,1].set_xlabel("data percentage", fontsize=12.5)
+    # data percentage
+    ax[1,1].set_xlabel("fraction of data", fontsize=12.5)
     ax[1,1].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1    ])
     ax[1,1].set_xticks([0.25, 0.5, 0.75, 1])
 
