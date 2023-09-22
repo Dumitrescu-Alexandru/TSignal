@@ -16,7 +16,7 @@ Use pip install -r requirements.txt
 
 **Necessary for reproducing the main results:** We use data from [3]. Add the necessary training
 binaries directly from [Link to CV files](https://www.dropbox.com/scl/fo/h3dyfr358optb7to5n9ma/h?dl=0&rlkey=iwvnr6bcklhtogiz9t3pterir) or download from [SignalP 6.0](https://services.healthtech.dtu.dk/service.php?SignalP-6.0) 
-the train_set.fasta file "SignalP 6.0 Training set" and add it to sp_data/ folder (in the latter case, the cross-validation binaries should automatically be created). In either case, please properly cite the authors of the homology-split data. The benchmark data on which we
+the train_set.fasta file "SignalP 6.0 Training set" and add it to sp_data/sp6_data/ folder (in the latter case, the cross-validation binaries should automatically be created). In either case, please properly cite the authors of the homology-split data. The benchmark data on which we
 report the results is found in "SignalP 5.0 Benchmark set", which can be found in the data section at the same link [SignalP 6.0](https://services.healthtech.dtu.dk/service.php?SignalP-6.0) (also add it to sp_data/). Note that results will be predicted for the whole homology-partitioned data, and the benchmark SignalP 5.0 data 
 will just specify which of those sequences to be accounted for in the final resultsbut in the functions of misc/visualization.py, it will be used to report performance on this data if specified so (to compare
 against SignalP 6.0 results reported in their manuscript for instance, do set benchmark=True).
@@ -31,7 +31,17 @@ ProtBERT will automatically be downloaded to sp_data/models folder when training
 
 The base fasta file needs to be in the correct folder for training (refer to Section 2).
 
-### 3.1  Test the performance of the model
+### 3.1 Predict on your own sequences
+
+Download our pre-trained model from [here](https://www.dropbox.com/s/lfuleg9470s7nqx/deployment_sep_pe_swa_extra_inpemb_on_gen_best_eval_only_dec.pth?dl=0) and add it in sp_data folder. Then, add the file containing the test sequences (fasta or binary format) in the sp_data folder.
+
+The fasta or binary format files need to be provided via the argument "--test_files <test_file>" (see Example 1 in example_runs.txt): fasta and binary formats. If a fasta file is given as argument, a corresponding binary file will automatically be created and added in the same folder (sp_data/).
+
+If a binary file is given to --test_files, a dictionary of the form {sequence:[embedding, label_sequence, life_group, sp-type]} will be required. Since it is used for testing, all entries may be random, and the binaries are created this way for compatibility with training datasets. Refer to "sp_data/test_seqs.bin" as an example binary test file.
+
+To extract saliency maps of some sequences: follow the same procedures as in extracting predictions, and simply add "--compute_saliency" argument to your call.
+
+### 3.2  Test the performance of the model
 
 - **Necessary for reproducing the main results:**: To re-create a similar experiment on SignalP 6.0 data, 3 different runs are needed (refer to example 2 from
 example_runs.txt and its comments). At the end, plot_sp6_vs_tnmt and plot_sp6_vs_tnmt_mcc methods from misc/visualize_cs_pred_results.py 
@@ -45,20 +55,6 @@ may be used for CS-F1 and MCC1/2. Note that all predictions from all runs have t
 - If a different dataset needs to be tested, refer to the 3.4 to create your own sequence file. After predicting the 
 sequences, use the correct and true predictions with misc/visualize_cs_pred_results.py methods get_pred_perf_sptype and get_cs_perf
 to get the SP type/CS performance on your predictions.
-
-### 3.2 Using our deployment model
-
-Download our pre-trained model from [here](https://www.dropbox.com/s/lfuleg9470s7nqx/deployment_sep_pe_swa_extra_inpemb_on_gen_best_eval_only_dec.pth?dl=0) and add it in sp_data folder.
-
-
-To extract sequence predictions:
-- prepare binary file containing a dictionary of the form {sequence:[embedding, label_sequence, life_group, sp-type]}. Since
-it is used for testing, all entries may be random, and the binaries are created this way for compatibility with training
-dataloaders.
-
-To extract saliency maps of some sequences:
-
-- Follow the same procedures as in extracting predictions, and simply add "--compute_saliency" argument to your call.
 
 ### 3.3  Train a new model while tuning bert
 Recreating a deployment model: First, follow the instructions on Section 2. If you wish to replicate the experiment results, refer to arguments --train_folds 
