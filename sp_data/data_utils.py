@@ -11,6 +11,21 @@ from Bio import SeqIO
 from sp_data.bert_tuning import ProtBertClassifier, parse_arguments_and_retrieve_logger
 from sp_data.sp6_data.read_extract_sp6_data import extract_raw_data
 
+def create_binary_test_file_from_fasta(data_path):
+    if data_path[-3:] == "bin": # if it's already a binary, don't do anything
+        return data_path.split("/")[-1]
+    fasta_sequences = SeqIO.parse(open(data_path),'fasta')
+    test_dictionary = {}
+    for seq in fasta_sequences:
+        seq_ = str(seq.seq)
+        true_lbl_placeholder = "#" * (len(seq_)//2 - 3)  + "UNKNOWN" + "#" * (len(seq_)//2 - 4)
+        organism_grp_placeholder = "EUKARYA"
+        sp_type_placeholder = "NO_SP"
+        test_dictionary[seq_] = [np.array(1), true_lbl_placeholder, organism_grp_placeholder, sp_type_placeholder]
+    pickle.dump(test_dictionary, open(data_path.replace(".fasta", ".bin"), "wb"))
+    print("Created binary file for test set at {}.".format(data_path.replace(".fasta", ".bin")))
+    return data_path.split("/")[-1].replace(".fasta", ".bin")
+
 def check_compatibility(tune_bert=True):
     data = pickle.load(open(get_data_folder()+"sp6_partitioned_data_train_0.bin", "rb"))
     # if the embeddings are "dummy" embeddings (used for compatibility in the dataloader, when assuming the ProtBERT
@@ -423,8 +438,10 @@ class CSPredsDataset(Dataset):
             data_dict = pickle.load(open(data_folder + test_f_name, "rb"))
             for seq_, vals_ in data_dict.items():
                 self.seqs.append(seq_)
-                self.lbls.append(self.transorm_seq(vals_[1], vals_[3])
-                                 if lipbobox_predictions else [lbl2inds[l] for l in vals_[1]])
+                if vals_[1][0] != "#":
+                    self.lbls.append(self.transorm_seq(vals_[1], vals_[3]) if lipbobox_predictions else [lbl2inds[l] for l in vals_[1]])
+                else:
+                    self.lbls.append(vals_[1])
                 self.life_grp.append(vals_[2])
                 self.glbl_lbl.append(vals_[3])
         if pick_seqs:

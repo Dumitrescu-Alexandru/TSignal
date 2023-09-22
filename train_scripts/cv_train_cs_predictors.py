@@ -17,7 +17,7 @@ import torch.optim as optim
 import torch
 sys.path.append(os.path.abspath(".."))
 from misc.visualize_cs_pred_results import get_cs_and_sp_pred_results, get_summary_sp_acc, get_summary_cs_acc, get_pred_perf_sptype, get_cs_perf
-from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights
+from sp_data.data_utils import SPbinaryData, BinarySPDataset, SPCSpredictionData, CSPredsDataset, collate_fn, get_sp_type_loss_weights, get_residue_label_loss_weights, create_binary_test_file_from_fasta
 from models.transformer_nmt import TransformerModel
 from models.binary_sp_classifier import BinarySPClassifier, CNN3, CNN4
 
@@ -879,7 +879,7 @@ def load_sptype_model(model_path):
 
 def load_model(model_path, dict_file=None, tuned_bert_embs_prefix="", tune_bert=False, testing=False, opt=False):
     folder = get_data_folder()
-    print(folder,model_path)
+    print("Loading model from {}".format(folder+model_path))
     model = torch.load(folder + model_path)
     if not tune_bert:
         model.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
@@ -1850,6 +1850,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
     sp_data = SPCSpredictionData(form_sp_reg_data=False, tune_bert=tune_bert)
     # hard-code this for now to check some sequences
     # test_file = "sp6_partitioned_data_train_1.bin"
+    test_file = create_binary_test_file_from_fasta(data_path=get_data_folder()+test_file)
     sp_dataset = CSPredsDataset(sp_data.lbl2ind, partitions=None, data_folder=sp_data.data_folder,
                                 glbl_lbl_2ind=sp_data.glbl_lbl_2ind, test_f_name=test_file, lipbobox_predictions=lipbobox_predictions)
     def visualize_importance(outs, grads, seqs_, ind2lbl_, batch_index_, sp_pred_inds_CS_spType_):
@@ -1924,8 +1925,9 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
         pickle.dump(all_seq_preds_grad_CSgrad,
                 open(folder+saliency_map_save_fn, "wb"))
     for seq, pred, lbl in zip(all_seqs, all_outs,all_lbls):
-        true_lbls.append("".join([ind2lbl[i] for i in lbl])[:70])
-        pred_lbls.append("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred]))
+        if lbl[0] == "#": true_lbls.append(lbl) # if it's a placeholder (testing new sequences), don't do anything
+        else: true_lbls.append("".join([ind2lbl[i] for i in lbl])[:70])
+        pred_lbls.append("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred if out_wrd != "ES"]))
         pred_probs = torch.softmax(pred, dim=-1)
         pred_probs = torch.max(pred_probs, dim=-1)[0].detach().cpu().numpy()
         # W = Tat/SPase II, T= Tat/SPase I, P=Sec/SPase IV, L=Sec/SPase II, S = Sec/SPase I

@@ -557,7 +557,10 @@ def extract_seq_group_for_predicted_aa_lbls(filename="run_wo_lg_info.bin", test_
 
 
 def get_data_folder():
-    return "sp_data/"
+    if os.path.exists("sp6_data/"):
+        return "./"
+    elif os.path.exists("results"):
+        return "../sp_data/"
 
 
 def get_cs_and_sp_pred_results(filename="run_wo_lg_info.bin", v=False, probabilities_file=None, return_everything=False,
