@@ -85,6 +85,17 @@ def generate_square_subsequent_mask(sz):
     mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
     return mask
 
+def set_mdl_device(model):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    model.classification_head.input_encoder.device = device
+    model.pos_encoder.device = device
+    model.label_encoder.device = device
+    model.classification_head.device = device
+    model.classification_head.label_encoder.device = device
+    model.classification_head.pos_encoder.device = device
+    return model
+
 def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=False, second_model=None,
                   test_only_cs=False, glbl_lbls=None, tune_bert=False, train_oh=False, saliency_map=False,
                   hook_layer="bert", sptype_preds=None,glbl_lbl_2ind=None, remove_eos_from_inference=True):
@@ -98,6 +109,7 @@ def greedy_decode(model, src, start_symbol, lbl2ind, tgt=None, form_sp_reg_data=
 
     # model.ProtBertBFD.requires_grad=True
     # onelasttime
+    model = set_mdl_device(model)
     eos_index = lbl2ind['ES']
     if saliency_map:
         model.requires_grad=True
@@ -873,7 +885,10 @@ def evaluate(model, lbl2ind, run_name="", test_batch_size=50, partitions=[0, 1],
 
 def load_sptype_model(model_path):
     folder = get_data_folder()
-    model = torch.load(folder + model_path)
+    if not torch.cuda.is_available():
+        model = torch.load(folder + model_path, map_location=torch.device('cpu'))
+    else:
+        model = torch.load(folder + model_path)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     return model.to(device)
 
