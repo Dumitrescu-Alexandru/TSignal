@@ -895,7 +895,10 @@ def load_sptype_model(model_path):
 def load_model(model_path, dict_file=None, tuned_bert_embs_prefix="", tune_bert=False, testing=False, opt=False):
     folder = get_data_folder()
     print("Loading model from {}".format(folder+model_path))
-    model = torch.load(folder + model_path)
+    if torch.cuda.is_available():
+        model = torch.load(folder + model_path)
+    else:
+        model = torch.load(folder + model_path, map_location=torch.device('cpu'))
     if not tune_bert:
         model.input_encoder.update(emb_f_name=dict_file,tuned_bert_embs_prefix=tuned_bert_embs_prefix)
     elif tune_bert and testing:
