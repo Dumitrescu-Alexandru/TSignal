@@ -14,17 +14,22 @@ from sp_data.sp6_data.read_extract_sp6_data import extract_raw_data
 def create_binary_test_file_from_fasta(data_path):
     if data_path[-3:] == "bin": # if it's already a binary, don't do anything
         return data_path.split("/")[-1]
-    fasta_sequences = SeqIO.parse(open(data_path),'fasta')
+    with open(data_path) as file:
+        fasta_sequences = SeqIO.parse(file, 'fasta')
+        fasta_sequences = [str(seq.seq) for seq in fasta_sequences]
+    fasta_sequences = [seq[:70] for seq in fasta_sequences]
     test_dictionary = {}
+
     for seq in fasta_sequences:
-        seq_ = str(seq.seq)
+        seq_ = seq
         true_lbl_placeholder = "#" * (len(seq_)//2 - 3)  + "UNKNOWN" + "#" * (len(seq_)//2 - 4)
         organism_grp_placeholder = "EUKARYA"
         sp_type_placeholder = "NO_SP"
         test_dictionary[seq_] = [np.array(1), true_lbl_placeholder, organism_grp_placeholder, sp_type_placeholder]
-    pickle.dump(test_dictionary, open(data_path.replace(".fasta", ".bin"), "wb"))
+    repl_string = "faa" if "faa" in data_path else "fasta"
+    pickle.dump(test_dictionary, open(data_path.replace(repl_string, ".bin"), "wb"))
     print("Created binary file for test set at {}.".format(data_path.replace(".fasta", ".bin")))
-    return data_path.split("/")[-1].replace(".fasta", ".bin")
+    return data_path.split("/")[-1].replace(repl_string, ".bin")
 
 def check_compatibility(tune_bert=True):
     data = pickle.load(open(get_data_folder()+"sp6_partitioned_data_train_0.bin", "rb"))
