@@ -6,6 +6,10 @@ The corresponding parameters (tune_bert, train_only_decoder) are required when t
 not trained using those, don't add them). Here we show a use case of our deployment model (see section 3.1 from README
 to download it)
 
+Useful parameters:
+    Add --verbose argument to the run command if you wish to print the results
+    Specify --output_file <output_file_name> (by default, results are saved to output.csv)
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 Example 2. Training run with parameters set to the ones which yielded the beste performance:

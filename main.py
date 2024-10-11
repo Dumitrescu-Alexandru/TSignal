@@ -135,6 +135,8 @@ def parse_arguments():
     parser.add_argument("--use_extra_oh", default=False,action="store_true")
     parser.add_argument("--use_aa_len", default=200, type=int, help="When training binary classifiers (not for TSignal).")
     parser.add_argument("--data", default="mammal", type=str, help="When training binary classifiers (not for TSignal).")
+    parser.add_argument("--output_file", default="", type=str, help="Specify output file name")
+    parser.add_argument("--verbouse", default=False, action="store_true", help="If true, print results when using test_seqs_w_pretrained_mdl")
 
     return parser.parse_args()
 
@@ -232,7 +234,8 @@ if __name__ == "__main__":
     if args.test_mdl and args.test_sptype_preds != "none":
         test_w_precomputed_sptypes(args)
     if args.test_seqs:
-        test_seqs_w_pretrained_mdl(args.test_mdl, args.test_seqs, tune_bert=args.tune_bert, saliency_map_save_fn=args.saliency_map_save_fn,hook_layer=args.hook_layer, compute_saliency=args.compute_saliency)
+        test_seqs_w_pretrained_mdl(args.test_mdl, args.test_seqs, tune_bert=args.tune_bert, saliency_map_save_fn=args.saliency_map_save_fn,hook_layer=args.hook_layer, compute_saliency=args.compute_saliency,
+                                   output_file=args.output_file, verbouse=args.verbouse)
     elif args.train_sp_type_predictor:
         logging.basicConfig(filename=args.run_name + ".log", level=logging.INFO)
 

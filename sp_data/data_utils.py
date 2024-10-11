@@ -15,18 +15,23 @@ def create_binary_test_file_from_fasta(data_path):
     if data_path[-3:] == "bin": # if it's already a binary, don't do anything
         return data_path.split("/")[-1]
     with open(data_path) as file:
-        fasta_sequences = SeqIO.parse(file, 'fasta')
-        fasta_sequences = [str(seq.seq) for seq in fasta_sequences]
+        fasta_elements = SeqIO.parse(file, 'fasta')
+        fasta_headers = [seq.description for seq in fasta_elements]
+    with open(data_path) as file:
+        fasta_elements = SeqIO.parse(file, 'fasta')
+        fasta_sequences = [str(seq.seq) for seq in fasta_elements]
+        
+        
     fasta_sequences = [seq[:70] for seq in fasta_sequences]
     test_dictionary = {}
 
-    for seq in fasta_sequences:
+    for h, seq in zip(fasta_headers, fasta_sequences):
         seq_ = seq
         true_lbl_placeholder = "#" * (len(seq_)//2 - 3)  + "UNKNOWN" + "#" * (len(seq_)//2 - 4)
         organism_grp_placeholder = "EUKARYA"
         sp_type_placeholder = "NO_SP"
-        test_dictionary[seq_] = [np.array(1), true_lbl_placeholder, organism_grp_placeholder, sp_type_placeholder]
-    repl_string = "faa" if "faa" in data_path else "fasta"
+        test_dictionary[seq_] = [np.array(1), true_lbl_placeholder, organism_grp_placeholder, sp_type_placeholder, h]
+    repl_string = ".faa" if ".faa" in data_path else ".fasta"
     pickle.dump(test_dictionary, open(data_path.replace(repl_string, ".bin"), "wb"))
     print("Created binary file for test set at {}.".format(data_path.replace(".fasta", ".bin")))
     return data_path.split("/")[-1].replace(repl_string, ".bin")
@@ -420,6 +425,7 @@ class CSPredsDataset(Dataset):
         self.glbl_lbl_2ind =glbl_lbl_2ind
         self.data_folder = data_folder
         self.lipbobox_predictions = lipbobox_predictions
+        self.header_info = []
         if partitions is not None:
             # when using partitions, the sp6 data partition files will be used in train/testing
             for p in partitions:
@@ -449,6 +455,8 @@ class CSPredsDataset(Dataset):
                     self.lbls.append(vals_[1])
                 self.life_grp.append(vals_[2])
                 self.glbl_lbl.append(vals_[3])
+                if len(vals_) == 5:
+                    self.header_info.append(vals_[4])
         if pick_seqs:
             # was used when i had memory leaks on grad computation of input wrt the prediction; probably will be deleted
             required_seqs=10

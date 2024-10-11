@@ -1,3 +1,4 @@
+import pandas as pd
 from copy import deepcopy
 from utils.swa_bn_update import update_bn
 from torch.optim.swa_utils import AveragedModel, SWALR
@@ -1863,7 +1864,7 @@ def train_cs_predictors(args):
             pos_fp_info.extend(false_positives)
 
 def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tune_bert=False, saliency_map_save_fn="save.bin",hook_layer="bert",
-                               lipbobox_predictions=False, compute_saliency=False):
+                               lipbobox_predictions=False, compute_saliency=False, output_file=""):
     folder = get_data_folder()
     sp_data = SPCSpredictionData(form_sp_reg_data=False, tune_bert=tune_bert)
     # hard-code this for now to check some sequences
@@ -1937,12 +1938,14 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
             all_outs.extend(some_output[1])
             all_seqs.extend(seqs)
             all_lbls.extend(lbl_seqs)
+    headers = sp_dataset.header_info
     pred_lbls = []
     true_lbls = []
     if compute_saliency:
         pickle.dump(all_seq_preds_grad_CSgrad,
                 open(folder+saliency_map_save_fn, "wb"))
-    for seq, pred, lbl in zip(all_seqs, all_outs,all_lbls):
+    results= {'headers':[], 'seqs':[], 'pred_lbls':[], 'SP_type_prob':[], 'CS_prob':[]}
+    for ind, (seq, pred, lbl) in enumerate(zip(all_seqs, all_outs,all_lbls)):
         if lbl[0] == "#": true_lbls.append(lbl) # if it's a placeholder (testing new sequences), don't do anything
         else: true_lbls.append("".join([ind2lbl[i] for i in lbl])[:70])
         pred_lbls.append("".join([ind2lbl[torch.argmax(out_wrd).item()] for out_wrd in pred if out_wrd != "ES"]))
@@ -1956,11 +1959,26 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
             cs_prob = pred_probs[cs_index+1]
         else:
             cs_prob = "N/A (no SP predicted)"
-
-        print("TRUE:", true_lbls[-1])
-        print("PRED:", pred_lbls[-1])
-        print("TYPE PROB:{}; CS PROB:{}".format(pred_probs[0], cs_prob))
-        print()
+        if len(headers): results['headers'].append(headers[ind])
+        results['seqs'].append(seq)
+        results['pred_lbls'].append(pred_lbls[-1])
+        results['SP_type_prob'].append(pred_probs[0])
+        results['CS_prob'].append(cs_prob)
+        if verbouse:
+            if len(headers): print(headers[ind])
+            print("SEQ:", seq)
+            print("TRUE:", true_lbls[-1])
+            print("PRED:", pred_lbls[-1])
+            print("TYPE PROB:{}; CS PROB:{}".format(pred_probs[0], cs_prob))
+            print()
+    df = pd.DataFrame(results)
+    if not output_file:
+        print("Result filename unspecified. Results are saved to {}".format("output.csv"))
+        df.to_csv("output.csv", index=False)
+    else:
+        output_file=output_file.replace(".csv","")+".csv" 
+        print(f"Results are saved to {output_file}")
+        df.to_csv(output_file, index=False)
 
 def test_w_precomputed_sptypes(args):
     partitions = [int(f) for f in args.train_folds]

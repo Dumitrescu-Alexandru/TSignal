@@ -259,8 +259,13 @@ class InputEmbeddingEncoder(nn.Module):
         if emb_f_name is not None:
             self.og2ind = pickle.load(open("sp6_dicts.bin", "rb"))[1]
             dict_ = pickle.load(open(self.data_folder + emb_f_name, "rb"))
-            seq2emb.update({seq: emb for seq, (emb, _, _, _) in dict_.items()})
-            self.seq2lg = {seq: self.og2ind[lg] for seq, (_, _, lg, _) in dict_.items()}
+            for seq, vals in dict_.items():
+                emb, lg = vals[0], vals[2]
+                seq2emb.update({seq: emb})
+                self.seq2lg.update({seq: self.og2ind[lg]})
+            # self.seq2lg = {seq: self.og2ind[lg] for seq, (_, _, lg, _) in dict_.items()}
+            # seq2emb.update({seq: emb for seq, (emb, _, _, _) in dict_.items()})
+            # self.seq2lg = {seq: self.og2ind[lg] for seq, (_, _, lg, _) in dict_.items()}
         else:
             for p in partitions:
                 for t in ["test", "train"]:
