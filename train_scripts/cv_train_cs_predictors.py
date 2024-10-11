@@ -1961,7 +1961,7 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
             cs_prob = "N/A (no SP predicted)"
         if len(headers): results['headers'].append(headers[ind])
         results['seqs'].append(seq)
-        results['pred_lbls'].append(pred_lbls[-1])
+        results['pred_lbls'].append(pred_lbls[-1].replace("ES",""))
         results['SP_type_prob'].append(pred_probs[0])
         results['CS_prob'].append(cs_prob)
         if verbouse:
