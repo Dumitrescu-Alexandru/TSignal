@@ -16,7 +16,7 @@ Use pip install -r requirements.txt
 
 **Necessary for reproducing the main results:** We use data from [3]. Add the necessary training
 binaries directly from [Link to CV files](https://www.dropbox.com/scl/fo/h3dyfr358optb7to5n9ma/h?dl=0&rlkey=iwvnr6bcklhtogiz9t3pterir) or download from [SignalP 6.0](https://services.healthtech.dtu.dk/service.php?SignalP-6.0) 
-the train_set.fasta file "SignalP 6.0 Training set" and add it to sp_data/sp6_data/ folder (in the latter case, the cross-validation binaries should automatically be created). In either case, please properly cite the authors of the homology-split data. The benchmark data on which we
+the train_set.fasta file "SignalP 6.0 Training set" and add it to sp_data/ folder (in the latter case, the cross-validation binaries should automatically be created). In either case, please properly cite the authors of the homology-split data. The benchmark data on which we
 report the results is found in "SignalP 5.0 Benchmark set", which can be found in the data section at the same link [SignalP 6.0](https://services.healthtech.dtu.dk/service.php?SignalP-6.0) (also add it to sp_data/). Note that results will be predicted for the whole homology-partitioned data, and the benchmark SignalP 5.0 data 
 will just specify which of those sequences to be accounted for in the final resultsbut in the functions of misc/visualization.py, it will be used to report performance on this data if specified so (to compare
 against SignalP 6.0 results reported in their manuscript for instance, do set benchmark=True).

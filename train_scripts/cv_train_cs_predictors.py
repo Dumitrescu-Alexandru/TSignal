@@ -1971,6 +1971,8 @@ def test_seqs_w_pretrained_mdl(model_f_name="", test_file="", verbouse=True, tun
             print("PRED:", pred_lbls[-1])
             print("TYPE PROB:{}; CS PROB:{}".format(pred_probs[0], cs_prob))
             print()
+    if not len(results['headers']):
+        results['headers'] = [""]*len(results['seqs'])
     df = pd.DataFrame(results)
     if not output_file:
         print("Result filename unspecified. Results are saved to {}".format("output.csv"))

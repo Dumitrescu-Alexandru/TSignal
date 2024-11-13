@@ -705,12 +705,7 @@ class SPbinaryData:
         return sequence_data, labels, names
 
     def get_data_folder(self):
-        if os.path.exists("/scratch/work/dumitra1"):
-            return "/scratch/work/dumitra1/sp_data/"
-        elif os.path.exists("/home/alex"):
-            return "sp_data/"
-        else:
-            return "/scratch/project2003818/dumitra1/sp_data/"
+        return "sp_data/"
 
 
 def collate_fn(batch):
@@ -751,12 +746,7 @@ class BinarySPDataset(Dataset):
 
 
 def get_data_folder():
-    if os.path.exists("/scratch/work/dumitra1"):
-        return "/scratch/work/dumitra1/sp_data/"
-    elif os.path.exists("/home/alex"):
-        return "sp_data/"
-    else:
-        return "sp_data/"
+    return "sp_data/"
 
 
 def get_sp_type_loss_weights():
