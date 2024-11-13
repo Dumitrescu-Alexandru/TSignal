@@ -12,6 +12,12 @@ Please install Python 3.7.7. Other versions are not guaranteed to work.
 
 Use pip install -r requirements.txt
 
+**IMPORTANT** Newer gpu architectures may not work out of the box because of incompatible cuda dependencies. If you encounter "RuntimeError: CUDA error: no kernel image is available for execution on the device", after installation, please additionally run (in the same environment):
+
+pip install torch==1.7.0+cu110  -f https://download.pytorch.org/whl/torch_stable.html
+
+Alternatively, if you only have a few sequences, you can also manually append  ` CUDA_VISIBLE_DEVICES="" ` in from of your run, which will force the run to be on CPU (e.g., `CUDA_VISIBLE_DEVICES="" python main.py  --test_seqs test_seqs.bin  --test_mdl deployment_sep_pe_swa_extra_inpemb_on_gen_best_eval_only_dec.pth --tune_bert --train_only_decoder`). Running on CPU may however be slow.
+
 ## 2 Data
 
 **Necessary for reproducing the main results:** We use data from [3]. Add the necessary training
